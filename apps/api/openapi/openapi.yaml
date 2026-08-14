@@ -1,0 +1,30 @@
+openapi: 3.1.0
+info:
+  title: YAFA VANAM Commerce API
+  version: 0.1.0
+servers:
+  - url: http://localhost:4000/api/v1
+paths:
+  /products/{slug}:
+    get:
+      summary: Get a sellable product with variants and merchandising data
+      parameters:
+        - in: path
+          name: slug
+          required: true
+          schema: { type: string }
+      responses:
+        "200":
+          description: Product response
+  /recommendations:
+    post:
+      summary: Request recommendations through the Go commerce gateway
+      responses:
+        "200":
+          description: Commerce-safe recommendation response
+  /admin/refunds:
+    post:
+      summary: Create a validated refund request
+      responses:
+        "202":
+          description: Refund workflow accepted

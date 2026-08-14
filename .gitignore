@@ -1,0 +1,39 @@
+# Node / Next.js
+node_modules/
+.next/
+dist/
+coverage/
+*.tsbuildinfo
+
+# Go
+apps/api/bin/
+*.test
+*.out
+
+# Python
+__pycache__/
+.venv/
+*.pyc
+.pytest_cache/
+
+# Secrets / local config
+.env
+.env.local
+.env.*.local
+
+# OS / editors
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+
+# Local catalogue source files
+data/raw/*.xlsx
+
+# npm
+npm-debug.log*
+
+# Local process logs
+*.err
+*.err.log
+*.out.log

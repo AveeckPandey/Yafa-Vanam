@@ -1,0 +1,2 @@
+"""YAFA VANAM scaffold module."""
+

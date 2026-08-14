@@ -1,0 +1,39 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: yafa_vanam
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d yafa_vanam"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  api:
+    build:
+      context: ./apps/api
+    environment:
+      API_PORT: 4000
+      DATABASE_URL: postgresql://postgres:postgres@postgres:5432/yafa_vanam?sslmode=disable
+      RECOMMENDATION_ENGINE_URL: http://recommendation-engine:8000
+    ports:
+      - "4000:4000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  recommendation-engine:
+    build:
+      context: .
+      dockerfile: services/recommendation-engine/Dockerfile
+    ports:
+      - "8000:8000"
+
+volumes:
+  postgres_data:

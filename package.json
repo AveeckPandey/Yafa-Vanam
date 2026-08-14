@@ -1,0 +1,17 @@
+{
+  "name": "yafa-vanam",
+  "private": true,
+  "workspaces": [
+    "apps/web"
+  ],
+  "scripts": {
+    "dev": "npm run dev:web",
+    "dev:web": "npm run dev --workspace=@yafa/web",
+    "dev:api": "cd apps/api && go run ./cmd/api",
+    "dev:worker": "cd apps/api && go run ./cmd/worker",
+    "build": "npm run build:web",
+    "build:web": "npm run build --workspace=@yafa/web",
+    "build:api": "cd apps/api && go build ./...",
+    "typecheck": "npm run typecheck --workspace=@yafa/web"
+  }
+}
