@@ -8,8 +8,8 @@ from typing import Any
 
 
 def _default_catalogue_path() -> Path:
-    # service/app/advisor/catalogue.py -> repo root/data/processed/products.json
-    return Path(__file__).resolve().parents[4] / "data" / "processed" / "products.json"
+    # service/app/advisor/catalogue.py -> repo root/data/processed/Product.json
+    return Path(__file__).resolve().parents[4] / "data" / "processed" / "Product.json"
 
 
 @lru_cache(maxsize=1)

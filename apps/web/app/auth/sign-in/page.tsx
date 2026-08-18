@@ -1,2 +1,5 @@
-// YAFA VANAM scaffold route. Replace this re-export when the page is implemented.
-export { default } from "@/components/layout/ScaffoldRoute";
+import AuthForm from "../AuthForm";
+
+export default function Page() {
+  return <AuthForm mode="sign-in" />;
+}

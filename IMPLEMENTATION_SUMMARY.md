@@ -4,7 +4,7 @@ Implemented on top of `YAFA_VANAM_GO_NPM_Architecture_Updated(1).zip` using the 
 
 ## Delivered
 
-- 78-product catalogue snapshot at `data/processed/products.json`.
+- 78-product catalogue snapshot at `data/processed/Product.json`.
 - Typed Beauty Profile and advisor sessions.
 - Adaptive goal/complexion/lips/eyes/cheeks/outfit quiz flow.
 - Dynamic 24-shade complexion choices from catalogue data.
@@ -23,9 +23,9 @@ Implemented on top of `YAFA_VANAM_GO_NPM_Architecture_Updated(1).zip` using the 
 - 11 deterministic Python tests.
 - Go monorepo test check and TypeScript/TSX syntax validation.
 
-## Intentionally not faked
+## Commerce backend update
 
-The supplied Go project does not yet implement its product/cart repositories or catalogue seed pipeline, so actual commerce sellability/cart writes cannot be truthfully completed from this baseline. Advisor responses carry exact `product_id + variant_id` and `commerce_validation_required=true`. Add-to-Bag controls are disabled until the Go commerce handler can validate and write cart state.
+The Go API now loads the 78-product catalogue, validates exact `product_id + variant_id` pairs, and owns anonymous cart writes and price totals. It also creates protected pending-payment orders with idempotency support. The storefront cart routes are connected to this API. Cart and pending-order persistence is currently process-local; PostgreSQL durability and Razorpay capture remain the next production phase.
 
 A real multimodal provider is also not configured in the supplied environment. The selfie/outfit API/UI interface exists, but returns `not_configured` rather than inventing a vision result.
 

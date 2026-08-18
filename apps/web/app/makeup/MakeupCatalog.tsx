@@ -2,7 +2,8 @@
 
 import Image from "next/image";
 import Link from "next/link";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { useSearchParams } from "next/navigation";
 import ProductCard from "@/components/product/ProductCard";
 import QuickShop from "@/components/product/QuickShop";
 import type { CatalogProduct, MakeupGroup } from "@/lib/catalog-types";
@@ -19,12 +20,35 @@ const categories: Array<{ value: MakeupFilter; label: string; image: string; alt
 
 const tabs: Array<{ value: MakeupFilter; label: string }> = [{ value: "all", label: "All" }, ...categories.map(({ value, label }) => ({ value, label }))];
 
+const queryCategoryMap: Record<string, MakeupFilter> = {
+  complexion: "face",
+  face: "face",
+  eyes: "eyes",
+  lips: "lips",
+  cheeks: "cheeks",
+};
+
+const queryTypeMap: Record<string, string[]> = {
+  foundation: ["Foundation"], "skin-tint": ["Skin Tint"], "powder-foundation": ["Powder Foundation"], concealer: ["Concealer"], "color-corrector": ["Color Corrector"], "face-primer": ["Face Primer"], "setting-powder": ["Setting Powder"], "setting-spray": ["Setting Spray"], bronzer: ["Bronzer"], contour: ["Contour"], highlighter: ["Highlighter"], mascara: ["Mascara"], eyeshadow: ["Eyeshadow"], eyeliner: ["Eyeliner"], brows: ["Brows"], "eye-sets": ["Eye Sets"], lipstick: ["Lip Color"], "lip-oil": ["Lip Oil"], "lip-gloss": ["Lip Gloss"], "lip-liner": ["Lip Liner"], "lip-stain": ["Lip Stain"], "lip-plumper": ["Lip Plumper"], blush: ["Blush"], "lip-cheek": ["Lip + Cheek"],
+};
+const noTypeFilter: string[] = [];
+
 export default function MakeupCatalog({ products }: { products: CatalogProduct[] }) {
+  const searchParams = useSearchParams();
   const [category, setCategory] = useState<MakeupFilter>("all");
   const [selectedTypes, setSelectedTypes] = useState<string[]>([]);
   const [sortOrder, setSortOrder] = useState<SortOrder>("featured");
   const [filterOpen, setFilterOpen] = useState(false);
   const [quickProduct, setQuickProduct] = useState<CatalogProduct | null>(null);
+  const requestedCategory = searchParams.get("category")?.toLowerCase() ?? null;
+  const requestedType = searchParams.get("type")?.toLowerCase() ?? null;
+  const resolvedCategory: MakeupFilter = requestedCategory ? queryCategoryMap[requestedCategory] ?? "all" : "all";
+  const resolvedTypes = requestedType ? queryTypeMap[requestedType] ?? noTypeFilter : noTypeFilter;
+
+  useEffect(() => {
+    setCategory(resolvedCategory);
+    setSelectedTypes(resolvedTypes);
+  }, [resolvedCategory, resolvedTypes]);
 
   const availableTypes = useMemo(() => Array.from(new Set(products.filter((product) => category === "all" || product.makeupGroup === category).map((product) => product.productType))).sort(), [category, products]);
   const visibleProducts = useMemo(() => {
@@ -43,6 +67,7 @@ export default function MakeupCatalog({ products }: { products: CatalogProduct[]
         <p>Home <span aria-hidden="true">/</span> Makeup</p>
         <div><span>The color ritual</span><h1 id="makeup-title">All Makeup</h1><strong>Color, complexion and definition — considered as one ritual.</strong></div>
         <nav className="makeup-category-nav" aria-label="Makeup categories">{categories.map((item) => <button key={item.value} type="button" className={category === item.value ? "is-active" : ""} aria-pressed={category === item.value} onClick={() => selectCategory(item.value)}><span><Image src={item.image} alt={item.alt} fill sizes="(max-width: 760px) 38vw, 180px" /></span><b>{item.label}</b></button>)}</nav>
+        <p className="collection-status" aria-live="polite">{requestedType && resolvedTypes.length ? `Showing ${requestedType.replaceAll("-", " ")}.` : requestedType ? `“${requestedType}” is not a recognised category. Showing all makeup.` : requestedCategory && !queryCategoryMap[requestedCategory] ? `“${requestedCategory}” is not a recognised collection. Showing all makeup.` : category === "all" ? "Showing all makeup" : `Showing ${tabs.find((tab) => tab.value === category)?.label.toLowerCase()} makeup`}</p>
       </section>
 
       <section className="collection-shop makeup-collection-shop" aria-label="Makeup collection">

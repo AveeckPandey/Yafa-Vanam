@@ -6,10 +6,13 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import type { CartResponse } from "@/lib/cart-types";
 import { formatCatalogPrice } from "@/lib/catalog-types";
 import { getCart, removeCartItem, updateCartItem } from "./cart-client";
+import { useRequireAuth } from "@/components/auth/AuthProvider";
+import { useRouter } from "next/navigation";
 
 const emptyCart: CartResponse = { items: [], itemCount: 0, subtotal: 0, currency: "INR" };
 
 export default function CartDrawer() {
+  const router = useRouter();
   const [open, setOpen] = useState(false);
   const [cart, setCart] = useState<CartResponse>(emptyCart);
   const [busyKey, setBusyKey] = useState<string | null>(null);
@@ -17,6 +20,7 @@ export default function CartDrawer() {
   const previousFocus = useRef<HTMLElement | null>(null);
 
   const close = useCallback(() => setOpen(false), []);
+  const checkout = useRequireAuth(() => { close(); router.push("/checkout"); });
 
   useEffect(() => {
     getCart().then(setCart).catch(() => undefined);
@@ -121,7 +125,7 @@ export default function CartDrawer() {
           <footer>
             <div><span>Subtotal</span><strong>{formatCatalogPrice(cart.currency, cart.subtotal)}</strong></div>
             <p>Shipping and tax are calculated at checkout.</p>
-            <Link href="/checkout" onClick={close}>Checkout</Link>
+            <button type="button" onClick={checkout}>Checkout</button>
             <button type="button" onClick={close}>Continue shopping</button>
           </footer>
         ) : null}

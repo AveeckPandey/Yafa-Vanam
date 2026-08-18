@@ -16,7 +16,14 @@ type SourceProduct = {
   variants: Array<{
     id: string;
     size: string | null;
-    shade: { name: string; hex: string | null } | null;
+    shade: {
+      name: string | null;
+      code?: string | null;
+      hex: string | null;
+      undertone?: string | null;
+      depth_index?: number | null;
+      depth_family?: string | null;
+    } | null;
     price: number;
     is_active: boolean;
   }>;
@@ -143,6 +150,27 @@ function getMakeupGroup(product: SourceProduct): MakeupGroup | null {
 
 const sources = productData as unknown as SourceProduct[];
 
+const shadeDepths = ["#f3d6bf", "#e7bd98", "#d69e76", "#ba7b54", "#955a3d", "#72402d", "#4f2b22", "#321b18"];
+
+function titleCase(value: string) {
+  return value.replace(/\b\w/g, (letter) => letter.toUpperCase());
+}
+
+function shadePreviewHex(shade: NonNullable<SourceProduct["variants"][number]["shade"]>) {
+  if (shade.hex) return shade.hex;
+  const depth = Math.max(1, Math.min(shadeDepths.length, Math.round(shade.depth_index ?? 4)));
+  const base = shadeDepths[depth - 1];
+  if (shade.undertone === "cool") return base.replace("#", "#");
+  return base;
+}
+
+function shadeLabel(shade: NonNullable<SourceProduct["variants"][number]["shade"]>) {
+  if (shade.name?.trim()) return shade.name.trim();
+  return [shade.code, shade.depth_family && titleCase(shade.depth_family), shade.undertone && titleCase(shade.undertone)]
+    .filter(Boolean)
+    .join(" ");
+}
+
 function mapProduct(product: SourceProduct): CatalogProduct {
   const activeVariants = product.variants.filter((variant) => variant.is_active);
   const primary = makeupProductImageManifest[product.id]
@@ -177,7 +205,12 @@ function mapProduct(product: SourceProduct): CatalogProduct {
       id: variant.id,
       size: variant.size,
       shade: variant.shade
-        ? { name: variant.shade.name, hex: variant.shade.hex }
+        ? {
+            name: shadeLabel(variant.shade),
+            code: variant.shade.code ?? null,
+            undertone: variant.shade.undertone ?? null,
+            hex: shadePreviewHex(variant.shade),
+          }
         : null,
       price: variant.price,
       isActive: variant.is_active,

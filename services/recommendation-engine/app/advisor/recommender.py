@@ -5,8 +5,8 @@ import re
 from typing import Any, Iterable
 
 from .catalogue import active_products, variant_is_available
-from .models import BeautyProfile, Recommendation, ScoreReason, ShadeResult
-from .shade_matcher import brightening_variant, exact_match_variant, suitable_supporting_variant
+from .models import BeautyProfile, Recommendation, ScoreReason
+from .shade_matcher import brightening_variant, exact_match_variant, shade_result, suitable_supporting_variant
 
 OCCASION_MAP = {
     "everyday": "daily", "work_college": "daily", "date_dinner": "evening", "party_night": "evening",
@@ -187,7 +187,7 @@ def _make_rec(product: dict[str, Any], variant: dict[str, Any] | None, score: fl
     if variant:
         variant_id = variant.get("id")
         s = variant.get("shade") or {}
-        shade = ShadeResult(code=s.get("code"), name=s.get("name"), hex=s.get("hex"))
+        shade = shade_result(s)
     return Recommendation(
         category=str(product.get("subcategory") or product.get("category") or "makeup"),
         product_id=product["id"], product_name=product["name"], product_slug=product["slug"],

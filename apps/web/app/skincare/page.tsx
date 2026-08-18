@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { Suspense } from "react";
 import SkinCareCatalog from "./SkinCareCatalog";
 import { getSkincareProducts } from "@/lib/catalog";
 
@@ -8,5 +9,5 @@ export const metadata: Metadata = {
 };
 
 export default function SkinCarePage() {
-  return <SkinCareCatalog products={getSkincareProducts()} />;
+  return <Suspense fallback={<main id="main-content" className="skincare-collection-page" />}><SkinCareCatalog products={getSkincareProducts()} /></Suspense>;
 }

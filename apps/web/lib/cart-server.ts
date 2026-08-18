@@ -1,57 +1,45 @@
 import "server-only";
+import type { NextRequest } from "next/server";
 import type { CartResponse } from "./cart-types";
+import { commerceApi, CommerceApiError, type ApiCart } from "./commerce-api";
 import { getProductById } from "./catalog";
 
-export const CART_COOKIE = "yafa-cart-v1";
+export const CART_COOKIE = "yafa-cart-id";
 
-export type StoredCartLine = {
-  productId: string;
-  variantId: string;
-  quantity: number;
-};
-
-export function decodeCart(value?: string): StoredCartLine[] {
-  if (!value) return [];
-  try {
-    const parsed = JSON.parse(Buffer.from(value, "base64url").toString("utf8"));
-    return Array.isArray(parsed) ? parsed : [];
-  } catch {
-    return [];
-  }
-}
-
-export function encodeCart(items: StoredCartLine[]) {
-  return Buffer.from(JSON.stringify(items), "utf8").toString("base64url");
-}
-
-export function hydrateCart(stored: StoredCartLine[]): CartResponse {
-  const items = stored.flatMap((line) => {
-    const product = getProductById(line.productId);
-    const variant = product?.variants.find(
-      (candidate) => candidate.id === line.variantId && candidate.isActive,
-    );
-    if (!product || !variant || !Number.isInteger(line.quantity) || line.quantity < 1) return [];
-
-    return [{
-      key: `${product.id}:${variant.id}`,
-      productId: product.id,
-      variantId: variant.id,
-      name: product.name,
-      slug: product.slug,
-      productType: product.productType,
-      currency: product.currency,
-      unitPrice: variant.price,
-      quantity: Math.min(line.quantity, 20),
-      size: variant.size,
-      shade: variant.shade?.name ?? null,
-      image: product.image,
-    }];
-  });
-
+export function toCartResponse(cart: ApiCart): CartResponse {
   return {
-    items,
-    itemCount: items.reduce((total, item) => total + item.quantity, 0),
-    subtotal: items.reduce((total, item) => total + item.unitPrice * item.quantity, 0),
-    currency: items[0]?.currency ?? "INR",
+    items: cart.items.map((line) => {
+      const localProduct = getProductById(line.product_id);
+      return {
+        key: line.key,
+        productId: line.product_id,
+        variantId: line.variant_id,
+        name: line.name,
+        slug: line.slug,
+        productType: line.product_type,
+        currency: line.currency,
+        unitPrice: line.unit_price,
+        quantity: line.quantity,
+        size: line.size,
+        shade: line.shade,
+        image: localProduct?.image || line.image || "/images/hero/yafa-vanam-soft-colour.png",
+      };
+    }),
+    itemCount: cart.item_count,
+    subtotal: cart.subtotal,
+    currency: cart.currency,
   };
+}
+
+export async function getOrCreateCart(request: NextRequest) {
+	const authCookie = request.headers.get("cookie") || undefined;
+  const existingId = request.cookies.get(CART_COOKIE)?.value;
+  if (existingId) {
+    try {
+      return { cart: await commerceApi.getCart(existingId, authCookie), created: false };
+    } catch (error) {
+      if (!(error instanceof CommerceApiError) || error.status !== 404) throw error;
+    }
+  }
+  return { cart: await commerceApi.createCart(authCookie), created: true };
 }

@@ -23,6 +23,23 @@ UNDERTONE_CODE = {
 }
 EXACT_MATCH_TYPES = {"Foundation", "Skin Tint", "Powder Foundation", "Concealer"}
 
+# The current normalized catalogue preserves master shade codes but some
+# complexion rows do not yet repeat the friendly display metadata. Keep the
+# canonical naming fallback at the matching boundary instead of inventing it
+# separately in each recommendation path.
+MASTER_SHADE_NAMES = {
+    "5O": "Olive Honey",
+}
+
+
+def shade_result(shade: dict[str, Any]) -> ShadeResult:
+    code = shade.get("code")
+    return ShadeResult(
+        code=code,
+        name=shade.get("name") or MASTER_SHADE_NAMES.get(code),
+        hex=shade.get("hex"),
+    )
+
 
 def master_code(depth: str | None, undertone: str | None) -> str | None:
     if not depth or not undertone:
@@ -61,7 +78,7 @@ def resolve_master_shade(profile: BeautyProfile) -> ShadeResult | None:
         variant = variant_for_code(product, code)
         if variant:
             shade = variant.get("shade") or {}
-            return ShadeResult(code=shade.get("code"), name=shade.get("name"), hex=shade.get("hex"))
+            return shade_result(shade)
     return None
 
 

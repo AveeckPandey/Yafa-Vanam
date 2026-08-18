@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { addCartItem } from "@/components/cart/cart-client";
+import { useRequireAuth } from "@/components/auth/AuthProvider";
 
 export default function AddToBag({ productId, variantId, quantity, className = "" }: { productId: string; variantId: string; quantity: number; className?: string }) {
   const [busy, setBusy] = useState(false);
@@ -19,10 +20,11 @@ export default function AddToBag({ productId, variantId, quantity, className = "
       setBusy(false);
     }
   };
+  const requireAuthThenAdd = useRequireAuth(add);
 
   return (
     <>
-      <button className={className} type="button" disabled={busy} onClick={add}>{busy ? "Adding…" : "Add to Bag"}</button>
+      <button className={className} type="button" disabled={busy} onClick={requireAuthThenAdd}>{busy ? "Adding…" : "Add to Bag"}</button>
       <span className="visually-hidden" aria-live="polite">{message}</span>
     </>
   );

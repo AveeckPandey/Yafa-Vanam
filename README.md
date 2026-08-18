@@ -51,6 +51,8 @@ go run ./cmd/api
 
 Health check: `http://localhost:4000/health`.
 
+Commerce endpoints: `http://localhost:4000/api/v1`. The current vertical slice includes products, categories, anonymous carts, and pending-payment orders. See `docs/api.md` for the contract and persistence boundary.
+
 ### Next.js
 
 Install Node.js/npm if needed, then:

@@ -63,9 +63,9 @@ V1 uses a thread-safe 24-hour in-memory `InMemorySessionStore`. It is intentiona
 
 Saved long-term Beauty Profiles are not enabled by default. Do not persist selfies by default; obtain consent before saving optional profile data.
 
-## Commerce integration gap
+## Commerce integration
 
-The current Go commerce project in the supplied ZIP is itself still a scaffold: its HTTP server exposes health/API metadata but does not yet implement a cart/product repository. The advisor therefore does not fake cart writes. Recommendation cards identify exact `product_id + variant_id`; wire these IDs into the Go cart/sellability APIs when those commerce handlers are implemented.
+The Go commerce service now validates exact `product_id + variant_id` pairs and owns anonymous cart writes and price totals. Recommendation cards can send these IDs through the storefront `/api/cart` adapter. Durable PostgreSQL cart persistence and direct complete-look bundle actions remain follow-up work.
 
 ## Analytics events
 

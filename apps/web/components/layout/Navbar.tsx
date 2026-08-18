@@ -13,6 +13,7 @@ import {
 import AnnouncementBar from "./AnnouncementBar";
 import MegaMenu, { type MegaMenuKey } from "./MegaMenu";
 import MobileMenu from "./MobileMenu";
+import { useAuth } from "@/components/auth/AuthProvider";
 
 type MenuTrigger = {
   label: string;
@@ -46,6 +47,7 @@ export default function Navbar() {
   const [activeMenu, setActiveMenu] = useState<MegaMenuKey | null>(null);
   const [mobileOpen, setMobileOpen] = useState(false);
   const [bagCount, setBagCount] = useState(0);
+  const { isAuthenticated, openAuth, logout } = useAuth();
 
   const closeDesktopMenu = useCallback(() => setActiveMenu(null), []);
 
@@ -146,9 +148,9 @@ export default function Navbar() {
           <Link href="/search" aria-label="Search">
             <ActionIcon type="search" />
           </Link>
-          <Link href="/account" aria-label="My account">
+          <button type="button" aria-label={isAuthenticated ? "Sign out" : "Sign in"} onClick={() => isAuthenticated ? void logout() : openAuth()}>
             <ActionIcon type="account" />
-          </Link>
+          </button>
           <button className="utility-nav__bag-button" type="button" aria-label={`Open shopping bag, ${bagCount} ${bagCount === 1 ? "item" : "items"}`} onClick={() => window.dispatchEvent(new Event("yafa-cart-open"))}>
             <ActionIcon type="bag" />
             <span className="utility-nav__bag-count" aria-hidden="true">{bagCount}</span>

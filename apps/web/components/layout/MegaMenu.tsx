@@ -27,7 +27,7 @@ const menuContent: Record<MegaMenuKey, MenuContent> = {
         title: "Hydrate", links: [{ label: "Moisturizers", href: "/skincare?category=moisturisers" }],
         groups: [
           { title: "Protect", links: [{ label: "Sunscreen", href: "/skincare?category=sun-care" }] },
-          { title: "Scalp Care", links: [{ label: "Scalp Tonic", href: "/body-care?category=scalp" }] },
+          { title: "Scalp Care", links: [{ label: "Scalp Tonic", href: "/skincare?category=scalp-care" }] },
         ],
       },
     ],
@@ -36,18 +36,18 @@ const menuContent: Record<MegaMenuKey, MenuContent> = {
   makeup: {
     eyebrow: "Colour with intention", title: "Make Up", shopAllHref: "/makeup",
     columns: [
-      { title: "Face", links: [{ label: "Foundation", href: "/makeup?category=complexion" }, { label: "Skin Tint", href: "/makeup?category=complexion" }, { label: "Powder Foundation", href: "/makeup?category=complexion" }, { label: "Concealer", href: "/makeup?category=complexion" }, { label: "Color Corrector", href: "/makeup?category=complexion" }, { label: "Face Primer", href: "/makeup?category=complexion" }, { label: "Setting Powder", href: "/makeup?category=complexion" }, { label: "Setting Spray", href: "/makeup?category=complexion" }, { label: "Bronzer", href: "/makeup?category=cheeks" }, { label: "Contour", href: "/makeup?category=cheeks" }, { label: "Highlighter", href: "/makeup?category=cheeks" }] },
-      { title: "Eyes", links: [{ label: "Mascara", href: "/makeup?category=eyes" }, { label: "Eyeshadow", href: "/makeup?category=eyes" }, { label: "Eyeliner", href: "/makeup?category=eyes" }, { label: "Brows", href: "/makeup?category=eyes" }, { label: "Eye Sets", href: "/makeup?category=eyes" }] },
-      { title: "Lips", links: [{ label: "Lipstick", href: "/makeup?category=lips" }, { label: "Lip Oil", href: "/makeup?category=lips" }, { label: "Lip Gloss", href: "/makeup?category=lips" }, { label: "Lip Liner", href: "/makeup?category=lips" }, { label: "Lip Stain", href: "/makeup?category=lips" }, { label: "Lip Plumper", href: "/makeup?category=lips" }] },
-      { title: "Cheeks", links: [{ label: "Blush", href: "/makeup?category=cheeks" }, { label: "Lip + Cheek", href: "/makeup?category=cheeks" }] },
+      { title: "Face", links: [{ label: "Foundation", href: "/makeup?category=face&type=foundation" }, { label: "Skin Tint", href: "/makeup?category=face&type=skin-tint" }, { label: "Powder Foundation", href: "/makeup?category=face&type=powder-foundation" }, { label: "Concealer", href: "/makeup?category=face&type=concealer" }, { label: "Color Corrector", href: "/makeup?category=face&type=color-corrector" }, { label: "Face Primer", href: "/makeup?category=face&type=face-primer" }, { label: "Setting Powder", href: "/makeup?category=face&type=setting-powder" }, { label: "Setting Spray", href: "/makeup?category=face&type=setting-spray" }, { label: "Bronzer", href: "/makeup?category=face&type=bronzer" }, { label: "Contour", href: "/makeup?category=face&type=contour" }, { label: "Highlighter", href: "/makeup?category=face&type=highlighter" }] },
+      { title: "Eyes", links: [{ label: "Mascara", href: "/makeup?category=eyes&type=mascara" }, { label: "Eyeshadow", href: "/makeup?category=eyes&type=eyeshadow" }, { label: "Eyeliner", href: "/makeup?category=eyes&type=eyeliner" }, { label: "Brows", href: "/makeup?category=eyes&type=brows" }, { label: "Eye Sets", href: "/makeup?category=eyes&type=eye-sets" }] },
+      { title: "Lips", links: [{ label: "Lipstick", href: "/makeup?category=lips&type=lipstick" }, { label: "Lip Oil", href: "/makeup?category=lips&type=lip-oil" }, { label: "Lip Gloss", href: "/makeup?category=lips&type=lip-gloss" }, { label: "Lip Liner", href: "/makeup?category=lips&type=lip-liner" }, { label: "Lip Stain", href: "/makeup?category=lips&type=lip-stain" }, { label: "Lip Plumper", href: "/makeup?category=lips&type=lip-plumper" }] },
+      { title: "Cheeks", links: [{ label: "Blush", href: "/makeup?category=cheeks&type=blush" }, { label: "Lip + Cheek", href: "/makeup?category=cheeks&type=lip-cheek" }] },
     ],
     feature: { image: "/images/hero/yafa-vanam-cheek-collection.png", imagePosition: "80% center", label: "Petal-soft colour", title: "A fresh flush with a luminous finish", href: "/makeup?category=cheeks" },
   },
   body: {
     eyebrow: "Care from head to toe", title: "Body Care", shopAllHref: "/body-care",
     columns: [
-      { title: "Body Moisturizers", links: [{ label: "Body Butter", href: "/body-care?category=moisturisers" }] },
-      { title: "Hand & Foot Care", links: [{ label: "Hand Cream", href: "/body-care?category=hand-care" }, { label: "Foot Cream", href: "/body-care?category=foot-care" }] },
+      { title: "Body Moisturizers", links: [{ label: "Body Butter", href: "/body-care?type=body-butter" }] },
+      { title: "Hand & Foot Care", links: [{ label: "Hand Cream", href: "/body-care?type=hand-cream" }, { label: "Foot Cream", href: "/body-care?type=foot-cream" }] },
     ],
     feature: { image: "/images/hero/yafa-vanam-soft-colour.png", imagePosition: "88% center", label: "Daily rituals", title: "Care that feels as good as it performs", href: "/body-care" },
   },

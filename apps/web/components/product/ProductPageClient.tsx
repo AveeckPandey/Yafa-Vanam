@@ -65,8 +65,8 @@ export default function ProductPageClient({
               {variantOptions.length > 0 ? (
                 <fieldset className="pdp-shade-selector">
                   <legend>{variantOptions.some((variant) => variant.shade) ? "Choose shade" : "Choose option"}</legend>
-                  <div>{variantOptions.map((variant) => <button key={variant.id} type="button" className={variantId === variant.id ? "is-selected" : ""} aria-pressed={variantId === variant.id} aria-label={`Select ${variant.shade?.name ?? variant.size ?? "option"}`} onClick={() => setVariantId(variant.id)}>{variant.shade?.hex ? <i style={{ backgroundColor: variant.shade.hex }} aria-hidden="true" /> : null}<span>{variant.size ?? variant.shade?.name}</span></button>)}</div>
-                  <p aria-live="polite">Selected: <strong>{selected?.shade?.name ?? selected?.size ?? "Default option"}</strong></p>
+                  <div>{variantOptions.map((variant) => <button key={variant.id} type="button" className={variantId === variant.id ? "is-selected" : ""} aria-pressed={variantId === variant.id} aria-label={`Select ${variant.shade?.name ?? variant.size ?? "option"}`} onClick={() => setVariantId(variant.id)}>{variant.shade?.hex ? <i style={{ backgroundColor: variant.shade.hex }} aria-hidden="true" /> : null}<span>{variant.size ?? variant.shade?.code ?? variant.shade?.name}</span></button>)}</div>
+                  <p aria-live="polite">Selected: <strong>{selected?.shade?.name ?? selected?.size ?? "Standard option"}</strong></p>
                 </fieldset>
               ) : null}
               <div className="pdp-purchase__row">
@@ -88,7 +88,7 @@ export default function ProductPageClient({
               {product.usage.amount ? <p>Amount: {product.usage.amount}</p> : null}
             </ProductAccordion>
             <ProductAccordion title="Ingredients">
-              {product.ingredients.fullInci ? <p>{product.ingredients.fullInci}</p> : <p>Final ingredient list will be published with the approved production formula.</p>}
+              {product.ingredients.fullInci ? <p>{product.ingredients.fullInci}</p> : <p>The complete ingredient list is included on the product packaging. Contact us before purchase if you need ingredient guidance.</p>}
             </ProductAccordion>
             {product.warnings.length ? (
               <ProductAccordion title="Warnings"><ul>{product.warnings.map((warning) => <li key={warning}>{warning}</li>)}</ul></ProductAccordion>
@@ -151,7 +151,7 @@ export default function ProductPageClient({
 
       <section className="reviews-empty" aria-labelledby="reviews-title">
         <div><p>Customer reflections</p><h2 id="reviews-title">Reviews</h2></div>
-        <div><span aria-hidden="true">☆ ☆ ☆ ☆ ☆</span><h3>No reviews yet</h3><p>Be the first to review this product when verified customer reviews become available.</p><button type="button" disabled>Write a review</button></div>
+        <div><span aria-hidden="true">☆ ☆ ☆ ☆ ☆</span><h3>No reviews yet</h3><p>We are preparing verified customer reviews. In the meantime, explore the product details, ingredients and delivery information above.</p><span className="reviews-empty__coming">Reviews coming soon</span></div>
       </section>
 
       {related.length > 0 ? (

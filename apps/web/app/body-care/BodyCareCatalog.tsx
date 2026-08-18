@@ -1,7 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { useSearchParams } from "next/navigation";
 import ProductCard from "@/components/product/ProductCard";
 import QuickShop from "@/components/product/QuickShop";
 import type { BodyCareGroup, CatalogProduct } from "@/lib/catalog-types";
@@ -20,12 +21,28 @@ const bodyCareGroups: Array<{ value: BodyCareGroup; label: string }> = [
   { value: "hand-foot-care", label: "Hand & Foot" },
 ];
 
+const typeQueryMap: Record<string, string> = {
+  "body-butter": "Body Butter",
+  "hand-cream": "Hand Cream",
+  "foot-cream": "Foot Cream",
+};
+
 export default function BodyCareCatalog({ products }: { products: CatalogProduct[] }) {
+  const searchParams = useSearchParams();
   const [category, setCategory] = useState<BodyCareFilter>("all");
   const [sortOrder, setSortOrder] = useState<SortOrder>("featured");
   const [selectedGroups, setSelectedGroups] = useState<BodyCareGroup[]>([]);
+  const [selectedTypes, setSelectedTypes] = useState<string[]>([]);
   const [filterOpen, setFilterOpen] = useState(false);
   const [quickProduct, setQuickProduct] = useState<CatalogProduct | null>(null);
+  const requestedType = searchParams.get("type")?.toLowerCase() ?? null;
+  const resolvedType = requestedType ? typeQueryMap[requestedType] : null;
+
+  useEffect(() => {
+    setCategory("all");
+    setSelectedGroups([]);
+    setSelectedTypes(resolvedType ? [resolvedType] : []);
+  }, [resolvedType]);
 
   const visibleProducts = useMemo(() => {
     const activeTab = collectionTabs.find((tab) => tab.value === category)!;
@@ -33,16 +50,17 @@ export default function BodyCareCatalog({ products }: { products: CatalogProduct
       const group = product.bodyCareGroup;
       if (!group) return false;
       const matchesTab = category === "all" || activeTab.groups.includes(group);
-      return matchesTab && (selectedGroups.length === 0 || selectedGroups.includes(group));
+      return matchesTab && (selectedGroups.length === 0 || selectedGroups.includes(group)) && (selectedTypes.length === 0 || selectedTypes.includes(product.productType));
     });
     if (sortOrder === "price-asc") return [...filtered].sort((a, b) => a.price - b.price);
     if (sortOrder === "price-desc") return [...filtered].sort((a, b) => b.price - a.price);
     if (sortOrder === "name") return [...filtered].sort((a, b) => a.name.localeCompare(b.name));
     return filtered;
-  }, [category, products, selectedGroups, sortOrder]);
+  }, [category, products, selectedGroups, selectedTypes, sortOrder]);
 
   const groupCount = (group: BodyCareGroup) => products.filter((product) => product.bodyCareGroup === group).length;
-  const showEditorialTile = category === "all" && selectedGroups.length === 0 && sortOrder === "featured";
+  const showEditorialTile = category === "all" && selectedGroups.length === 0 && selectedTypes.length === 0 && sortOrder === "featured";
+  const selectCategory = (next: BodyCareFilter) => { setCategory(next); setSelectedGroups([]); setSelectedTypes([]); };
 
   return (
     <main id="main-content" className="bodycare-collection-page">
@@ -55,7 +73,7 @@ export default function BodyCareCatalog({ products }: { products: CatalogProduct
       <section className="collection-shop" aria-label="Body Care collection">
         <div className="collection-toolbar">
           <div className="collection-tabs" role="group" aria-label="Filter by Body Care category">
-            {collectionTabs.map((item) => <button key={item.value} type="button" className={category === item.value ? "is-active" : ""} aria-pressed={category === item.value} onClick={() => setCategory(item.value)}>{item.label}</button>)}
+            {collectionTabs.map((item) => <button key={item.value} type="button" className={category === item.value && selectedTypes.length === 0 ? "is-active" : ""} aria-pressed={category === item.value && selectedTypes.length === 0} onClick={() => selectCategory(item.value)}>{item.label}</button>)}
           </div>
           <div className="collection-toolbar__actions">
             <button type="button" onClick={() => setFilterOpen(true)}><span aria-hidden="true">☷</span> Filter{selectedGroups.length ? ` (${selectedGroups.length})` : ""}</button>
@@ -63,6 +81,7 @@ export default function BodyCareCatalog({ products }: { products: CatalogProduct
             <p>{visibleProducts.length} {visibleProducts.length === 1 ? "product" : "products"}</p>
           </div>
         </div>
+        {requestedType ? <p className="collection-status" aria-live="polite">{resolvedType ? `Showing ${resolvedType.toLowerCase()}.` : `“${requestedType}” is not a recognised category. Showing all body care.`}</p> : null}
 
         <div className="commerce-grid">
           {visibleProducts.map((product, index) => <div className="commerce-grid__item" key={product.id}><ProductCard product={product} onQuickShop={setQuickProduct} eager={index < 3} /></div>)}

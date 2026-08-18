@@ -2,7 +2,8 @@
 
 import Image from "next/image";
 import Link from "next/link";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { useSearchParams } from "next/navigation";
 import ProductCard from "@/components/product/ProductCard";
 import QuickShop from "@/components/product/QuickShop";
 import type { CatalogProduct, SkincareGroup } from "@/lib/catalog-types";
@@ -30,12 +31,35 @@ const skincareGroups: Array<{ value: SkincareGroup; label: string }> = [
   { value: "scalp-care", label: "Scalp Care" },
 ];
 
+const queryGroupMap: Record<string, SkincareGroup> = {
+  cleansers: "cleansers",
+  serums: "serums-treatments",
+  "serums-treatments": "serums-treatments",
+  "eye-care": "eye-care",
+  "lip-care": "lip-care",
+  masks: "masks-exfoliation",
+  "masks-exfoliation": "masks-exfoliation",
+  moisturisers: "moisturizers",
+  moisturizers: "moisturizers",
+  "sun-care": "sunscreen",
+  sunscreen: "sunscreen",
+  "scalp-care": "scalp-care",
+};
+
 export default function SkinCareCatalog({ products }: { products: CatalogProduct[] }) {
+  const searchParams = useSearchParams();
   const [category, setCategory] = useState<SkinCareFilter>("all");
   const [sortOrder, setSortOrder] = useState<SortOrder>("featured");
   const [selectedGroups, setSelectedGroups] = useState<SkincareGroup[]>([]);
   const [filterOpen, setFilterOpen] = useState(false);
   const [quickProduct, setQuickProduct] = useState<CatalogProduct | null>(null);
+  const requestedCategory = searchParams.get("category")?.toLowerCase() ?? null;
+  const requestedGroup = requestedCategory ? queryGroupMap[requestedCategory] : null;
+
+  useEffect(() => {
+    setCategory("all");
+    setSelectedGroups(requestedGroup ? [requestedGroup] : []);
+  }, [requestedGroup]);
 
   const visibleProducts = useMemo(() => {
     const activeTab = collectionTabs.find((tab) => tab.value === category)!;
@@ -52,6 +76,7 @@ export default function SkinCareCatalog({ products }: { products: CatalogProduct
   }, [category, products, selectedGroups, sortOrder]);
 
   const groupCount = (group: SkincareGroup) => products.filter((product) => product.skincareGroup === group).length;
+  const selectCategory = (next: SkinCareFilter) => { setCategory(next); setSelectedGroups([]); };
 
   return (
     <main id="main-content" className="skincare-collection-page">
@@ -65,7 +90,7 @@ export default function SkinCareCatalog({ products }: { products: CatalogProduct
         <div className="collection-toolbar">
           <div className="collection-tabs" role="group" aria-label="Filter by Skin Care routine step">
             {collectionTabs.map((item) => (
-              <button key={item.value} type="button" className={category === item.value ? "is-active" : ""} aria-pressed={category === item.value} onClick={() => setCategory(item.value)}>
+              <button key={item.value} type="button" className={category === item.value && selectedGroups.length === 0 ? "is-active" : ""} aria-pressed={category === item.value && selectedGroups.length === 0} onClick={() => selectCategory(item.value)}>
                 {item.label}
               </button>
             ))}
@@ -76,6 +101,7 @@ export default function SkinCareCatalog({ products }: { products: CatalogProduct
             <p>{visibleProducts.length} {visibleProducts.length === 1 ? "product" : "products"}</p>
           </div>
         </div>
+        {requestedCategory ? <p className="collection-status" aria-live="polite">{requestedGroup ? `Showing ${skincareGroups.find((group) => group.value === requestedGroup)?.label.toLowerCase()}.` : `“${requestedCategory}” is not a recognised category. Showing all skin care.`}</p> : null}
 
         <div className="commerce-grid">
           {visibleProducts.map((product, index) => (

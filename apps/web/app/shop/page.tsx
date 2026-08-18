@@ -1,1 +1,6 @@
-export default function Page(){return <main className="route-page"><h1>Shop</h1><p>YAFA VANAM Shop.</p></main>}
+import ShopCatalog from "./ShopCatalog";
+import { getAllCatalogProducts } from "@/lib/catalog";
+
+export default function Page() {
+  return <ShopCatalog products={getAllCatalogProducts()} />;
+}

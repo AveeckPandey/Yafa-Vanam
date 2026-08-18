@@ -1,7 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { z } from "zod";
-import { CART_COOKIE, decodeCart, encodeCart, hydrateCart } from "@/lib/cart-server";
-import { getProductById } from "@/lib/catalog";
+import { CART_COOKIE, getOrCreateCart, toCartResponse } from "@/lib/cart-server";
+import { commerceApi, CommerceApiError } from "@/lib/commerce-api";
 
 const addSchema = z.object({
   product_id: z.string().min(1),
@@ -9,12 +9,32 @@ const addSchema = z.object({
   quantity: z.number().int().min(1).max(20),
 });
 
-function cartResponse(request: NextRequest) {
-  return hydrateCart(decodeCart(request.cookies.get(CART_COOKIE)?.value));
+function withCartCookie(response: NextResponse, cartId: string) {
+  response.cookies.set(CART_COOKIE, cartId, {
+    httpOnly: true,
+    sameSite: "lax",
+    secure: process.env.NODE_ENV === "production",
+    path: "/",
+    maxAge: 60 * 60 * 24 * 30,
+  });
+  return response;
+}
+
+function apiError(error: unknown) {
+  if (error instanceof CommerceApiError) {
+    return NextResponse.json({ error: error.message }, { status: error.status });
+  }
+  return NextResponse.json({ error: "An unexpected cart error occurred." }, { status: 500 });
 }
 
 export async function GET(request: NextRequest) {
-  return NextResponse.json(cartResponse(request));
+  try {
+    const { cart, created } = await getOrCreateCart(request);
+    const response = NextResponse.json(toCartResponse(cart));
+    return created ? withCartCookie(response, cart.id) : response;
+  } catch (error) {
+    return apiError(error);
+  }
 }
 
 export async function POST(request: NextRequest) {
@@ -22,36 +42,12 @@ export async function POST(request: NextRequest) {
   if (!parsed.success) {
     return NextResponse.json({ error: "Invalid cart item." }, { status: 400 });
   }
-
-  const product = getProductById(parsed.data.product_id);
-  const variant = product?.variants.find(
-    (candidate) => candidate.id === parsed.data.variant_id && candidate.isActive,
-  );
-  if (!product || !variant) {
-    return NextResponse.json({ error: "This product option is unavailable." }, { status: 404 });
+  try {
+    const { cart, created } = await getOrCreateCart(request);
+    const updated = await commerceApi.addItem(cart.id, parsed.data, request.headers.get("cookie") || undefined);
+    const response = NextResponse.json(toCartResponse(updated));
+    return created ? withCartCookie(response, cart.id) : response;
+  } catch (error) {
+    return apiError(error);
   }
-
-  const stored = decodeCart(request.cookies.get(CART_COOKIE)?.value);
-  const existing = stored.find(
-    (line) => line.productId === product.id && line.variantId === variant.id,
-  );
-  const updated = existing
-    ? stored.map((line) =>
-        line === existing
-          ? { ...line, quantity: Math.min(line.quantity + parsed.data.quantity, 20) }
-          : line,
-      )
-    : [...stored, {
-        productId: product.id,
-        variantId: variant.id,
-        quantity: parsed.data.quantity,
-      }];
-  const response = NextResponse.json(hydrateCart(updated));
-  response.cookies.set(CART_COOKIE, encodeCart(updated), {
-    httpOnly: true,
-    sameSite: "lax",
-    path: "/",
-    maxAge: 60 * 60 * 24 * 30,
-  });
-  return response;
 }

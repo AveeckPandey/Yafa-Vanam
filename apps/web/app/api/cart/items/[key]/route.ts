@@ -1,18 +1,21 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { z } from "zod";
-import { CART_COOKIE, decodeCart, encodeCart, hydrateCart } from "@/lib/cart-server";
+import { CART_COOKIE, toCartResponse } from "@/lib/cart-server";
+import { commerceApi, CommerceApiError } from "@/lib/commerce-api";
 
 const quantitySchema = z.object({ quantity: z.number().int().min(1).max(20) });
 
-function save(items: ReturnType<typeof decodeCart>) {
-  const response = NextResponse.json(hydrateCart(items));
-  response.cookies.set(CART_COOKIE, encodeCart(items), {
-    httpOnly: true,
-    sameSite: "lax",
-    path: "/",
-    maxAge: 60 * 60 * 24 * 30,
-  });
-  return response;
+function apiError(error: unknown) {
+  if (error instanceof CommerceApiError) {
+    return NextResponse.json({ error: error.message }, { status: error.status });
+  }
+  return NextResponse.json({ error: "An unexpected cart error occurred." }, { status: 500 });
+}
+
+function cartIdentity(request: NextRequest, key: string) {
+  const cartId = request.cookies.get(CART_COOKIE)?.value;
+  const [, variantId] = decodeURIComponent(key).split(":");
+  return { cartId, variantId };
 }
 
 export async function PATCH(
@@ -22,13 +25,13 @@ export async function PATCH(
   const { key } = await context.params;
   const parsed = quantitySchema.safeParse(await request.json().catch(() => null));
   if (!parsed.success) return NextResponse.json({ error: "Invalid quantity." }, { status: 400 });
-  const [productId, variantId] = decodeURIComponent(key).split(":");
-  const stored = decodeCart(request.cookies.get(CART_COOKIE)?.value);
-  return save(stored.map((line) =>
-    line.productId === productId && line.variantId === variantId
-      ? { ...line, quantity: parsed.data.quantity }
-      : line,
-  ));
+  const { cartId, variantId } = cartIdentity(request, key);
+  if (!cartId || !variantId) return NextResponse.json({ error: "Cart item not found." }, { status: 404 });
+  try {
+    return NextResponse.json(toCartResponse(await commerceApi.setItem(cartId, variantId, parsed.data.quantity, request.headers.get("cookie") || undefined)));
+  } catch (error) {
+    return apiError(error);
+  }
 }
 
 export async function DELETE(
@@ -36,9 +39,11 @@ export async function DELETE(
   context: { params: Promise<{ key: string }> },
 ) {
   const { key } = await context.params;
-  const [productId, variantId] = decodeURIComponent(key).split(":");
-  const stored = decodeCart(request.cookies.get(CART_COOKIE)?.value);
-  return save(stored.filter(
-    (line) => line.productId !== productId || line.variantId !== variantId,
-  ));
+  const { cartId, variantId } = cartIdentity(request, key);
+  if (!cartId || !variantId) return NextResponse.json({ error: "Cart item not found." }, { status: 404 });
+  try {
+    return NextResponse.json(toCartResponse(await commerceApi.removeItem(cartId, variantId, request.headers.get("cookie") || undefined)));
+  } catch (error) {
+    return apiError(error);
+  }
 }
