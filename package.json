@@ -7,6 +7,7 @@
   "scripts": {
     "dev": "npm run dev:web",
     "dev:web": "npm run dev --workspace=@yafa/web",
+    "start": "npm run start --workspace=@yafa/web",
     "dev:api": "cd apps/api && go run ./cmd/api",
     "dev:worker": "cd apps/api && go run ./cmd/worker",
     "build": "npm run build:web",
