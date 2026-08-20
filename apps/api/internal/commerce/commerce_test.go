@@ -97,4 +97,16 @@ func TestCartAndOrderFlow(t *testing.T) {
 	if err != nil || read.AccessToken != "" {
 		t.Fatalf("GetOrder() = %#v, error %v", read, err)
 	}
+	attached, err := store.AttachRazorpayOrder(order.OrderNumber, "order_razorpay_123")
+	if err != nil || attached.RazorpayOrderID != "order_razorpay_123" {
+		t.Fatalf("AttachRazorpayOrder() = %#v, error %v", attached, err)
+	}
+	verified, err := store.VerifyRazorpayPayment("order_razorpay_123", "pay_razorpay_123")
+	if err != nil || verified.PaymentStatus != "AUTHORIZED" {
+		t.Fatalf("VerifyRazorpayPayment() = %#v, error %v", verified, err)
+	}
+	captured, err := store.RecordRazorpayPayment("order_razorpay_123", "pay_razorpay_123", "captured")
+	if err != nil || captured.PaymentStatus != "CAPTURED" || captured.OrderStatus != "PAID" {
+		t.Fatalf("RecordRazorpayPayment() = %#v, error %v", captured, err)
+	}
 }

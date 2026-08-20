@@ -26,6 +26,31 @@ export type ApiCart = {
   updated_at: string;
 };
 
+export type RazorpayCheckoutInput = {
+  cart_id: string;
+  customer_email: string;
+  shipping_method: "standard" | "express";
+  discount_code: string;
+  shipping_address: {
+    recipient_name: string;
+    phone: string;
+    line1: string;
+    line2?: string;
+    city: string;
+    state_region: string;
+    postal_code: string;
+    country_code: "IN";
+  };
+};
+
+export type RazorpayCheckoutOrder = {
+  order_number: string;
+  razorpay_order_id: string;
+  amount: number;
+  currency: string;
+  key_id: string;
+};
+
 export class CommerceApiError extends Error {
   constructor(
     public readonly status: number,
@@ -74,5 +99,15 @@ export const commerceApi = {
   removeItem: (cartId: string, variantId: string, cookie?: string) =>
     request<ApiCart>(`/api/v1/carts/${encodeURIComponent(cartId)}/items/${encodeURIComponent(variantId)}`, {
       method: "DELETE",
+    }, cookie),
+  createRazorpayOrder: (input: RazorpayCheckoutInput, idempotencyKey: string, cookie?: string) =>
+    request<RazorpayCheckoutOrder>("/api/v1/payments/razorpay/orders", {
+      method: "POST",
+      headers: { "Idempotency-Key": idempotencyKey },
+      body: JSON.stringify(input),
+    }, cookie),
+  verifyRazorpayPayment: (input: { razorpay_payment_id: string; razorpay_order_id: string; razorpay_signature: string }, cookie?: string) =>
+    request<{ verified: boolean; order_number: string; payment_status: string }>("/api/v1/payments/razorpay/verify", {
+      method: "POST", body: JSON.stringify(input),
     }, cookie),
 };

@@ -22,6 +22,7 @@ var ErrEmptyCart = errors.New("cart is empty")
 var ErrInvalidQuantity = errors.New("quantity must be between 1 and 20")
 var ErrInvalidEmail = errors.New("a valid customer email is required")
 var ErrInvalidAddress = errors.New("a complete shipping address is required")
+var ErrPaymentOrderNotFound = errors.New("payment order not found")
 
 type Cart struct {
 	ID        string         `json:"id"`
@@ -70,6 +71,8 @@ type CreateOrderInput struct {
 	CartID          string  `json:"cart_id"`
 	CustomerEmail   string  `json:"customer_email"`
 	ShippingAddress Address `json:"shipping_address"`
+	ShippingMethod  string  `json:"shipping_method,omitempty"`
+	DiscountCode    string  `json:"discount_code,omitempty"`
 }
 
 type Order struct {
@@ -82,9 +85,12 @@ type Order struct {
 	Currency          string     `json:"currency"`
 	Subtotal          float64    `json:"subtotal"`
 	ShippingAmount    float64    `json:"shipping_amount"`
+	DiscountAmount    float64    `json:"discount_amount"`
 	TotalAmount       float64    `json:"total_amount"`
 	OrderStatus       string     `json:"order_status"`
 	PaymentStatus     string     `json:"payment_status"`
+	RazorpayOrderID   string     `json:"razorpay_order_id,omitempty"`
+	RazorpayPaymentID string     `json:"razorpay_payment_id,omitempty"`
 	FulfillmentStatus string     `json:"fulfillment_status"`
 	ShippingAddress   Address    `json:"shipping_address"`
 	CreatedAt         time.Time  `json:"created_at"`
@@ -254,8 +260,15 @@ func (store *Store) CreateOrder(input CreateOrderInput, idempotencyKey string) (
 	if len(view.Items) == 0 {
 		return Order{}, false, ErrEmptyCart
 	}
+	discount := 0.0
+	if strings.EqualFold(strings.TrimSpace(input.DiscountCode), "WELCOME10") {
+		discount = float64(int(view.Subtotal*0.1 + 0.5))
+	}
+	discountedSubtotal := max(0.0, view.Subtotal-discount)
 	shipping := 199.0
-	if view.Subtotal >= 2500 {
+	if strings.EqualFold(strings.TrimSpace(input.ShippingMethod), "express") {
+		shipping = 299
+	} else if discountedSubtotal >= 2500 {
 		shipping = 0
 	}
 	now := store.now().UTC()
@@ -263,7 +276,7 @@ func (store *Store) CreateOrder(input CreateOrderInput, idempotencyKey string) (
 		ID: randomID("ord_", 12), OrderNumber: "YV-" + now.Format("20060102") + "-" + strings.ToUpper(randomID("", 4)),
 		AccessToken: randomID("ot_", 24), CustomerEmail: strings.ToLower(strings.TrimSpace(input.CustomerEmail)),
 		Items: append([]CartLine(nil), view.Items...), Currency: view.Currency, Subtotal: view.Subtotal,
-		ShippingAmount: shipping, TotalAmount: view.Subtotal + shipping, OrderStatus: "PENDING_PAYMENT",
+		ShippingAmount: shipping, DiscountAmount: discount, TotalAmount: discountedSubtotal + shipping, OrderStatus: "PENDING_PAYMENT",
 		PaymentStatus: "PENDING", FulfillmentStatus: "UNFULFILLED", ShippingAddress: input.ShippingAddress,
 		CreatedAt: now,
 	}
@@ -272,6 +285,54 @@ func (store *Store) CreateOrder(input CreateOrderInput, idempotencyKey string) (
 		store.idempotency[idempotencyKey] = order.OrderNumber
 	}
 	return *order, false, nil
+}
+
+func (store *Store) AttachRazorpayOrder(orderNumber, razorpayOrderID string) (Order, error) {
+	store.mu.Lock()
+	defer store.mu.Unlock()
+	order, ok := store.orders[orderNumber]
+	if !ok {
+		return Order{}, ErrOrderNotFound
+	}
+	order.RazorpayOrderID = razorpayOrderID
+	return *order, nil
+}
+
+func (store *Store) VerifyRazorpayPayment(razorpayOrderID, paymentID string) (Order, error) {
+	store.mu.Lock()
+	defer store.mu.Unlock()
+	for _, order := range store.orders {
+		if order.RazorpayOrderID == razorpayOrderID {
+			order.RazorpayPaymentID = paymentID
+			if order.PaymentStatus == "PENDING" || order.PaymentStatus == "FAILED" {
+				order.PaymentStatus = "AUTHORIZED"
+			}
+			return *order, nil
+		}
+	}
+	return Order{}, ErrPaymentOrderNotFound
+}
+
+func (store *Store) RecordRazorpayPayment(razorpayOrderID, paymentID, status string) (Order, error) {
+	store.mu.Lock()
+	defer store.mu.Unlock()
+	for _, order := range store.orders {
+		if order.RazorpayOrderID != razorpayOrderID {
+			continue
+		}
+		if paymentID != "" {
+			order.RazorpayPaymentID = paymentID
+		}
+		switch status {
+		case "captured", "paid":
+			order.PaymentStatus = "CAPTURED"
+			order.OrderStatus = "PAID"
+		case "failed":
+			order.PaymentStatus = "FAILED"
+		}
+		return *order, nil
+	}
+	return Order{}, ErrPaymentOrderNotFound
 }
 
 func (store *Store) CreateOrderForUser(ownerID string, input CreateOrderInput, idempotencyKey string) (Order, bool, error) {

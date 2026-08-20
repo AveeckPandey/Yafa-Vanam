@@ -62,6 +62,10 @@ func main() {
 	}
 	handler := httpserver.New(catalog, commerce.NewStore(catalog), httpserver.Config{
 		AllowedOrigins: origins, Logger: logger, Auth: authHandler,
+		RazorpayKeyID:           strings.TrimSpace(os.Getenv("RAZORPAY_KEY_ID")),
+		RazorpayKeySecret:       strings.TrimSpace(os.Getenv("RAZORPAY_KEY_SECRET")),
+		RazorpayWebhookSecret:   strings.TrimSpace(os.Getenv("RAZORPAY_WEBHOOK_SECRET")),
+		RazorpayCheckoutEnabled: strings.EqualFold(strings.TrimSpace(os.Getenv("RAZORPAY_CHECKOUT_ENABLED")), "true"),
 	})
 	server := &http.Server{
 		Addr: ":" + port, Handler: handler, ReadHeaderTimeout: 10 * time.Second,

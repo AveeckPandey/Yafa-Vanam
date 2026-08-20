@@ -5,6 +5,7 @@ from app.api.advisor import router as advisor_router
 from app.advisor.catalogue import load_catalogue
 from app.advisor.models import BeautyProfile
 from app.advisor.recommender import recommend
+from app.v1 import router as v1_router
 
 app = FastAPI(title="YAFA VANAM Product Advisor", version="1.0.0")
 app.add_middleware(
@@ -15,6 +16,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 app.include_router(advisor_router)
+app.include_router(v1_router)
 
 
 @app.get("/health")

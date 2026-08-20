@@ -17,17 +17,25 @@ import (
 )
 
 type Config struct {
-	AllowedOrigins []string
-	Logger         *slog.Logger
-	Auth           *auth.Handler
+	AllowedOrigins          []string
+	Logger                  *slog.Logger
+	Auth                    *auth.Handler
+	RazorpayKeyID           string
+	RazorpayKeySecret       string
+	RazorpayWebhookSecret   string
+	RazorpayCheckoutEnabled bool
 }
 
 type Server struct {
-	catalog        *commerce.Catalog
-	store          *commerce.Store
-	logger         *slog.Logger
-	allowedOrigins map[string]struct{}
-	startedAt      time.Time
+	catalog                 *commerce.Catalog
+	store                   *commerce.Store
+	logger                  *slog.Logger
+	allowedOrigins          map[string]struct{}
+	startedAt               time.Time
+	razorpayKeyID           string
+	razorpayKeySecret       string
+	razorpayWebhookSecret   string
+	razorpayCheckoutEnabled bool
 }
 
 type apiError struct {
@@ -46,7 +54,11 @@ func New(catalog *commerce.Catalog, store *commerce.Store, config Config) http.H
 	}
 	server := &Server{
 		catalog: catalog, store: store, logger: logger, startedAt: time.Now().UTC(),
-		allowedOrigins: make(map[string]struct{}),
+		allowedOrigins:          make(map[string]struct{}),
+		razorpayKeyID:           config.RazorpayKeyID,
+		razorpayKeySecret:       config.RazorpayKeySecret,
+		razorpayWebhookSecret:   config.RazorpayWebhookSecret,
+		razorpayCheckoutEnabled: config.RazorpayCheckoutEnabled,
 	}
 	for _, origin := range config.AllowedOrigins {
 		origin = strings.TrimSpace(origin)
@@ -65,6 +77,9 @@ func New(catalog *commerce.Catalog, store *commerce.Store, config Config) http.H
 	mux.HandleFunc("GET /api/v1/categories", server.categories)
 	mux.HandleFunc("GET /api/v1/products", server.products)
 	mux.HandleFunc("GET /api/v1/products/{slug}", server.product)
+	mux.HandleFunc("POST /api/v1/payments/razorpay/orders", server.createRazorpayOrder)
+	mux.HandleFunc("POST /api/v1/payments/razorpay/verify", server.verifyRazorpayPayment)
+	mux.HandleFunc("POST /api/v1/payments/razorpay/webhook", server.razorpayWebhook)
 	if config.Auth != nil {
 		mux.Handle("POST /api/v1/carts", config.Auth.Middleware(http.HandlerFunc(server.createCart)))
 		mux.Handle("GET /api/v1/carts/{cartID}", config.Auth.Middleware(http.HandlerFunc(server.getCart)))

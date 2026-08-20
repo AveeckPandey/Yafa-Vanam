@@ -5,6 +5,8 @@ import Navbar from "../components/layout/Navbar";
 import Footer from "../components/layout/Footer";
 import CartDrawer from "../components/cart/CartDrawer";
 import { AuthProvider } from "../components/auth/AuthProvider";
+import AnalyticsProvider from "../components/analytics/AnalyticsProvider";
+import { CookieBanner } from "../components/consent/CookieBanner";
 
 export const metadata: Metadata = {
   title: "YAFA VANAM | Botanical Beauty, Made Personal",
@@ -17,14 +19,15 @@ export default function RootLayout({
 }: Readonly<{ children: React.ReactNode }>) {
   return (
     <html lang="en" data-scroll-behavior="smooth">
-      <body><AuthProvider>
+      <body><AnalyticsProvider><AuthProvider>
         <a className="skip-link" href="#page-content">Skip to main content</a>
         <Navbar />
         <div id="page-content" tabIndex={-1}>{children}</div>
         <Footer />
         <CartDrawer />
         <MakeupAdvisor />
-      </AuthProvider></body>
+        <CookieBanner />
+      </AuthProvider></AnalyticsProvider></body>
     </html>
   );
 }

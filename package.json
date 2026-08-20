@@ -14,5 +14,8 @@
     "build:web": "npm run build --workspace=@yafa/web",
     "build:api": "cd apps/api && go build ./...",
     "typecheck": "npm run typecheck --workspace=@yafa/web"
+  },
+  "dependencies": {
+    "@elevenlabs/react": "^1.12.4"
   }
 }
