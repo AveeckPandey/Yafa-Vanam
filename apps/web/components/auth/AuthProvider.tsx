@@ -8,7 +8,7 @@ type AuthContextValue = { user: AuthUser | null; isAuthenticated: boolean; isLoa
 const AuthContext = createContext<AuthContextValue | null>(null);
 // Auth is proxied through this same-origin route so secure cookies work when
 // the API remains private inside Railway's network.
-const API = "/api/auth";
+const API = "/api";
 
 function readCookie(name: string) { return document.cookie.split("; ").find((item) => item.startsWith(`${name}=`))?.split("=").slice(1).join("=") || ""; }
 async function csrf() { const response = await fetch(`${API}/auth/csrf`, { credentials: "include" }); if (!response.ok) throw new Error("Unable to prepare secure sign-in."); return (await response.json() as { csrfToken: string }).csrfToken; }
@@ -27,7 +27,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const requireAuth = useCallback((action: () => void | Promise<void>) => { if (user) { void action(); return; } deferredAction.current = action; setModalOpen(true); }, [user]);
   const value = useMemo(() => ({ user, isAuthenticated: !!user, isLoading, login, register, logout, requireAuth, openAuth: () => setModalOpen(true) }), [user, isLoading, login, register, logout, requireAuth]);
   const currentPath = typeof window === "undefined" ? "/" : `${window.location.pathname}${window.location.search}`;
-  const googleUrl = `${API}/google?return_to=${encodeURIComponent(currentPath)}`;
+  const googleUrl = `${API}/auth/google?return_to=${encodeURIComponent(currentPath)}`;
   return <AuthContext.Provider value={value}>{children}<AuthModal open={modalOpen} onClose={() => { deferredAction.current = null; setModalOpen(false); }} onLogin={login} onRegister={register} googleUrl={googleUrl} /></AuthContext.Provider>;
 }
 export function useAuth() { const value = useContext(AuthContext); if (!value) throw new Error("useAuth must be used inside AuthProvider"); return value; }
