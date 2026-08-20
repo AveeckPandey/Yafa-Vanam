@@ -260,15 +260,12 @@ func (store *Store) CreateOrder(input CreateOrderInput, idempotencyKey string) (
 	if len(view.Items) == 0 {
 		return Order{}, false, ErrEmptyCart
 	}
-	discount := 0.0
-	if strings.EqualFold(strings.TrimSpace(input.DiscountCode), "WELCOME10") {
-		discount = float64(int(view.Subtotal*0.1 + 0.5))
-	}
+	discount := checkoutDiscount(view.Subtotal, input.DiscountCode)
 	discountedSubtotal := max(0.0, view.Subtotal-discount)
 	shipping := 199.0
 	if strings.EqualFold(strings.TrimSpace(input.ShippingMethod), "express") {
 		shipping = 299
-	} else if discountedSubtotal >= 2500 {
+	} else if discountedSubtotal >= 1999 {
 		shipping = 0
 	}
 	now := store.now().UTC()
@@ -285,6 +282,21 @@ func (store *Store) CreateOrder(input CreateOrderInput, idempotencyKey string) (
 		store.idempotency[idempotencyKey] = order.OrderNumber
 	}
 	return *order, false, nil
+}
+
+func checkoutDiscount(subtotal float64, code string) float64 {
+	switch strings.ToUpper(strings.TrimSpace(code)) {
+	case "YAFA20":
+		return float64(int(subtotal*0.2 + 0.5))
+	case "NATURE15":
+		return float64(int(subtotal*0.15 + 0.5))
+	case "FLAT500":
+		return min(500, subtotal)
+	case "WELCOME10":
+		return float64(int(subtotal*0.1 + 0.5))
+	default:
+		return 0
+	}
 }
 
 func (store *Store) AttachRazorpayOrder(orderNumber, razorpayOrderID string) (Order, error) {

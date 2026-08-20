@@ -77,13 +77,14 @@ func TestCartAndOrderFlow(t *testing.T) {
 
 	input := CreateOrderInput{
 		CartID: cart.ID, CustomerEmail: "customer@example.com",
+		DiscountCode:    "YAFA20",
 		ShippingAddress: Address{RecipientName: "A Customer", Line1: "1 Forest Road", City: "Pune", StateRegion: "Maharashtra", PostalCode: "411001"},
 	}
 	order, replayed, err := store.CreateOrder(input, "checkout-1")
 	if err != nil || replayed {
 		t.Fatalf("CreateOrder() = replayed %v, error %v", replayed, err)
 	}
-	if order.TotalAmount != 2599 || order.ShippingAddress.CountryCode != "IN" || order.AccessToken == "" {
+	if order.TotalAmount != 1920 || order.DiscountAmount != 480 || order.ShippingAddress.CountryCode != "IN" || order.AccessToken == "" {
 		t.Fatalf("order = %#v", order)
 	}
 	replayedOrder, replayed, err := store.CreateOrder(input, "checkout-1")

@@ -3,6 +3,7 @@
 import Image from "next/image";
 import Link from "next/link";
 import { useCallback, useEffect, useRef, useState, type FocusEvent } from "react";
+import HeroWordmarkTransition from "./HeroWordmarkTransition";
 
 type HeroSlide = {
   image: string;
@@ -131,7 +132,7 @@ export default function HeroCarousel() {
           const active = index === activeIndex;
           return (
             <article
-              className={`hero-carousel__slide${active ? " is-active" : ""}`}
+              className={`hero-carousel__slide${index === 0 ? " hero-carousel__slide--warm" : ""}${active ? " is-active" : ""}`}
               key={slide.image}
               role="group"
               aria-roledescription="slide"
@@ -154,6 +155,8 @@ export default function HeroCarousel() {
                   style={{ objectPosition: slide.objectPosition }}
                 />
               </Link>
+
+              {index === 0 && <HeroWordmarkTransition isActive={active} />}
 
               <div className="hero-carousel__mobile-copy">
                 <p>{slide.kicker}</p>

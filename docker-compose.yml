@@ -25,6 +25,11 @@ services:
       DATABASE_URL: postgresql://postgres:postgres@postgres:5432/yafa_vanam?sslmode=disable
       REDIS_URL: redis://redis:6379/0
       JWT_SECRET: change-this-local-development-secret-to-a-long-random-value
+      APP_ENV: development
+      APP_URL: http://localhost:3000
+      GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-}
+      GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET:-}
+      GOOGLE_CALLBACK_URL: http://localhost:3000/api/auth/google/callback
       YAFA_CATALOGUE_PATH: /app/data/processed/Product.json
       RECOMMENDATION_ENGINE_URL: http://recommendation-engine:8000
     ports:

@@ -735,97 +735,6 @@ img {
   text-underline-offset: 3px;
 }
 
-/* Shared-element wordmark stage */
-
-.brand-stage {
-  position: relative;
-  min-height: clamp(220px, 18vw, 300px);
-  isolation: isolate;
-  background: linear-gradient(105deg, #de7d69 0%, #ef9788 46%, #ffc1bc 100%);
-}
-
-.brand-stage__wash {
-  position: absolute;
-  z-index: -1;
-  inset: 0;
-  background:
-    radial-gradient(circle at 71% 26%, rgba(255, 255, 255, 0.26), transparent 26%),
-    linear-gradient(90deg, rgba(120, 42, 29, 0.07), transparent 45%);
-}
-
-.brand-stage__source,
-.morph-logo {
-  width: clamp(240px, 27vw, 370px);
-  height: clamp(84px, 8.7vw, 120px);
-}
-
-.brand-stage__source {
-  position: absolute;
-  top: 50%;
-  left: clamp(36px, 7vw, 130px);
-  transform: translateY(-50%);
-}
-
-.brand-stage__static-logo,
-.morph-logo {
-  display: flex;
-  align-items: center;
-}
-
-.brand-stage__static-logo {
-  width: 100%;
-  height: 100%;
-  transition: opacity 80ms linear;
-}
-
-.brand-stage__static-logo.is-hidden {
-  opacity: 0;
-}
-
-.morph-logo {
-  --morph-logo-scale: 1;
-  position: fixed;
-  z-index: 110;
-  top: 0;
-  left: 0;
-  visibility: hidden;
-  color: #0d0c0a;
-  will-change: transform;
-  pointer-events: none;
-  align-items: flex-start;
-  width: max-content;
-  height: auto;
-}
-
-.morph-logo.is-ready {
-  visibility: visible;
-}
-
-.morph-logo__type {
-  display: inline-flex;
-  flex-direction: column;
-  font-family: Georgia, "Times New Roman", serif;
-  font-size: clamp(48px, 5vw, 74px);
-  font-weight: 500;
-  line-height: 0.78;
-  letter-spacing: 0.08em;
-}
-
-.morph-logo > .morph-logo__type {
-  transform: scale(var(--morph-logo-scale));
-  transform-origin: top left;
-}
-
-.brand-stage__line {
-  position: absolute;
-  right: clamp(24px, 5vw, 88px);
-  bottom: 27px;
-  margin: 0;
-  font-size: 9px;
-  font-weight: 600;
-  letter-spacing: 0.22em;
-}
-
 /* Hero carousel */
 
 .hero-carousel {
@@ -858,6 +767,73 @@ img {
   opacity: 1;
   pointer-events: auto;
   transform: scale(1);
+}
+
+/* The warm colour wash belongs to the first collection slide, never to a
+   standalone block above the carousel. */
+.hero-carousel__slide--warm::before {
+  position: absolute;
+  z-index: 1;
+  inset: 0;
+  content: "";
+  pointer-events: none;
+  background: linear-gradient(
+    180deg,
+    rgba(202, 101, 78, 0.54) 0%,
+    rgba(224, 135, 108, 0.3) 27%,
+    rgba(240, 174, 149, 0.08) 48%,
+    transparent 68%
+  );
+}
+
+.hero-carousel__wordmark-source {
+  position: absolute;
+  z-index: 2;
+  top: clamp(32px, 6vw, 100px);
+  left: clamp(30px, 7vw, 130px);
+  width: clamp(205px, 22vw, 340px);
+  pointer-events: none;
+}
+
+.hero-carousel__wordmark-static {
+  transition: opacity 80ms linear;
+}
+
+.hero-carousel__wordmark-static.is-hidden {
+  opacity: 0;
+}
+
+.morph-logo {
+  --morph-logo-scale: 1;
+  position: fixed;
+  z-index: 110;
+  top: 0;
+  left: 0;
+  visibility: hidden;
+  width: max-content;
+  color: #0d0c0a;
+  pointer-events: none;
+  transform-origin: top left;
+  will-change: transform;
+}
+
+.morph-logo.is-ready {
+  visibility: visible;
+}
+
+.morph-logo__type {
+  display: inline-flex;
+  flex-direction: column;
+  font-family: Georgia, "Times New Roman", serif;
+  font-size: clamp(42px, 4.8vw, 74px);
+  font-weight: 500;
+  line-height: 0.78;
+  letter-spacing: 0.08em;
+}
+
+.morph-logo > .morph-logo__type {
+  transform: scale(var(--morph-logo-scale));
+  transform-origin: top left;
 }
 
 .hero-carousel__artwork {
@@ -2037,31 +2013,6 @@ img {
     letter-spacing: 0.07em;
   }
 
-  .brand-stage {
-    min-height: 184px;
-  }
-
-  .brand-stage__source,
-  .morph-logo {
-    width: 230px;
-    height: 82px;
-  }
-
-  .brand-stage__source {
-    left: 24px;
-  }
-
-  .morph-logo__type {
-    font-size: 46px;
-  }
-
-  .brand-stage__line {
-    right: 18px;
-    bottom: 15px;
-    font-size: 7px;
-    letter-spacing: 0.16em;
-  }
-
   .hero-carousel__viewport {
     height: min(680px, calc(100svh - var(--header-height)));
     min-height: 560px;
@@ -2072,6 +2023,16 @@ img {
     display: flex;
     flex-direction: column;
     background: #f5eee6;
+  }
+
+  .hero-carousel__wordmark-source {
+    top: 24px;
+    left: 24px;
+    width: 205px;
+  }
+
+  .morph-logo__type {
+    font-size: 42px;
   }
 
   .hero-carousel__artwork {
@@ -2085,6 +2046,8 @@ img {
   }
 
   .hero-carousel__mobile-copy {
+    position: relative;
+    z-index: 2;
     display: flex;
     flex: 1;
     flex-direction: column;
@@ -4091,3 +4054,8 @@ img {
 @media(max-width:900px){.checkout-layout{grid-template-columns:minmax(0,1fr) minmax(320px,.8fr)}.checkout-main{width:min(100% - 46px,610px);margin-right:25px}.checkout-summary{padding-inline:25px}.checkout-payment-card{grid-template-columns:18px 1fr}.checkout-payment-icons{grid-column:2}}
 @media(max-width:720px){.checkout-layout{display:flex;flex-direction:column}.checkout-main{order:2;width:min(100% - 36px,620px);padding-top:32px;margin:0 auto}.checkout-summary{order:1;padding:0;border:0;border-bottom:1px solid #dedcd7}.checkout-summary__toggle{display:grid;grid-template-columns:1fr auto 20px;width:100%;min-height:62px;padding:0 18px;border:0;color:#27251f;background:transparent;text-align:left;cursor:pointer}.checkout-summary__toggle span{font-size:13px;font-weight:700}.checkout-summary__toggle em{color:#77736d;font-style:normal;font-weight:400}.checkout-summary__toggle strong{margin-right:12px;font-size:13px}.checkout-summary__toggle b{font-size:18px;font-weight:400;transition:transform .2s ease}.checkout-summary.is-open .checkout-summary__toggle b{transform:rotate(180deg)}.checkout-summary__content{display:none;position:static;width:auto;padding:0 18px 24px}.checkout-summary.is-open .checkout-summary__content{display:block}.checkout-header{margin-bottom:34px}.checkout-section__title{display:block}.checkout-section__title span{display:block;margin-top:8px;text-align:left}.checkout-grid--three{grid-template-columns:1fr 1fr}.checkout-grid--three>:last-child{grid-column:1/-1}.checkout-submit{position:sticky;bottom:14px;box-shadow:0 9px 24px rgba(0,0,0,.17)}.checkout-footer{padding-bottom:12px}}
 @media(max-width:440px){.checkout-main{width:min(100% - 28px,620px)}.checkout-grid--two,.checkout-grid--three{grid-template-columns:1fr}.checkout-grid--three>:last-child{grid-column:auto}.checkout-payment-card{align-items:start}.checkout-section h1,.checkout-section h2{font-size:20px}}
+
+/* Checkout summary interactions */
+.checkout-line[aria-busy="true"]{opacity:.58}.checkout-line__quantity{display:inline-grid;grid-template-columns:28px 29px 28px;height:30px;align-items:center;margin-top:11px;border:1px solid #d8d5cf;border-radius:3px;overflow:hidden}.checkout-line__quantity button{height:100%;padding:0;border:0;background:#fff;color:#173426;cursor:pointer;font-size:17px;line-height:1}.checkout-line__quantity button:first-child{border-right:1px solid #e5e2dc}.checkout-line__quantity button:last-child{border-left:1px solid #e5e2dc}.checkout-line__quantity button:hover:not(:disabled){background:#edf3ee}.checkout-line__quantity button:disabled{color:#b5b2ac;cursor:not-allowed}.checkout-line__quantity>span{display:grid;height:100%;color:#34312c;font-size:12px;place-items:center}.checkout-discount__hint{margin:7px 0 0;color:#857f77;font-size:10px;line-height:1.45}.checkout-discount--applied{align-items:center;padding:10px 12px;border:1px solid #adc4b2;border-radius:3px;background:#f1f7f2}.checkout-discount--applied span{display:grid;gap:2px}.checkout-discount--applied strong{color:#224a30;font-size:12px;letter-spacing:.06em}.checkout-discount--applied small{color:#56715d;font-size:10px}.checkout-discount--applied button{display:grid;min-width:28px;height:28px;border:0;border-radius:50%;background:transparent;color:#224a30;font-size:19px;cursor:pointer;place-items:center}.checkout-discount--applied button:hover{background:#dcebdd}
+.checkout-payment-icons{gap:7px}.checkout-payment-icons img{width:auto;height:28px;filter:drop-shadow(0 1px 1px rgba(31,25,20,.06))}.checkout-razorpay-mark{display:block;width:96px;height:28px;margin-top:13px}
+.checkout-payment-icons{display:none}.checkout-payment-methods{display:flex;justify-content:flex-end;margin-top:10px}.checkout-payment-methods img{width:282px;height:36px}.checkout-payment-trust{display:flex;align-items:center;gap:10px;margin:13px 0 0}.checkout-payment-trust img{width:166px;height:40px}.checkout-payment-trust span{color:#77736d;font-size:10px}

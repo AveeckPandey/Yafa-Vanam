@@ -1,11 +1,9 @@
 import HeroCarousel from "../components/home/HeroCarousel";
-import HeroLogoTransition from "../components/home/HeroLogoTransition";
 
 export default function HomePage() {
   return (
     <main id="main-content">
       <h1 className="visually-hidden">YAFA VANAM — botanical beauty, made personal</h1>
-      <HeroLogoTransition />
       <HeroCarousel />
 
       <section className="home-intro" aria-labelledby="home-intro-title">

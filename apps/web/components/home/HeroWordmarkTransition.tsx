@@ -1,11 +1,11 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
+import { useEffect, useRef, useState } from "react";
 import { gsap } from "gsap";
 import { ScrollTrigger } from "gsap/ScrollTrigger";
 
-function LogoType() {
+function Wordmark() {
   return (
     <span className="morph-logo__type" aria-hidden="true">
       <span>YAFA</span>
@@ -14,8 +14,8 @@ function LogoType() {
   );
 }
 
-export default function HeroLogoTransition() {
-  const stageRef = useRef<HTMLElement>(null);
+/** Starts in the first carousel slide, then settles into the navbar on scroll. */
+export default function HeroWordmarkTransition({ isActive }: { isActive: boolean }) {
   const sourceRef = useRef<HTMLDivElement>(null);
   const staticLogoRef = useRef<HTMLDivElement>(null);
   const movingLogoRef = useRef<HTMLSpanElement>(null);
@@ -26,28 +26,24 @@ export default function HeroLogoTransition() {
   useEffect(() => {
     if (!mounted) return;
 
-    const stage = stageRef.current;
     const source = sourceRef.current;
     const staticLogo = staticLogoRef.current;
     const movingLogo = movingLogoRef.current;
     const target = document.querySelector<HTMLElement>("[data-logo-target]");
-
-    if (!stage || !source || !staticLogo || !movingLogo || !target) return;
+    if (!source || !staticLogo || !movingLogo || !target) return;
 
     gsap.registerPlugin(ScrollTrigger);
     const media = gsap.matchMedia();
 
     media.add("(prefers-reduced-motion: no-preference)", () => {
+      const sourceType = staticLogo.querySelector<HTMLElement>(".morph-logo__type");
+      const targetType = target.querySelector<HTMLElement>(".wordmark");
+      const movingType = movingLogo.querySelector<HTMLElement>(".morph-logo__type");
+      if (!sourceType || !targetType || !movingType) return;
+
       target.classList.add("is-logo-target-hidden");
       staticLogo.classList.add("is-hidden");
       movingLogo.classList.add("is-ready");
-
-      const sourceType = staticLogo.querySelector<HTMLElement>(".morph-logo__type");
-      const targetType = target.querySelector<HTMLElement>(".wordmark");
-      if (!sourceType || !targetType) return;
-
-      const movingType = movingLogo.querySelector<HTMLElement>(".morph-logo__type");
-      if (!movingType) return;
 
       const sourceBox = () => sourceType.getBoundingClientRect();
       const targetBox = () => targetType.getBoundingClientRect();
@@ -63,7 +59,6 @@ export default function HeroLogoTransition() {
           x: () => sourceBox().left - movingTypeOffset().left,
           y: () => sourceBox().top + window.scrollY - movingTypeOffset().top,
           "--morph-logo-scale": 1,
-          transformOrigin: "top left",
         },
         {
           x: () => targetBox().left - movingTypeOffset().left,
@@ -73,7 +68,7 @@ export default function HeroLogoTransition() {
           scrollTrigger: {
             trigger: document.documentElement,
             start: "top top",
-            end: () => `+=${Math.min(Math.max(stage.offsetHeight * 0.9, 190), 320)}`,
+            end: "+=260",
             scrub: 0.45,
             invalidateOnRefresh: true,
           },
@@ -83,7 +78,6 @@ export default function HeroLogoTransition() {
       const resizeObserver = new ResizeObserver(() => ScrollTrigger.refresh());
       resizeObserver.observe(sourceType);
       resizeObserver.observe(targetType);
-
       document.fonts?.ready.then(() => ScrollTrigger.refresh());
 
       return () => {
@@ -93,33 +87,44 @@ export default function HeroLogoTransition() {
         movingLogo.classList.remove("is-ready");
         staticLogo.classList.remove("is-hidden");
         target.classList.remove("is-logo-target-hidden");
-
       };
     });
 
     return () => media.revert();
   }, [mounted]);
 
+  useEffect(() => {
+    if (!mounted) return;
+
+    const movingLogo = movingLogoRef.current;
+    const target = document.querySelector<HTMLElement>("[data-logo-target]");
+    if (!movingLogo || !target) return;
+
+    // The portal is outside the slide, so explicitly hide it when the carousel
+    // advances and restore the ordinary navbar wordmark.
+    if (isActive) {
+      movingLogo.style.opacity = "1";
+      movingLogo.style.visibility = "visible";
+      target.classList.add("is-logo-target-hidden");
+    } else {
+      movingLogo.style.opacity = "0";
+      movingLogo.style.visibility = "hidden";
+      target.classList.remove("is-logo-target-hidden");
+    }
+  }, [isActive, mounted]);
+
   return (
-    <section className="brand-stage" ref={stageRef} data-logo-stage aria-label="YAFA VANAM">
-      <div className="brand-stage__wash" aria-hidden="true" />
-      <div className="brand-stage__source" ref={sourceRef} data-logo-source>
-        <div className="brand-stage__static-logo" ref={staticLogoRef}>
-          <LogoType />
-        </div>
+    <div className="hero-carousel__wordmark-source" ref={sourceRef} aria-label="YAFA VANAM">
+      <div className="hero-carousel__wordmark-static" ref={staticLogoRef}>
+        <Wordmark />
       </div>
-      <p className="brand-stage__line">BOTANICAL BEAUTY · MADE PERSONAL</p>
       {mounted &&
         createPortal(
-          <span
-            className="morph-logo"
-            aria-hidden="true"
-            ref={movingLogoRef}
-          >
-            <LogoType />
+          <span className="morph-logo" aria-hidden="true" ref={movingLogoRef}>
+            <Wordmark />
           </span>,
           document.body,
         )}
-    </section>
+    </div>
   );
 }
