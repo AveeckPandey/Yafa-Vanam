@@ -16,7 +16,16 @@ async function forward(request: NextRequest, context: { params: Promise<{ path: 
     cache: "no-store",
   });
 
-  const response = new NextResponse(upstream.body, { status: upstream.status, headers: upstream.headers });
+  const headers = new Headers(upstream.headers);
+  const setCookie = headers.get("set-cookie");
+  if (setCookie) {
+    // OAuth is exposed to the browser under /api/auth, while the private Go
+    // service mounts it at /auth. Keep its state cookies available on the
+    // public callback path so Google OAuth state validation succeeds.
+    headers.set("set-cookie", setCookie.replaceAll("Path=/auth/google", "Path=/api/auth/google"));
+  }
+
+  const response = new NextResponse(upstream.body, { status: upstream.status, headers });
   response.headers.delete("content-encoding");
   response.headers.delete("content-length");
   return response;
