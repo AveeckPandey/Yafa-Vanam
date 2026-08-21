@@ -44,7 +44,7 @@ export async function POST(request: NextRequest) {
   }
   try {
     const { cart, created } = await getOrCreateCart(request);
-    const updated = await commerceApi.addItem(cart.id, parsed.data, request.headers.get("cookie") || undefined);
+    const updated = await commerceApi.addItem(cart.id, parsed.data, request.headers.get("cookie") || undefined, request.headers.get("x-csrf-token") || undefined);
     const response = NextResponse.json(toCartResponse(updated));
     return created ? withCartCookie(response, cart.id) : response;
   } catch (error) {

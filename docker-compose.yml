@@ -31,7 +31,8 @@ services:
       GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET:-}
       GOOGLE_CALLBACK_URL: http://localhost:3000/api/auth/google/callback
       YAFA_CATALOGUE_PATH: /app/data/processed/Product.json
-      RECOMMENDATION_ENGINE_URL: http://recommendation-engine:8000
+      YAFA_ANALYZER_URL: http://recommendation-engine:8000
+      YAFA_INTERNAL_SERVICE_TOKEN: ${YAFA_INTERNAL_SERVICE_TOKEN:-local-development-token-must-be-at-least-32-characters}
     ports:
       - "4000:4000"
     depends_on:
@@ -46,8 +47,8 @@ services:
     build:
       context: .
       dockerfile: services/recommendation-engine/Dockerfile
-    ports:
-      - "8000:8000"
+    environment:
+      YAFA_INTERNAL_SERVICE_TOKEN: ${YAFA_INTERNAL_SERVICE_TOKEN:-local-development-token-must-be-at-least-32-characters}
 
 volumes:
   postgres_data:

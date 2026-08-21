@@ -125,8 +125,9 @@ def analyse_skin_image(image_bytes: bytes) -> SkinAnalysisResult:
     # Ignore highlights and deep shadows before averaging skin-region pixels.
     usable = sample[(sample.mean(axis=1) > 35) & (sample.mean(axis=1) < 235)]
     if len(usable) < 100: return SkinAnalysisResult(quality_pass=False, face_detected=True, issues=["unreliable_skin_visibility"], retake_required=True)
+    skin_region_ratio = len(usable) / (height * width)
     mean_rgb = usable.mean(axis=0)
     lab = _rgb_to_lab(mean_rgb)
     candidates = select_three_shades(lab)
     confidence = max(.4, min(.95, .94 - candidates[0].colour_distance / 30 - (candidates[1].colour_distance - candidates[0].colour_distance < .3) * .12))
-    return SkinAnalysisResult(quality_pass=True, face_detected=True, analysis=SkinAnalysis(lab={"L": round(lab[0], 2), "a": round(lab[1], 2), "b": round(lab[2], 2)}, ita=round(_ita(lab), 2), depth_family=_depth(lab[0]), undertone=_undertone(lab[1], lab[2])), shade_candidates=candidates, confidence=round(confidence, 3))
+    return SkinAnalysisResult(quality_pass=True, face_detected=True, analysis=SkinAnalysis(lab={"L": round(lab[0], 2), "a": round(lab[1], 2), "b": round(lab[2], 2)}, ita=round(_ita(lab), 2), depth_family=_depth(lab[0]), undertone=_undertone(lab[1], lab[2])), shade_candidates=candidates, confidence=round(confidence, 3), skin_region_ratio=round(skin_region_ratio, 5))

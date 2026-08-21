@@ -1,6 +1,7 @@
 package httpserver
 
 import (
+	"context"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
@@ -41,5 +42,22 @@ func TestCommerceHTTPFlow(t *testing.T) {
 	handler.ServeHTTP(unknown, httptest.NewRequest(http.MethodGet, "/api/v1/products/missing", nil))
 	if unknown.Code != http.StatusNotFound || !strings.Contains(unknown.Body.String(), `"code":"not_found"`) {
 		t.Fatalf("missing product status = %d, body = %s", unknown.Code, unknown.Body.String())
+	}
+}
+
+func TestPaymentRateLimitIsBoundedPerClient(t *testing.T) {
+	server := &Server{clientRates: make(map[string]*clientRate)}
+	request := httptest.NewRequest(http.MethodPost, "/api/v1/payments/razorpay/orders", nil)
+	bucket, limit := requestLimitBucket(request)
+	if limit != 20 {
+		t.Fatalf("payment limit = %d, want 20", limit)
+	}
+	for attempt := 0; attempt < limit; attempt++ {
+		if !server.allowRequest(context.Background(), bucket, limit) {
+			t.Fatalf("payment request %d should have been allowed", attempt+1)
+		}
+	}
+	if server.allowRequest(context.Background(), bucket, limit) {
+		t.Fatal("payment requests above the burst limit must be rejected")
 	}
 }

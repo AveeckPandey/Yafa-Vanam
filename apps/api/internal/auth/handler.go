@@ -3,6 +3,7 @@ package auth
 import (
 	"context"
 	"crypto/rand"
+	"crypto/subtle"
 	"encoding/base64"
 	"encoding/json"
 	"net/http"
@@ -27,6 +28,22 @@ type Handler struct {
 }
 
 func (h *Handler) Middleware(next http.Handler) http.Handler { return h.service.Middleware(next) }
+func (h *Handler) OptionalMiddleware(next http.Handler) http.Handler {
+	return h.service.OptionalMiddleware(next)
+}
+
+// CSRFMiddleware protects cookie-authenticated API mutations. Anonymous flows
+// retain their own scoped credentials, while a signed-in browser must prove it
+// obtained a same-site CSRF token before changing server state.
+func (h *Handler) CSRFMiddleware(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodGet && r.Method != http.MethodHead && r.Method != http.MethodOptions && cookie(r, accessCookie) != "" && !h.validCSRF(r) {
+			fail(w, http.StatusForbidden, "Invalid security token.")
+			return
+		}
+		next.ServeHTTP(w, r)
+	})
+}
 
 func NewHandler(s *Service, clientID, clientSecret, callback, frontendURL string) *Handler {
 	h := &Handler{service: s, secure: s.config.SecureCookies, frontendURL: strings.TrimRight(frontendURL, "/"), loginLimiter: rate.NewLimiter(rate.Every(time.Minute/8), 8), registerLimiter: rate.NewLimiter(rate.Every(time.Minute/5), 5)}
@@ -214,7 +231,8 @@ func (h *Handler) clear(w http.ResponseWriter) {
 	}
 }
 func (h *Handler) validCSRF(r *http.Request) bool {
-	return cookie(r, csrfCookie) != "" && cookie(r, csrfCookie) == r.Header.Get("X-CSRF-Token")
+	provided, expected := r.Header.Get("X-CSRF-Token"), cookie(r, csrfCookie)
+	return expected != "" && len(provided) == len(expected) && subtle.ConstantTimeCompare([]byte(provided), []byte(expected)) == 1
 }
 func cookie(r *http.Request, n string) string {
 	c, e := r.Cookie(n)

@@ -8,14 +8,19 @@ import { formatCatalogPrice } from "@/lib/catalog-types";
 import { getCart, removeCartItem, updateCartItem } from "./cart-client";
 import { useRequireAuth } from "@/components/auth/AuthProvider";
 import { useRouter } from "next/navigation";
+import { useAuth } from "@/components/auth/AuthProvider";
+import { getConfirmedYafaProfile, type ConfirmedYafaProfile } from "@/lib/yafa-profile";
+import { trackEvent } from "@/lib/analytics";
 
 const emptyCart: CartResponse = { items: [], itemCount: 0, subtotal: 0, currency: "INR" };
 
 export default function CartDrawer() {
   const router = useRouter();
+  const { user } = useAuth();
   const [open, setOpen] = useState(false);
   const [cart, setCart] = useState<CartResponse>(emptyCart);
   const [busyKey, setBusyKey] = useState<string | null>(null);
+  const [yafaProfile, setYafaProfile] = useState<ConfirmedYafaProfile | null>(null);
   const closeRef = useRef<HTMLButtonElement>(null);
   const previousFocus = useRef<HTMLElement | null>(null);
 
@@ -29,6 +34,7 @@ export default function CartDrawer() {
       const detail = (event as CustomEvent<CartResponse>).detail;
       if (detail) setCart(detail);
       setOpen(true);
+      trackEvent("cart_viewed", { item_count: detail?.itemCount ?? cart.itemCount });
     };
     const onUpdate = (event: Event) => {
       const detail = (event as CustomEvent<CartResponse>).detail;
@@ -41,6 +47,14 @@ export default function CartDrawer() {
       window.removeEventListener("yafa-cart-updated", onUpdate);
     };
   }, []);
+
+  useEffect(() => {
+    if (!user) {
+      setYafaProfile(null);
+      return;
+    }
+    getConfirmedYafaProfile().then(setYafaProfile).catch(() => setYafaProfile(null));
+  }, [user]);
 
   useEffect(() => {
     if (!open) return;
@@ -81,6 +95,7 @@ export default function CartDrawer() {
       setBusyKey(null);
     }
   };
+  const foundationMismatch = Boolean(yafaProfile && cart.items.some((item) => item.productType.toLowerCase().includes("foundation")) && !cart.items.some((item) => item.shade === yafaProfile.shade_name));
 
   return (
     <div className={`site-cart-drawer${open ? " is-open" : ""}`} aria-hidden={!open}>
@@ -92,6 +107,7 @@ export default function CartDrawer() {
         </header>
 
         <div className="site-cart-drawer__body">
+          {foundationMismatch ? <aside className="site-cart-yafa-upsell">Your Yafa shade {yafaProfile?.shade_name} is available. <Link href="/shop" onClick={close}>Find your match</Link></aside> : null}
           {cart.items.length === 0 ? (
             <div className="site-cart-drawer__empty">
               <p>Your fragrance ritual begins here.</p>
@@ -107,6 +123,7 @@ export default function CartDrawer() {
                 <h3><Link href={`/products/${item.slug}`} onClick={close}>{item.name}</Link></h3>
                 {item.size ? <span>Size: {item.size}</span> : null}
                 {item.shade ? <span>Shade: {item.shade}</span> : null}
+                {yafaProfile?.shade_name === item.shade ? <small className="site-cart-yafa-match">Yafa match</small> : null}
                 <strong>{formatCatalogPrice(item.currency, item.unitPrice)}</strong>
                 <div className="site-cart-line__actions">
                   <div aria-label={`Quantity for ${item.name}`}>
