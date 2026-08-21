@@ -1,4 +1,5 @@
 import HeroCarousel from "../components/home/HeroCarousel";
+import FeaturedSets from "../components/home/FeaturedSets";
 
 export default function HomePage() {
   return (
@@ -18,6 +19,7 @@ export default function HomePage() {
           <a href="/build-my-kit">Build my personal kit</a>
         </div>
       </section>
+      <FeaturedSets />
     </main>
   );
 }
