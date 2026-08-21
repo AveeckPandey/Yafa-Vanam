@@ -6,6 +6,7 @@ import (
 	"crypto/subtle"
 	"encoding/base64"
 	"encoding/json"
+	"log"
 	"net/http"
 	"strings"
 	"time"
@@ -87,7 +88,14 @@ func (h *Handler) requestPasswordReset(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	resetURL := h.frontendURL + "/auth/reset-password?token=" + raw
-	_ = h.mailer.SendPasswordReset(strings.TrimSpace(in.Email), resetURL)
+	// SMTP delivery must never hold the browser request open. The generic 202
+	// response remains identical for every address, while delivery failures are
+	// recorded server-side without exposing account details to a visitor.
+	go func(email, url string) {
+		if err := h.mailer.SendPasswordReset(email, url); err != nil {
+			log.Printf("password reset email delivery failed: %v", err)
+		}
+	}(strings.TrimSpace(in.Email), resetURL)
 }
 func (h *Handler) confirmPasswordReset(w http.ResponseWriter, r *http.Request) {
 	var in struct{ Token, Password string }
