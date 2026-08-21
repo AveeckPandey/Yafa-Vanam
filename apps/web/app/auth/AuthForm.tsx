@@ -5,26 +5,17 @@ import { useRouter } from "next/navigation";
 import { FormEvent, useState } from "react";
 import { useAuth } from "../../components/auth/AuthProvider";
 
-export default function AuthForm({ mode }: { mode: "sign-in" | "sign-up" }) {
-  const router = useRouter();
-  const { login, register } = useAuth();
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState("");
-  const create = mode === "sign-up";
-  const submit = async (event: FormEvent<HTMLFormElement>) => {
-    event.preventDefault();
-    const data = new FormData(event.currentTarget);
-    const email = String(data.get("email") || "");
-    const password = String(data.get("password") || "");
-    const name = String(data.get("name") || "");
-    setBusy(true); setError("");
-    try {
-      if (create) await register(name, email, password, false);
-      else await login(email, password, false);
-      router.push("/account");
-    } catch (reason) {
-      setError(reason instanceof Error ? reason.message : "Unable to continue. Please try again.");
-    } finally { setBusy(false); }
-  };
-  return <main id="main-content" className="auth-page"><section><p>YAFA VANAM / Account</p><h1>{create ? "Create your account." : "Welcome back."}</h1><span>{create ? "Save your ritual and make future checkout simpler." : "Sign in to see your orders, saved products and beauty profile."}</span><form onSubmit={submit}>{create ? <label htmlFor="auth-name">Name<input id="auth-name" name="name" autoComplete="name" required /></label> : null}<label htmlFor="auth-email">Email<input id="auth-email" name="email" type="email" autoComplete="email" required /></label><label htmlFor="auth-password">Password<input id="auth-password" name="password" type="password" autoComplete={create ? "new-password" : "current-password"} minLength={8} required /></label>{error ? <p role="alert">{error}</p> : null}<button type="submit" disabled={busy}>{busy ? "Please wait…" : create ? "Create account" : "Sign in"}</button></form><p>{create ? "Already have an account?" : "New to YAFA VANAM?"} <Link href={create ? "/auth/sign-in" : "/auth/sign-up"}>{create ? "Sign in" : "Create one"}</Link></p></section></main>;
+function PasswordInput({ id, name = "password", label = "Password", autoComplete }: { id: string; name?: string; label?: string; autoComplete: string }) {
+  const [visible, setVisible] = useState(false);
+  return <label htmlFor={id}>{label}<span className="auth-page__password-wrap"><input id={id} name={name} type={visible ? "text" : "password"} autoComplete={autoComplete} minLength={8} required/><button type="button" onClick={() => setVisible((value) => !value)} aria-label={`${visible ? "Hide" : "Show"} ${label.toLowerCase()}`} aria-pressed={visible}><svg aria-hidden="true" viewBox="0 0 24 24" fill="none"><path d="M2.5 12s3.3-5.5 9.5-5.5S21.5 12 21.5 12 18.2 17.5 12 17.5 2.5 12 2.5 12Z" stroke="currentColor" strokeWidth="1.6"/><circle cx="12" cy="12" r="2.7" stroke="currentColor" strokeWidth="1.6"/>{!visible && <path d="m4 4 16 16" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"/>}</svg></button></span></label>;
+}
+
+export default function AuthForm({ mode }: { mode: "sign-in" | "sign-up" | "reset-password" }) {
+  const router = useRouter(); const { login, register, requestPasswordReset, resetPassword } = useAuth();
+  const [busy, setBusy] = useState(false), [error, setError] = useState(""), [notice, setNotice] = useState("");
+  const create = mode === "sign-up", reset = mode === "reset-password", token = typeof window === "undefined" ? "" : new URLSearchParams(window.location.search).get("token") || "";
+  const submit = async (event: FormEvent<HTMLFormElement>) => { event.preventDefault(); const data = new FormData(event.currentTarget); const email = String(data.get("email") || ""), password = String(data.get("password") || ""), name = String(data.get("name") || ""); if (reset && password !== String(data.get("confirmPassword") || "")) { setError("Passwords do not match. Please check and try again."); return; } setBusy(true); setError(""); setNotice(""); try { if (reset) { if (!token) throw new Error("This reset link is invalid or has expired. Please request a new one."); setNotice(await resetPassword(token, password)); } else if (create) { await register(name, email, password, false); router.push("/account"); } else { await login(email, password, false); router.push("/account"); } } catch (reason) { setError(reason instanceof Error ? reason.message : "Unable to continue. Please try again."); } finally { setBusy(false); } };
+  const requestLink = async () => { const email = window.prompt("Enter your email address to receive a reset link:"); if (email) { setBusy(true); setError(""); try { setNotice(await requestPasswordReset(email)); } catch (reason) { setError(reason instanceof Error ? reason.message : "Unable to request a reset link."); } finally { setBusy(false); } } };
+  const title = reset ? "Choose a new password." : create ? "Create your account." : "Welcome back."; const intro = reset ? "Use a new password you have not used elsewhere." : create ? "Save your ritual and make future checkout simpler." : "Sign in to see your orders, saved products and beauty profile.";
+  return <main id="main-content" className="auth-page"><section><p>YAFA VANAM / Account</p><h1>{title}</h1><span>{intro}</span><form onSubmit={submit}>{create && <label htmlFor="auth-name">Name<input id="auth-name" name="name" autoComplete="name" required/></label>}{!reset && <label htmlFor="auth-email">Email<input id="auth-email" name="email" type="email" autoComplete="email" required/></label>}<PasswordInput id="auth-password" autoComplete={create || reset ? "new-password" : "current-password"}/>{(create || reset) && <PasswordInput id="auth-confirm-password" name="confirmPassword" label="Confirm password" autoComplete="new-password"/>}{error && <p role="alert">{error}</p>}{notice && <p role="status">{notice}</p>}<button type="submit" disabled={busy}>{busy ? "Please wait…" : reset ? "Update password" : create ? "Create account" : "Sign in"}</button></form>{reset ? <p>Remembered it? <Link href="/auth/sign-in">Sign in</Link></p> : <><p>{create ? "Already have an account?" : "New to YAFA VANAM?"} <Link href={create ? "/auth/sign-in" : "/auth/sign-up"}>{create ? "Sign in" : "Create one"}</Link></p>{!create && <button className="auth-page__forgot" type="button" disabled={busy} onClick={() => void requestLink()}>Forgot password?</button>}</>}</section></main>;
 }
