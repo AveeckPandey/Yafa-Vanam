@@ -63,7 +63,14 @@ func (server *Server) createRazorpayOrder(w http.ResponseWriter, request *http.R
 	// order while the first request is still attaching its provider ID.
 	server.razorpayMu.Lock()
 	defer server.razorpayMu.Unlock()
-	order, _, err := server.store.CreateOrder(input.CreateOrderInput, idempotencyKey)
+	var order commerce.Order
+	var err error
+	if user, ok := requestUser(request); ok {
+		input.CustomerEmail = user.Email
+		order, _, err = server.store.CreateOrderForUser(user.ID, input.CreateOrderInput, idempotencyKey)
+	} else {
+		order, _, err = server.store.CreateOrder(input.CreateOrderInput, idempotencyKey)
+	}
 	if err != nil {
 		server.writeDomainError(w, err)
 		return
