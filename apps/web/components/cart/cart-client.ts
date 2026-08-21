@@ -15,7 +15,10 @@ export async function addCartItem(productId: string, variantId: string, quantity
     headers: { "Content-Type": "application/json", "X-CSRF-Token": token },
     body: JSON.stringify({ product_id: productId, variant_id: variantId, quantity }),
   });
-  if (!response.ok) throw new Error("This item could not be added to your bag.");
+  if (!response.ok) {
+    const payload = await response.json().catch(() => null) as { error?: string } | null;
+    throw new Error(payload?.error || "This item could not be added to your bag.");
+  }
   const cart = await response.json() as CartResponse;
   window.dispatchEvent(new CustomEvent("yafa-cart-updated", { detail: cart }));
   window.dispatchEvent(new CustomEvent("yafa-cart-open", { detail: cart }));

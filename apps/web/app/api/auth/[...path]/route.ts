@@ -24,15 +24,18 @@ async function forward(request: NextRequest, context: { params: Promise<{ path: 
   }
 
   const headers = new Headers(upstream.headers);
-  const setCookie = headers.get("set-cookie");
-  if (setCookie) {
+  // A login response sets both access and refresh cookies. Headers.get()
+  // combines them into one string, which browsers cannot reliably store as
+  // two cookies. Preserve each Set-Cookie header independently.
+  const setCookies = upstream.headers.getSetCookie();
+  headers.delete("set-cookie");
+  const response = new NextResponse(upstream.body, { status: upstream.status, headers });
+  for (const cookie of setCookies) {
     // OAuth is exposed to the browser under /api/auth, while the private Go
     // service mounts it at /auth. Keep its state cookies available on the
     // public callback path so Google OAuth state validation succeeds.
-    headers.set("set-cookie", setCookie.replaceAll("Path=/auth/google", "Path=/api/auth/google"));
+    response.headers.append("set-cookie", cookie.replaceAll("Path=/auth/google", "Path=/api/auth/google"));
   }
-
-  const response = new NextResponse(upstream.body, { status: upstream.status, headers });
   response.headers.delete("content-encoding");
   response.headers.delete("content-length");
   return response;

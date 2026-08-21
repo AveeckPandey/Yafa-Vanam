@@ -27,7 +27,7 @@ export default function AddToBag({ productId, variantId, quantity, className = "
   return (
     <>
       <button className={className} type="button" disabled={busy} onClick={requireAuthThenAdd}>{busy ? "Adding…" : "Add to Bag"}</button>
-      <span className="visually-hidden" aria-live="polite">{message}</span>
+      {message ? <p className={`add-to-bag__message${message === "Added to your bag." ? " is-success" : " is-error"}`} role="status">{message}</p> : null}
     </>
   );
 }
