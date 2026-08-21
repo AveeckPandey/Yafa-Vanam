@@ -1,6 +1,8 @@
 import type { AdvisorSession } from "./types";
 
-const BASE = process.env.NEXT_PUBLIC_ADVISOR_URL || "http://localhost:8000";
+// The browser talks only to this same-origin route. The Next.js server then
+// reaches the private Railway recommendation service using ADVISOR_URL.
+const BASE = "/api/advisor";
 
 async function json<T>(path: string, init?: RequestInit): Promise<T> {
   const response = await fetch(`${BASE}${path}`, {
