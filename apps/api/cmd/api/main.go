@@ -95,7 +95,10 @@ func main() {
 		if storageErr == nil && analyzerErr == nil {
 			yafaService.SetInfrastructure(storage, analyzer)
 		} else if production {
-			logger.Error("Yafa configuration failed", "storage_configured", storageErr == nil, "analyzer_configured", analyzerErr == nil)
+			// These errors only identify a missing or invalid configuration group; they
+			// never contain credential values. Keeping them in the startup log makes a
+			// Railway deployment actionable without exposing secrets.
+			logger.Error("Yafa configuration failed", "storage_error", storageErr, "analyzer_error", analyzerErr)
 			os.Exit(1)
 		} else {
 			logger.Warn("Yafa selfie analysis disabled until private storage and analyzer are configured")
