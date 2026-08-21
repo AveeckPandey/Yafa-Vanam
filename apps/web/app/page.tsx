@@ -1,5 +1,6 @@
 import HeroCarousel from "../components/home/HeroCarousel";
 import FeaturedSets from "../components/home/FeaturedSets";
+import EditorialGrid from "../components/home/EditorialGrid";
 
 export default function HomePage() {
   return (
@@ -20,6 +21,7 @@ export default function HomePage() {
         </div>
       </section>
       <FeaturedSets />
+      <EditorialGrid />
     </main>
   );
 }
