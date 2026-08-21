@@ -11,8 +11,7 @@ RUN addgroup -S yafa && adduser -S yafa -G yafa
 WORKDIR /app
 COPY --from=build /out/yafa-api /app/yafa-api
 COPY --from=build /src/data/processed/Product.json /app/data/processed/Product.json
-COPY apps/api/db/migrations /app/db/migrations
-ENV API_PORT=4000
+COPY --from=build /src/apps/api/db/migrations /app/db/migrations
 ENV YAFA_CATALOGUE_PATH=/app/data/processed/Product.json
 USER yafa
 EXPOSE 4000
