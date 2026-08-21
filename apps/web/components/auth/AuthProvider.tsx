@@ -41,13 +41,27 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [modalOpen, setModalOpen] = useState(false);
   const deferredAction = useRef<(() => void | Promise<void>) | null>(null);
   useEffect(() => { fetch(`${API}/auth/me`, { credentials: "include" }).then(async (response) => response.ok ? (await response.json() as { user: AuthUser }).user : null).then(setUser).catch(() => setUser(null)).finally(() => setIsLoading(false)); }, []);
+  useEffect(() => {
+    if (isLoading || !deferredAction.current) return;
+    if (user) {
+      const action = deferredAction.current;
+      deferredAction.current = null;
+      void action();
+      return;
+    }
+    setModalOpen(true);
+  }, [isLoading, user]);
   const complete = useCallback((nextUser: AuthUser) => { setUser(nextUser); setModalOpen(false); const action = deferredAction.current; deferredAction.current = null; void action?.(); }, []);
   const login = useCallback(async (email: string, password: string, remember: boolean) => complete(await authRequest("/auth/login", { email, password, remember })), [complete]);
   const register = useCallback(async (name: string, email: string, password: string, remember: boolean) => complete(await authRequest("/auth/register", { name, email, password, remember })), [complete]);
   const requestPasswordReset = useCallback((email: string) => resetRequest("/auth/password-reset/request", { email }), []);
   const resetPassword = useCallback((token: string, password: string) => resetRequest("/auth/password-reset/confirm", { token, password }), []);
   const logout = useCallback(async () => { const token = await csrf(); await fetch(`${API}/auth/logout`, { method: "POST", credentials: "include", headers: { "X-CSRF-Token": token } }); setUser(null); }, []);
-  const requireAuth = useCallback((action: () => void | Promise<void>) => { if (user) { void action(); return; } deferredAction.current = action; setModalOpen(true); }, [user]);
+  const requireAuth = useCallback((action: () => void | Promise<void>) => {
+    if (user) { void action(); return; }
+    deferredAction.current = action;
+    if (!isLoading) setModalOpen(true);
+  }, [isLoading, user]);
   const value = useMemo(() => ({ user, isAuthenticated: !!user, isLoading, login, register, requestPasswordReset, resetPassword, logout, requireAuth, openAuth: () => setModalOpen(true) }), [user, isLoading, login, register, requestPasswordReset, resetPassword, logout, requireAuth]);
   const currentPath = typeof window === "undefined" ? "/" : `${window.location.pathname}${window.location.search}`;
   const googleUrl = `${API}/auth/google?return_to=${encodeURIComponent(currentPath)}`;
