@@ -6,6 +6,13 @@ import { getProductById } from "./catalog";
 
 export const CART_COOKIE = "yafa-cart-id";
 
+export const emptyCartResponse: CartResponse = {
+  items: [],
+  itemCount: 0,
+  subtotal: 0,
+  currency: "INR",
+};
+
 export function toCartResponse(cart: ApiCart): CartResponse {
   return {
     items: cart.items.map((line) => {
@@ -32,7 +39,8 @@ export function toCartResponse(cart: ApiCart): CartResponse {
 }
 
 export async function getOrCreateCart(request: NextRequest) {
-	const authCookie = request.headers.get("cookie") || undefined;
+  const authCookie = request.headers.get("cookie") || undefined;
+  const csrf = request.headers.get("x-csrf-token") || undefined;
   const existingId = request.cookies.get(CART_COOKIE)?.value;
   if (existingId) {
     try {
@@ -41,5 +49,5 @@ export async function getOrCreateCart(request: NextRequest) {
       if (!(error instanceof CommerceApiError) || error.status !== 404) throw error;
     }
   }
-  return { cart: await commerceApi.createCart(authCookie), created: true };
+  return { cart: await commerceApi.createCart(authCookie, csrf), created: true };
 }

@@ -1,6 +1,6 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { z } from "zod";
-import { CART_COOKIE, getOrCreateCart, toCartResponse } from "@/lib/cart-server";
+import { CART_COOKIE, emptyCartResponse, getOrCreateCart, toCartResponse } from "@/lib/cart-server";
 import { commerceApi, CommerceApiError } from "@/lib/commerce-api";
 
 const addSchema = z.object({
@@ -28,11 +28,22 @@ function apiError(error: unknown) {
 }
 
 export async function GET(request: NextRequest) {
+  // A GET request must not create a cart. Authenticated cart creation is a
+  // state-changing operation and therefore requires the CSRF token supplied
+  // by the browser on POST.
+  if (!request.cookies.get(CART_COOKIE)?.value) {
+    return NextResponse.json(emptyCartResponse);
+  }
+  const cartId = request.cookies.get(CART_COOKIE)?.value;
   try {
-    const { cart, created } = await getOrCreateCart(request);
-    const response = NextResponse.json(toCartResponse(cart));
-    return created ? withCartCookie(response, cart.id) : response;
+    const cart = await commerceApi.getCart(cartId!, request.headers.get("cookie") || undefined);
+    return NextResponse.json(toCartResponse(cart));
   } catch (error) {
+    if (error instanceof CommerceApiError && error.status === 404) {
+      const response = NextResponse.json(emptyCartResponse);
+      response.cookies.delete(CART_COOKIE);
+      return response;
+    }
     return apiError(error);
   }
 }
