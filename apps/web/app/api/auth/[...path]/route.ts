@@ -1,20 +1,27 @@
 import { NextRequest, NextResponse } from "next/server";
 
-const API = (process.env.COMMERCE_API_URL || process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000").replace(/\/$/, "");
+const apiBase = () => (process.env.COMMERCE_API_URL || process.env.NEXT_PUBLIC_API_URL || (process.env.NODE_ENV === "production" ? "" : "http://localhost:4000")).replace(/\/$/, "");
 
 async function forward(request: NextRequest, context: { params: Promise<{ path: string[] }> }) {
+  const API = apiBase();
+  if (!API) return NextResponse.json({ error: "Secure sign-in is unavailable because the commerce connection is not configured." }, { status: 503 });
   const { path } = await context.params;
-  const upstream = await fetch(`${API}/auth/${path.map(encodeURIComponent).join("/")}${request.nextUrl.search}`, {
-    method: request.method,
-    headers: {
-      ...(request.headers.get("content-type") ? { "content-type": request.headers.get("content-type")! } : {}),
-      ...(request.headers.get("x-csrf-token") ? { "x-csrf-token": request.headers.get("x-csrf-token")! } : {}),
-      ...(request.headers.get("cookie") ? { cookie: request.headers.get("cookie")! } : {}),
-    },
-    body: request.method === "GET" || request.method === "HEAD" ? undefined : await request.text(),
-    redirect: "manual",
-    cache: "no-store",
-  });
+  let upstream: Response;
+  try {
+    upstream = await fetch(`${API}/auth/${path.map(encodeURIComponent).join("/")}${request.nextUrl.search}`, {
+      method: request.method,
+      headers: {
+        ...(request.headers.get("content-type") ? { "content-type": request.headers.get("content-type")! } : {}),
+        ...(request.headers.get("x-csrf-token") ? { "x-csrf-token": request.headers.get("x-csrf-token")! } : {}),
+        ...(request.headers.get("cookie") ? { cookie: request.headers.get("cookie")! } : {}),
+      },
+      body: request.method === "GET" || request.method === "HEAD" ? undefined : await request.text(),
+      redirect: "manual",
+      cache: "no-store",
+    });
+  } catch {
+    return NextResponse.json({ error: "Secure sign-in is temporarily unavailable. Please try again shortly." }, { status: 502 });
+  }
 
   const headers = new Headers(upstream.headers);
   const setCookie = headers.get("set-cookie");

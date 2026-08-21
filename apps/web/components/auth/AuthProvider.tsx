@@ -10,9 +10,24 @@ const AuthContext = createContext<AuthContextValue | null>(null);
 // the API remains private inside Railway's network.
 const API = "/api";
 
-function readCookie(name: string) { return document.cookie.split("; ").find((item) => item.startsWith(`${name}=`))?.split("=").slice(1).join("=") || ""; }
-async function csrf() { const response = await fetch(`${API}/auth/csrf`, { credentials: "include" }); if (!response.ok) throw new Error("Unable to prepare secure sign-in."); return (await response.json() as { csrfToken: string }).csrfToken; }
-async function authRequest(path: string, body?: unknown) { const token = await csrf(); const response = await fetch(`${API}${path}`, { method: "POST", credentials: "include", headers: { "Content-Type": "application/json", "X-CSRF-Token": token }, body: body === undefined ? undefined : JSON.stringify(body) }); const payload = await response.json().catch(() => ({})) as { user?: AuthUser; error?: string }; if (!response.ok || !payload.user) throw new Error(payload.error || "Something went wrong. Please try again."); return payload.user; }
+async function readError(response: Response, fallback: string) { const payload = await response.json().catch(() => null) as { error?: string } | null; return payload?.error || fallback; }
+async function csrf() {
+  const response = await fetch(`${API}/auth/csrf`, { credentials: "include", cache: "no-store" });
+  if (!response.ok) throw new Error(await readError(response, "Secure sign-in is temporarily unavailable. Please try again shortly."));
+  const payload = await response.json().catch(() => null) as { csrfToken?: string } | null;
+  if (!payload?.csrfToken) throw new Error("Secure sign-in is temporarily unavailable. Please try again shortly.");
+  return payload.csrfToken;
+}
+async function authRequest(path: string, body?: unknown) {
+  const token = await csrf();
+  const response = await fetch(`${API}${path}`, { method: "POST", credentials: "include", headers: { "Content-Type": "application/json", "X-CSRF-Token": token }, body: body === undefined ? undefined : JSON.stringify(body) });
+  const payload = await response.json().catch(() => ({})) as { user?: AuthUser; error?: string };
+  if (!response.ok || !payload.user) {
+    if (response.status === 401) throw new Error("Incorrect email or password. Please try again.");
+    throw new Error(payload.error || "We could not complete that request. Please try again.");
+  }
+  return payload.user;
+}
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<AuthUser | null>(null);
