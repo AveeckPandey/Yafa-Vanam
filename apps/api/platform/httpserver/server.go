@@ -1,25 +1,37 @@
 package httpserver
 
 import (
+	"context"
+	"crypto/rand"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
 	"log/slog"
+	"net"
 	"net/http"
 	"runtime/debug"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/BuildWithAveeck/yafa-vanam/apps/api/internal/auth"
 	"github.com/BuildWithAveeck/yafa-vanam/apps/api/internal/commerce"
+	"github.com/BuildWithAveeck/yafa-vanam/apps/api/internal/yafa"
+	"github.com/redis/go-redis/v9"
+	"golang.org/x/time/rate"
 )
 
 type Config struct {
 	AllowedOrigins          []string
 	Logger                  *slog.Logger
+	DependencyHealth        func(context.Context) map[string]string
+	RateLimitStore          redis.UniversalClient
+	PanicReporter           func(*http.Request, any, []byte)
 	Auth                    *auth.Handler
+	Yafa                    *yafa.Service
 	RazorpayKeyID           string
 	RazorpayKeySecret       string
 	RazorpayWebhookSecret   string
@@ -32,10 +44,22 @@ type Server struct {
 	logger                  *slog.Logger
 	allowedOrigins          map[string]struct{}
 	startedAt               time.Time
+	dependencyHealth        func(context.Context) map[string]string
+	rateLimitStore          redis.UniversalClient
+	panicReporter           func(*http.Request, any, []byte)
 	razorpayKeyID           string
 	razorpayKeySecret       string
 	razorpayWebhookSecret   string
 	razorpayCheckoutEnabled bool
+	razorpayMu              sync.Mutex
+	yafa                    *yafa.Service
+	rateMu                  sync.Mutex
+	clientRates             map[string]*clientRate
+}
+
+type clientRate struct {
+	limiter *rate.Limiter
+	seenAt  time.Time
 }
 
 type apiError struct {
@@ -59,6 +83,11 @@ func New(catalog *commerce.Catalog, store *commerce.Store, config Config) http.H
 		razorpayKeySecret:       config.RazorpayKeySecret,
 		razorpayWebhookSecret:   config.RazorpayWebhookSecret,
 		razorpayCheckoutEnabled: config.RazorpayCheckoutEnabled,
+		yafa:                    config.Yafa,
+		clientRates:             make(map[string]*clientRate),
+		dependencyHealth:        config.DependencyHealth,
+		rateLimitStore:          config.RateLimitStore,
+		panicReporter:           config.PanicReporter,
 	}
 	for _, origin := range config.AllowedOrigins {
 		origin = strings.TrimSpace(origin)
@@ -81,6 +110,22 @@ func New(catalog *commerce.Catalog, store *commerce.Store, config Config) http.H
 	mux.HandleFunc("POST /api/v1/payments/razorpay/verify", server.verifyRazorpayPayment)
 	mux.HandleFunc("POST /api/v1/payments/razorpay/webhook", server.razorpayWebhook)
 	if config.Auth != nil {
+		mux.Handle("GET /api/v1/me/beauty-profile", config.Auth.Middleware(http.HandlerFunc(server.yafaBeautyProfile)))
+		mux.Handle("POST /api/v1/yafa/session/start", config.Auth.OptionalMiddleware(http.HandlerFunc(server.startYafaSession)))
+		mux.Handle("PATCH /api/v1/yafa/session/{sessionID}/answer", config.Auth.OptionalMiddleware(http.HandlerFunc(server.saveYafaAnswer)))
+		mux.Handle("POST /api/v1/yafa/session/{sessionID}/selfie", config.Auth.OptionalMiddleware(http.HandlerFunc(server.uploadYafaSelfie)))
+		mux.Handle("POST /api/v1/yafa/session/{sessionID}/analyze", config.Auth.OptionalMiddleware(http.HandlerFunc(server.analyzeYafaSession)))
+		mux.Handle("POST /api/v1/yafa/session/{sessionID}/confirm", config.Auth.OptionalMiddleware(http.HandlerFunc(server.confirmYafaShade)))
+		mux.Handle("POST /api/v1/yafa/confirm-shade", config.Auth.OptionalMiddleware(http.HandlerFunc(server.confirmYafaShade)))
+	} else {
+		mux.HandleFunc("POST /api/v1/yafa/session/start", server.startYafaSession)
+		mux.HandleFunc("PATCH /api/v1/yafa/session/{sessionID}/answer", server.saveYafaAnswer)
+		mux.HandleFunc("POST /api/v1/yafa/session/{sessionID}/selfie", server.uploadYafaSelfie)
+		mux.HandleFunc("POST /api/v1/yafa/session/{sessionID}/analyze", server.analyzeYafaSession)
+		mux.HandleFunc("POST /api/v1/yafa/session/{sessionID}/confirm", server.confirmYafaShade)
+		mux.HandleFunc("POST /api/v1/yafa/confirm-shade", server.confirmYafaShade)
+	}
+	if config.Auth != nil {
 		mux.Handle("POST /api/v1/carts", config.Auth.Middleware(http.HandlerFunc(server.createCart)))
 		mux.Handle("GET /api/v1/carts/{cartID}", config.Auth.Middleware(http.HandlerFunc(server.getCart)))
 		mux.Handle("POST /api/v1/carts/{cartID}/items", config.Auth.Middleware(http.HandlerFunc(server.addCartItem)))
@@ -99,14 +144,36 @@ func New(catalog *commerce.Catalog, store *commerce.Store, config Config) http.H
 	}
 	mux.HandleFunc("/", server.notFound)
 
-	return server.recoverPanic(server.securityHeaders(server.cors(server.requestLog(mux))))
+	var handler http.Handler = mux
+	handler = server.requestLog(handler)
+	if config.Auth != nil {
+		handler = config.Auth.OptionalMiddleware(handler)
+		handler = config.Auth.CSRFMiddleware(handler)
+	}
+	return server.recoverPanic(server.securityHeaders(server.cors(server.rateLimit(handler))))
 }
 
-func (server *Server) health(w http.ResponseWriter, _ *http.Request) {
-	writeJSON(w, http.StatusOK, map[string]any{
-		"service": "yafa-api", "status": "ok", "catalogue_products": server.catalog.ProductCount(),
-		"uptime_seconds": int64(time.Since(server.startedAt).Seconds()), "time": time.Now().UTC(),
-	})
+func (server *Server) health(w http.ResponseWriter, request *http.Request) {
+	dependencies := map[string]string{}
+	if server.dependencyHealth != nil {
+		dependencies = server.dependencyHealth(request.Context())
+	}
+	status := "ok"
+	for _, value := range dependencies {
+		if value != "ok" {
+			status = "degraded"
+			break
+		}
+	}
+	response := map[string]any{"service": "yafa-api", "status": status, "catalogue_products": server.catalog.ProductCount(), "uptime_seconds": int64(time.Since(server.startedAt).Seconds()), "time": time.Now().UTC()}
+	for name, value := range dependencies {
+		response[name] = value
+	}
+	if status != "ok" {
+		writeJSON(w, http.StatusServiceUnavailable, response)
+		return
+	}
+	writeJSON(w, http.StatusOK, response)
 }
 
 func (server *Server) index(w http.ResponseWriter, _ *http.Request) {
@@ -322,9 +389,58 @@ func writeError(w http.ResponseWriter, status int, code, message string) {
 func (server *Server) requestLog(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, request *http.Request) {
 		started := time.Now()
-		next.ServeHTTP(w, request)
-		server.logger.Info("request", "method", request.Method, "path", request.URL.Path, "duration_ms", time.Since(started).Milliseconds())
+		requestID := requestID(request.Header.Get("X-Request-ID"))
+		w.Header().Set("X-Request-ID", requestID)
+		recorder := &statusRecorder{ResponseWriter: w}
+		next.ServeHTTP(recorder, request)
+		status := recorder.status
+		if status == 0 {
+			status = http.StatusOK
+		}
+		userID := "anonymous"
+		if user, ok := requestUser(request); ok {
+			userID = user.ID
+		}
+		server.logger.Info("request", "request_id", requestID, "method", request.Method, "path", request.URL.Path, "status_code", status, "latency_ms", time.Since(started).Milliseconds(), "user_id", userID)
 	})
+}
+
+type statusRecorder struct {
+	http.ResponseWriter
+	status int
+}
+
+func (recorder *statusRecorder) WriteHeader(status int) {
+	recorder.status = status
+	recorder.ResponseWriter.WriteHeader(status)
+}
+
+func (recorder *statusRecorder) Write(body []byte) (int, error) {
+	if recorder.status == 0 {
+		recorder.status = http.StatusOK
+	}
+	return recorder.ResponseWriter.Write(body)
+}
+
+func requestID(incoming string) string {
+	incoming = strings.TrimSpace(incoming)
+	if len(incoming) > 0 && len(incoming) <= 100 {
+		valid := true
+		for _, character := range incoming {
+			if !((character >= 'a' && character <= 'z') || (character >= 'A' && character <= 'Z') || (character >= '0' && character <= '9') || character == '-' || character == '_') {
+				valid = false
+				break
+			}
+		}
+		if valid {
+			return incoming
+		}
+	}
+	bytes := make([]byte, 16)
+	if _, err := rand.Read(bytes); err == nil {
+		return hex.EncodeToString(bytes)
+	}
+	return strconv.FormatInt(time.Now().UnixNano(), 36)
 }
 
 func (server *Server) cors(next http.Handler) http.Handler {
@@ -334,7 +450,7 @@ func (server *Server) cors(next http.Handler) http.Handler {
 			w.Header().Set("Access-Control-Allow-Origin", origin)
 			w.Header().Set("Vary", "Origin")
 			w.Header().Set("Access-Control-Allow-Credentials", "true")
-			w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Idempotency-Key, X-Order-Access-Token, X-CSRF-Token")
+			w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Idempotency-Key, X-Order-Access-Token, X-CSRF-Token, X-Yafa-Session-Token")
 			w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PATCH, DELETE, OPTIONS")
 		}
 		if request.Method == http.MethodOptions {
@@ -343,6 +459,68 @@ func (server *Server) cors(next http.Handler) http.Handler {
 		}
 		next.ServeHTTP(w, request)
 	})
+}
+
+func (server *Server) rateLimit(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, request *http.Request) {
+		if request.Method == http.MethodOptions || request.URL.Path == "/health" || request.URL.Path == "/ready" {
+			next.ServeHTTP(w, request)
+			return
+		}
+		bucket, perMinute := requestLimitBucket(request)
+		if !server.allowRequest(request.Context(), bucket, perMinute) {
+			w.Header().Set("Retry-After", "60")
+			writeError(w, http.StatusTooManyRequests, "rate_limited", "Too many requests. Please try again shortly.")
+			return
+		}
+		next.ServeHTTP(w, request)
+	})
+}
+
+func requestLimitBucket(request *http.Request) (string, int) {
+	path := request.URL.Path
+	class, perMinute := "api", 100
+	if strings.HasPrefix(path, "/auth/") {
+		class, perMinute = "auth", 10
+	} else if strings.HasPrefix(path, "/api/v1/payments/") {
+		class, perMinute = "payments", 20
+	}
+	host, _, err := net.SplitHostPort(request.RemoteAddr)
+	if err != nil || host == "" {
+		host = request.RemoteAddr
+	}
+	return class + ":" + host, perMinute
+}
+
+func (server *Server) allowRequest(ctx context.Context, bucket string, perMinute int) bool {
+	if server.rateLimitStore != nil {
+		key := "yafa:ratelimit:" + bucket
+		count, err := server.rateLimitStore.Incr(ctx, key).Result()
+		if err == nil {
+			if count == 1 {
+				_ = server.rateLimitStore.Expire(ctx, key, time.Minute).Err()
+			}
+			return count <= int64(perMinute)
+		}
+		server.logger.Error("rate limit store unavailable; using local fallback", "error", err)
+	}
+	now := time.Now()
+	server.rateMu.Lock()
+	defer server.rateMu.Unlock()
+	if len(server.clientRates) > 2_048 {
+		for key, value := range server.clientRates {
+			if now.Sub(value.seenAt) > 10*time.Minute {
+				delete(server.clientRates, key)
+			}
+		}
+	}
+	entry := server.clientRates[bucket]
+	if entry == nil {
+		entry = &clientRate{limiter: rate.NewLimiter(rate.Limit(float64(perMinute)/60), perMinute)}
+		server.clientRates[bucket] = entry
+	}
+	entry.seenAt = now
+	return entry.limiter.Allow()
 }
 
 func (server *Server) securityHeaders(next http.Handler) http.Handler {
@@ -363,7 +541,11 @@ func (server *Server) recoverPanic(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, request *http.Request) {
 		defer func() {
 			if recovered := recover(); recovered != nil {
-				server.logger.Error("panic recovered", "panic", recovered, "stack", string(debug.Stack()))
+				stack := debug.Stack()
+				if server.panicReporter != nil {
+					server.panicReporter(request, recovered, stack)
+				}
+				server.logger.Error("panic recovered", "panic", recovered, "stack", string(stack))
 				writeError(w, http.StatusInternalServerError, "internal_error", "An unexpected error occurred.")
 			}
 		}()

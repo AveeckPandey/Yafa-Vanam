@@ -1,0 +1,5 @@
+{
+  "CONFIDENCE_THRESHOLD": 0.72,
+  "status": "provisional",
+  "note": "Replace only with the reviewed result from tools/calibrate.py after the consented validation dataset has been evaluated."
+}

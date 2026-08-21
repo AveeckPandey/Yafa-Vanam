@@ -28,7 +28,7 @@ export async function PATCH(
   const { cartId, variantId } = cartIdentity(request, key);
   if (!cartId || !variantId) return NextResponse.json({ error: "Cart item not found." }, { status: 404 });
   try {
-    return NextResponse.json(toCartResponse(await commerceApi.setItem(cartId, variantId, parsed.data.quantity, request.headers.get("cookie") || undefined)));
+    return NextResponse.json(toCartResponse(await commerceApi.setItem(cartId, variantId, parsed.data.quantity, request.headers.get("cookie") || undefined, request.headers.get("x-csrf-token") || undefined)));
   } catch (error) {
     return apiError(error);
   }
@@ -42,7 +42,7 @@ export async function DELETE(
   const { cartId, variantId } = cartIdentity(request, key);
   if (!cartId || !variantId) return NextResponse.json({ error: "Cart item not found." }, { status: 404 });
   try {
-    return NextResponse.json(toCartResponse(await commerceApi.removeItem(cartId, variantId, request.headers.get("cookie") || undefined)));
+    return NextResponse.json(toCartResponse(await commerceApi.removeItem(cartId, variantId, request.headers.get("cookie") || undefined, request.headers.get("x-csrf-token") || undefined)));
   } catch (error) {
     return apiError(error);
   }

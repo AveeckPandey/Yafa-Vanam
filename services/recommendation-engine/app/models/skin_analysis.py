@@ -28,3 +28,4 @@ class SkinAnalysisResult(BaseModel):
     analysis: SkinAnalysis | None = None
     shade_candidates: list[ShadeCandidate] = Field(default_factory=list)
     confidence: float | None = Field(default=None, ge=0, le=1)
+    skin_region_ratio: float | None = Field(default=None, ge=0, le=1)

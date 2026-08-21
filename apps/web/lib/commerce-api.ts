@@ -61,13 +61,13 @@ export class CommerceApiError extends Error {
   }
 }
 
-async function request<T>(path: string, init?: RequestInit, cookie?: string): Promise<T> {
+async function request<T>(path: string, init?: RequestInit, cookie?: string, csrf?: string): Promise<T> {
   let response: Response;
   try {
     response = await fetch(`${BASE}${path}`, {
       ...init,
       cache: "no-store",
-      headers: { "Content-Type": "application/json", ...(cookie ? { Cookie: cookie } : {}), ...(init?.headers || {}) },
+      headers: { "Content-Type": "application/json", ...(cookie ? { Cookie: cookie } : {}), ...(csrf ? { "X-CSRF-Token": csrf } : {}), ...(init?.headers || {}) },
     });
   } catch {
     throw new CommerceApiError(503, "The commerce service is temporarily unavailable.");
@@ -86,28 +86,28 @@ async function request<T>(path: string, init?: RequestInit, cookie?: string): Pr
 export const commerceApi = {
   createCart: (cookie?: string) => request<ApiCart>("/api/v1/carts", { method: "POST", body: "{}" }, cookie),
   getCart: (cartId: string, cookie?: string) => request<ApiCart>(`/api/v1/carts/${encodeURIComponent(cartId)}`, undefined, cookie),
-  addItem: (cartId: string, input: { product_id: string; variant_id: string; quantity: number }, cookie?: string) =>
+  addItem: (cartId: string, input: { product_id: string; variant_id: string; quantity: number }, cookie?: string, csrf?: string) =>
     request<ApiCart>(`/api/v1/carts/${encodeURIComponent(cartId)}/items`, {
       method: "POST",
       body: JSON.stringify(input),
-    }, cookie),
-  setItem: (cartId: string, variantId: string, quantity: number, cookie?: string) =>
+    }, cookie, csrf),
+  setItem: (cartId: string, variantId: string, quantity: number, cookie?: string, csrf?: string) =>
     request<ApiCart>(`/api/v1/carts/${encodeURIComponent(cartId)}/items/${encodeURIComponent(variantId)}`, {
       method: "PATCH",
       body: JSON.stringify({ quantity }),
-    }, cookie),
-  removeItem: (cartId: string, variantId: string, cookie?: string) =>
+    }, cookie, csrf),
+  removeItem: (cartId: string, variantId: string, cookie?: string, csrf?: string) =>
     request<ApiCart>(`/api/v1/carts/${encodeURIComponent(cartId)}/items/${encodeURIComponent(variantId)}`, {
       method: "DELETE",
-    }, cookie),
-  createRazorpayOrder: (input: RazorpayCheckoutInput, idempotencyKey: string, cookie?: string) =>
+    }, cookie, csrf),
+  createRazorpayOrder: (input: RazorpayCheckoutInput, idempotencyKey: string, cookie?: string, csrf?: string) =>
     request<RazorpayCheckoutOrder>("/api/v1/payments/razorpay/orders", {
       method: "POST",
       headers: { "Idempotency-Key": idempotencyKey },
       body: JSON.stringify(input),
-    }, cookie),
-  verifyRazorpayPayment: (input: { razorpay_payment_id: string; razorpay_order_id: string; razorpay_signature: string }, cookie?: string) =>
+    }, cookie, csrf),
+  verifyRazorpayPayment: (input: { razorpay_payment_id: string; razorpay_order_id: string; razorpay_signature: string }, cookie?: string, csrf?: string) =>
     request<{ verified: boolean; order_number: string; payment_status: string }>("/api/v1/payments/razorpay/verify", {
       method: "POST", body: JSON.stringify(input),
-    }, cookie),
+    }, cookie, csrf),
 };

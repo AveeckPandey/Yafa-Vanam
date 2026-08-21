@@ -23,7 +23,7 @@ export async function POST(request: NextRequest) {
     const order = await commerceApi.createRazorpayOrder({
       cart_id: cart.id, customer_email: customer.email, shipping_method: shippingMethod, discount_code: discountCode,
       shipping_address: { recipient_name: `${customer.firstName} ${customer.lastName}`.trim(), phone: customer.phone, line1: customer.address, line2: customer.apartment || undefined, city: customer.city, state_region: customer.state, postal_code: customer.pin, country_code: "IN" },
-    }, idempotencyKey, request.headers.get("cookie") || undefined);
+    }, idempotencyKey, request.headers.get("cookie") || undefined, request.headers.get("x-csrf-token") || undefined);
     return NextResponse.json({ orderId: order.razorpay_order_id, amount: order.amount, currency: order.currency, keyId: order.key_id, orderNumber: order.order_number });
   } catch (error) {
     if (error instanceof CommerceApiError) return NextResponse.json({ error: error.message }, { status: error.status });

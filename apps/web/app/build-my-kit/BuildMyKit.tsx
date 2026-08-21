@@ -1,11 +1,14 @@
 "use client";
 
 import Link from "next/link";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import VoiceKitAssistant, { type VoiceKitBrief } from "@/components/advisor/VoiceKitAssistant";
 import { advisorApi } from "@/lib/advisor/client";
 import type { Recommendation } from "@/lib/advisor/types";
 import type { CatalogProduct } from "@/lib/catalog-types";
+import { useAuth } from "@/components/auth/AuthProvider";
+import { getConfirmedYafaProfile, type ConfirmedYafaProfile } from "@/lib/yafa-profile";
+import { trackEvent } from "@/lib/analytics";
 
 type Answer = { goal: string; finish: string; focus: string; budget: string };
 const steps: Array<{ key: keyof Answer; label: string; question: string; options: Array<{ label: string; value: string }> }> = [
@@ -16,17 +19,28 @@ const steps: Array<{ key: keyof Answer; label: string; question: string; options
 ];
 
 export default function BuildMyKit({ products }: { products: CatalogProduct[] }) {
+  const { user } = useAuth();
   const [step, setStep] = useState(0);
   const [answers, setAnswers] = useState<Answer>({ goal: "", finish: "", focus: "", budget: "" });
   const [voiceRecommendations, setVoiceRecommendations] = useState<Recommendation[] | null>(null);
+  const [yafaProfile, setYafaProfile] = useState<ConfirmedYafaProfile | null>(null);
+  const [useYafaMatch, setUseYafaMatch] = useState(true);
   const current = steps[step];
   const complete = step === steps.length;
+  useEffect(() => {
+    if (!user) {
+      setYafaProfile(null);
+      return;
+    }
+    getConfirmedYafaProfile().then(setYafaProfile).catch(() => setYafaProfile(null));
+  }, [user]);
   const recommendations = useMemo(() => {
     const preferred = answers.focus === "face" ? products.filter((product) => product.makeupGroup === "face") : answers.focus === "care" ? products.filter((product) => product.category === "Skincare") : products.filter((product) => product.makeupGroup === "eyes" || product.makeupGroup === "lips");
-    return [...preferred, ...products.filter((product) => !preferred.includes(product))].slice(0, answers.budget === "essential" ? 3 : 5);
-  }, [answers.budget, answers.focus, products]);
+    const yafaProduct = useYafaMatch && yafaProfile?.shade_code ? products.find((product) => product.variants.some((variant) => variant.shade?.code === yafaProfile.shade_code)) : undefined;
+    return [...(yafaProduct ? [yafaProduct] : []), ...preferred, ...products.filter((product) => !preferred.includes(product) && product !== yafaProduct)].filter((product, index, list) => list.indexOf(product) === index).slice(0, answers.budget === "essential" ? 3 : 5);
+  }, [answers.budget, answers.focus, products, useYafaMatch, yafaProfile]);
   const choose = (value: string) => setAnswers((currentAnswers) => ({ ...currentAnswers, [current.key]: value }));
-  const next = () => setStep((currentStep) => Math.min(steps.length, currentStep + 1));
+  const next = () => setStep((currentStep) => { const nextStep = Math.min(steps.length, currentStep + 1); if (nextStep === steps.length) trackEvent("recommendation_viewed", { source: "kit_builder", has_yafa_match: Boolean(yafaProfile && useYafaMatch) }); return nextStep; });
   const applyVoiceBrief = async (brief: VoiceKitBrief) => {
     setAnswers((currentAnswers) => ({ ...currentAnswers, ...brief }));
     setStep(steps.length);
@@ -41,7 +55,7 @@ export default function BuildMyKit({ products }: { products: CatalogProduct[] })
   };
 
   return <main id="main-content" className="kit-flow">
-    <section className="kit-flow__intro"><p>YAFA VANAM / Personal ritual</p><h1>Build My Kit</h1><span>A small guided edit, shaped around how you want to feel.</span></section>
+    <section className="kit-flow__intro"><p>YAFA VANAM / Personal ritual</p><h1>Build My Kit</h1><span>A small guided edit, shaped around how you want to feel.</span>{yafaProfile && useYafaMatch ? <aside className="kit-flow__yafa">We’ve pre-selected your Yafa shade — {yafaProfile.shade_name}. <button type="button" onClick={() => setUseYafaMatch(false)}>Undo</button></aside> : !yafaProfile ? <Link className="kit-flow__yafa" href="/yafa">Complete your Yafa profile to get your shade pre-selected.</Link> : null}</section>
     <VoiceKitAssistant onKitReady={applyVoiceBrief} />
     {!complete ? <section className="kit-flow__step" aria-labelledby="kit-question">
       <div className="kit-flow__progress" aria-label={`Step ${step + 1} of ${steps.length}`}><span>Step {step + 1} of {steps.length}</span><ol>{steps.map((item, index) => <li key={item.key} className={index <= step ? "is-active" : ""}><span className="visually-hidden">{item.label}</span></li>)}</ol></div>

@@ -9,9 +9,10 @@
   },
   "dependencies": {
     "@hookform/resolvers": "latest",
+    "@sentry/nextjs": "^10.70.0",
     "clsx": "latest",
     "gsap": "latest",
-    "next": "latest",
+    "next": "^16.3.0",
     "posthog-js": "latest",
     "react": "latest",
     "react-dom": "latest",

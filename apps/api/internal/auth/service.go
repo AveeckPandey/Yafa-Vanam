@@ -41,7 +41,7 @@ func (s *Service) Register(ctx context.Context, name, email, password string) (U
 	if name == "" || len(password) < 8 || !strings.Contains(email, "@") {
 		return User{}, errors.New("provide a name, valid email, and password of at least 8 characters")
 	}
-	hash, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
+	hash, err := bcrypt.GenerateFromPassword([]byte(password), 12)
 	if err != nil {
 		return User{}, err
 	}
@@ -147,11 +147,11 @@ func (s *Service) signed(u User, kind, jti string, ttl time.Duration) (string, e
 }
 func (s *Service) parse(token, kind string) (jwt.MapClaims, error) {
 	parsed, err := jwt.Parse(token, func(t *jwt.Token) (any, error) {
-		if _, ok := t.Method.(*jwt.SigningMethodHMAC); !ok {
+		if t.Method.Alg() != jwt.SigningMethodHS256.Alg() {
 			return nil, errors.New("unexpected signing method")
 		}
 		return []byte(s.config.JWTSecret), nil
-	})
+	}, jwt.WithValidMethods([]string{jwt.SigningMethodHS256.Alg()}))
 	if err != nil || !parsed.Valid {
 		return nil, errors.New("invalid token")
 	}

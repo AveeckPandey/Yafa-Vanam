@@ -2,7 +2,7 @@
 
 import Image from "next/image";
 import Link from "next/link";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import type { CatalogProduct } from "@/lib/catalog-types";
 import { formatCatalogPrice } from "@/lib/catalog-types";
 import { getMakeupVariantImage } from "@/lib/makeup-variant-images";
@@ -12,6 +12,9 @@ import ProductAccordion from "./ProductAccordion";
 import ProductGallery from "./ProductGallery";
 import QuantitySelector from "./QuantitySelector";
 import StickyBuyBar from "./StickyBuyBar";
+import { useAuth } from "@/components/auth/AuthProvider";
+import { getConfirmedYafaProfile, type ConfirmedYafaProfile } from "@/lib/yafa-profile";
+import { trackEvent } from "@/lib/analytics";
 
 function pretty(value: string) {
   return value.replaceAll("_", " ");
@@ -26,8 +29,10 @@ export default function ProductPageClient({
   related: CatalogProduct[];
   layerMatch: CatalogProduct | null;
 }) {
+  const { user } = useAuth();
   const [quantity, setQuantity] = useState(1);
   const [variantId, setVariantId] = useState(product.defaultVariantId);
+  const [yafaProfile, setYafaProfile] = useState<ConfirmedYafaProfile | null>(null);
   const variantOptions = product.variants.filter((variant) => variant.size || variant.shade);
   const selected = product.variants.find((variant) => variant.id === variantId);
   const profile = product.fragranceProfile;
@@ -36,6 +41,22 @@ export default function ProductPageClient({
   const galleryImages = selectedImage
     ? [selectedImage, ...product.gallery.filter((image) => image !== selectedImage)]
     : product.gallery;
+
+  useEffect(() => {
+    trackEvent("product_viewed", { product_id: product.id, product_slug: product.slug, category: product.category });
+  }, [product.category, product.id, product.slug]);
+  useEffect(() => {
+    if (!user) {
+      setYafaProfile(null);
+      return;
+    }
+    getConfirmedYafaProfile().then((profile) => {
+      setYafaProfile(profile);
+      const match = profile?.shade_code ? product.variants.find((variant) => variant.shade?.code === profile.shade_code) : undefined;
+      if (match) setVariantId(match.id);
+    }).catch(() => setYafaProfile(null));
+  }, [product.variants, user]);
+  const yafaVariantMatch = Boolean(yafaProfile?.shade_code && selected?.shade?.code === yafaProfile.shade_code);
 
   return (
     <main id="main-content" className="product-page">
@@ -60,12 +81,13 @@ export default function ProductPageClient({
               {product.compareAtPrice ? <del>{formatCatalogPrice(product.currency, product.compareAtPrice)}</del> : null}
             </div>
             <p className="pdp-info__description">{product.shortDescription}</p>
+            {yafaProfile ? <aside className="pdp-yafa-match"><span style={{ backgroundColor: yafaProfile.hex }} aria-hidden="true" /><div><strong>{yafaVariantMatch ? "Recommended for you by Yafa" : `Your Yafa match: ${yafaProfile.shade_name}`}</strong><p>{yafaVariantMatch ? `${yafaProfile.shade_name} is selected for this product.` : "This product does not currently offer your exact Yafa shade."} <Link href="/yafa">Change shade</Link></p></div></aside> : <Link className="pdp-yafa-cta" href="/yafa">Find Your Shade with Yafa</Link>}
 
             <div id="pdp-purchase" className="pdp-purchase">
               {variantOptions.length > 0 ? (
                 <fieldset className="pdp-shade-selector">
                   <legend>{variantOptions.some((variant) => variant.shade) ? "Choose shade" : "Choose option"}</legend>
-                  <div>{variantOptions.map((variant) => <button key={variant.id} type="button" className={variantId === variant.id ? "is-selected" : ""} aria-pressed={variantId === variant.id} aria-label={`Select ${variant.shade?.name ?? variant.size ?? "option"}`} onClick={() => setVariantId(variant.id)}>{variant.shade?.hex ? <i style={{ backgroundColor: variant.shade.hex }} aria-hidden="true" /> : null}<span>{variant.size ?? variant.shade?.code ?? variant.shade?.name}</span></button>)}</div>
+                  <div>{variantOptions.map((variant) => <button key={variant.id} type="button" className={variantId === variant.id ? "is-selected" : ""} aria-pressed={variantId === variant.id} aria-label={`Select ${variant.shade?.name ?? variant.size ?? "option"}`} onClick={() => { setVariantId(variant.id); trackEvent("variant_selected", { product_id: product.id, variant_id: variant.id, shade_code: variant.shade?.code || null }); }}>{variant.shade?.hex ? <i style={{ backgroundColor: variant.shade.hex }} aria-hidden="true" /> : null}<span>{variant.size ?? variant.shade?.code ?? variant.shade?.name}</span></button>)}</div>
                   <p aria-live="polite">Selected: <strong>{selected?.shade?.name ?? selected?.size ?? "Standard option"}</strong></p>
                 </fieldset>
               ) : null}

@@ -59,6 +59,10 @@ func (server *Server) createRazorpayOrder(w http.ResponseWriter, request *http.R
 		writeError(w, http.StatusBadRequest, "invalid_idempotency_key", "Idempotency-Key must be 200 characters or fewer")
 		return
 	}
+	// A retry with the same idempotency key must never create a second gateway
+	// order while the first request is still attaching its provider ID.
+	server.razorpayMu.Lock()
+	defer server.razorpayMu.Unlock()
 	order, _, err := server.store.CreateOrder(input.CreateOrderInput, idempotencyKey)
 	if err != nil {
 		server.writeDomainError(w, err)

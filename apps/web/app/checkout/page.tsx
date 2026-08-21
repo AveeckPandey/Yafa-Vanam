@@ -1,5 +1,7 @@
+"use client";
+
 import CheckoutExperience from "./CheckoutExperience";
 
-export default function Page() {
+export default function CheckoutForm() {
   return <CheckoutExperience />;
 }

@@ -6,11 +6,12 @@ COPY data/processed/Product.json ./data/processed/Product.json
 WORKDIR /src/apps/api
 RUN CGO_ENABLED=0 GOOS=linux go build -trimpath -o /out/yafa-api ./cmd/api
 
-FROM alpine:3.21
+FROM alpine:3.20
 RUN addgroup -S yafa && adduser -S yafa -G yafa
 WORKDIR /app
 COPY --from=build /out/yafa-api /app/yafa-api
 COPY --from=build /src/data/processed/Product.json /app/data/processed/Product.json
+COPY apps/api/db/migrations /app/db/migrations
 ENV API_PORT=4000
 ENV YAFA_CATALOGUE_PATH=/app/data/processed/Product.json
 USER yafa
