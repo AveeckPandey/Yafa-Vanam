@@ -74,17 +74,18 @@ async function request<T>(path: string, init?: RequestInit, cookie?: string, csr
   }
 
   if (!response.ok) {
-    const body = await response.json().catch(() => null) as { error?: { message?: string } } | null;
+    const body = await response.json().catch(() => null) as { error?: string | { message?: string } } | null;
+    const message = typeof body?.error === "string" ? body.error : body?.error?.message;
     throw new CommerceApiError(
       response.status,
-      body?.error?.message || `Commerce request failed (${response.status}).`,
+      message || `Commerce request failed (${response.status}).`,
     );
   }
   return response.json() as Promise<T>;
 }
 
 export const commerceApi = {
-  createCart: (cookie?: string) => request<ApiCart>("/api/v1/carts", { method: "POST", body: "{}" }, cookie),
+  createCart: (cookie?: string, csrf?: string) => request<ApiCart>("/api/v1/carts", { method: "POST", body: "{}" }, cookie, csrf),
   getCart: (cartId: string, cookie?: string) => request<ApiCart>(`/api/v1/carts/${encodeURIComponent(cartId)}`, undefined, cookie),
   addItem: (cartId: string, input: { product_id: string; variant_id: string; quantity: number }, cookie?: string, csrf?: string) =>
     request<ApiCart>(`/api/v1/carts/${encodeURIComponent(cartId)}/items`, {
