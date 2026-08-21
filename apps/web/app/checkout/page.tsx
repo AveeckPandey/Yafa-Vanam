@@ -1,6 +1,6 @@
 "use client";
 
-import CheckoutExperience from "./CheckoutExperience";
+import CheckoutExperience from "./PremiumCheckoutExperience";
 
 export default function CheckoutForm() {
   return <CheckoutExperience />;

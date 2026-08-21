@@ -106,8 +106,13 @@ func New(catalog *commerce.Catalog, store *commerce.Store, config Config) http.H
 	mux.HandleFunc("GET /api/v1/categories", server.categories)
 	mux.HandleFunc("GET /api/v1/products", server.products)
 	mux.HandleFunc("GET /api/v1/products/{slug}", server.product)
-	mux.HandleFunc("POST /api/v1/payments/razorpay/orders", server.createRazorpayOrder)
-	mux.HandleFunc("POST /api/v1/payments/razorpay/verify", server.verifyRazorpayPayment)
+	if config.Auth != nil {
+		mux.Handle("POST /api/v1/payments/razorpay/orders", config.Auth.Middleware(http.HandlerFunc(server.createRazorpayOrder)))
+		mux.Handle("POST /api/v1/payments/razorpay/verify", config.Auth.Middleware(http.HandlerFunc(server.verifyRazorpayPayment)))
+	} else {
+		mux.HandleFunc("POST /api/v1/payments/razorpay/orders", server.createRazorpayOrder)
+		mux.HandleFunc("POST /api/v1/payments/razorpay/verify", server.verifyRazorpayPayment)
+	}
 	mux.HandleFunc("POST /api/v1/payments/razorpay/webhook", server.razorpayWebhook)
 	if config.Auth != nil {
 		mux.Handle("GET /api/v1/me/beauty-profile", config.Auth.Middleware(http.HandlerFunc(server.yafaBeautyProfile)))
