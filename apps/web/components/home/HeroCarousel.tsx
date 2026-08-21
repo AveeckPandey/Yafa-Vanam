@@ -32,12 +32,12 @@ const slides: HeroSlide[] = [
     objectPosition: "66% center",
   },
   {
-    image: "/images/hero/yafa-vanam-foundation-collection.png",
-    href: "/makeup?category=complexion",
-    kicker: "Earth Skin",
-    title: "Three rituals, one seamless match",
-    description: "Longwear, serum and natural-skin finishes for every day.",
-    objectPosition: "66% center",
+    image: "/images/hero/yafa-vanam-fragrance-trio-banner.png",
+    href: "/fragrance",
+    kicker: "Fragrance Trio",
+    title: "A fragrance for every rhythm",
+    description: "Forest Rain, Soft Current and Windwater — a three-scent wardrobe for every mood.",
+    objectPosition: "center center",
   },
   {
     image: "/images/hero/yafa-vanam-cheek-collection.png",
@@ -53,15 +53,10 @@ const AUTOPLAY_DELAY = 6500;
 
 export default function HeroCarousel() {
   const [activeIndex, setActiveIndex] = useState(0);
-  const [userPaused, setUserPaused] = useState(false);
   const [interactionPaused, setInteractionPaused] = useState(false);
   const [prefersReducedMotion, setPrefersReducedMotion] = useState(false);
   const pointerStartRef = useRef<number | null>(null);
   const swipedRef = useRef(false);
-
-  const showSlide = useCallback((index: number) => {
-    setActiveIndex((index + slides.length) % slides.length);
-  }, []);
 
   const showPrevious = useCallback(() => {
     setActiveIndex((current) => (current - 1 + slides.length) % slides.length);
@@ -80,11 +75,11 @@ export default function HeroCarousel() {
   }, []);
 
   useEffect(() => {
-    if (userPaused || interactionPaused || prefersReducedMotion) return;
+    if (interactionPaused || prefersReducedMotion) return;
 
     const interval = window.setInterval(showNext, AUTOPLAY_DELAY);
     return () => window.clearInterval(interval);
-  }, [interactionPaused, prefersReducedMotion, showNext, userPaused]);
+  }, [interactionPaused, prefersReducedMotion, showNext]);
 
   const handleBlur = (event: FocusEvent<HTMLElement>) => {
     if (!event.currentTarget.contains(event.relatedTarget as Node | null)) {
@@ -186,35 +181,6 @@ export default function HeroCarousel() {
         >
           <span aria-hidden="true">›</span>
         </button>
-
-        <div className="hero-carousel__toolbar">
-          <span className="hero-carousel__count" aria-hidden="true">
-            {String(activeIndex + 1).padStart(2, "0")} / {String(slides.length).padStart(2, "0")}
-          </span>
-          <div className="hero-carousel__dots" aria-label="Choose a collection">
-            {slides.map((slide, index) => (
-              <button
-                className={index === activeIndex ? "is-active" : ""}
-                type="button"
-                key={slide.image}
-                onClick={() => showSlide(index)}
-                aria-label={`Show slide ${index + 1}: ${slide.kicker}`}
-                aria-current={index === activeIndex ? "true" : undefined}
-              >
-                <span />
-              </button>
-            ))}
-          </div>
-          <button
-            className="hero-carousel__pause"
-            type="button"
-            onClick={() => setUserPaused((paused) => !paused)}
-            aria-label={userPaused ? "Play carousel" : "Pause carousel"}
-            aria-pressed={userPaused}
-          >
-            <span className={userPaused ? "play-icon" : "pause-icon"} aria-hidden="true" />
-          </button>
-        </div>
       </div>
     </section>
   );
