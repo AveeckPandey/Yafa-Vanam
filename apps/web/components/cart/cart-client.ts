@@ -32,7 +32,10 @@ export async function updateCartItem(key: string, quantity: number) {
     headers: { "Content-Type": "application/json", "X-CSRF-Token": token },
     body: JSON.stringify({ quantity }),
   });
-  if (!response.ok) throw new Error("The quantity could not be updated.");
+  if (!response.ok) {
+    const payload = await response.json().catch(() => null) as { error?: string } | null;
+    throw new Error(payload?.error || "The quantity could not be updated.");
+  }
   const cart = await response.json() as CartResponse;
   window.dispatchEvent(new CustomEvent("yafa-cart-updated", { detail: cart }));
   return cart;
@@ -41,7 +44,10 @@ export async function updateCartItem(key: string, quantity: number) {
 export async function removeCartItem(key: string) {
   const token = await csrfToken();
   const response = await fetch(`/api/cart/items/${encodeURIComponent(key)}`, { method: "DELETE", headers: { "X-CSRF-Token": token } });
-  if (!response.ok) throw new Error("The item could not be removed.");
+  if (!response.ok) {
+    const payload = await response.json().catch(() => null) as { error?: string } | null;
+    throw new Error(payload?.error || "The item could not be removed.");
+  }
   const cart = await response.json() as CartResponse;
   trackEvent("product_removed_from_cart", { line_item: key });
   window.dispatchEvent(new CustomEvent("yafa-cart-updated", { detail: cart }));

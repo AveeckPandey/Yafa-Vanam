@@ -19,30 +19,38 @@ export default function CartDrawer() {
   const { user } = useAuth();
   const [open, setOpen] = useState(false);
   const [cart, setCart] = useState<CartResponse>(emptyCart);
-  const [busyKey, setBusyKey] = useState<string | null>(null);
+  const [busyKeys, setBusyKeys] = useState<Set<string>>(() => new Set());
+  const [cartError, setCartError] = useState("");
   const [yafaProfile, setYafaProfile] = useState<ConfirmedYafaProfile | null>(null);
   const closeRef = useRef<HTMLButtonElement>(null);
   const previousFocus = useRef<HTMLElement | null>(null);
+  const cartRevision = useRef(0);
+  const pendingKeys = useRef(new Set<string>());
 
   const close = useCallback(() => setOpen(false), []);
   const checkout = useRequireAuth(() => { close(); router.push("/checkout"); });
 
   useEffect(() => {
-    getCart().then(setCart).catch(() => undefined);
+    let mounted = true;
+    const initialRevision = cartRevision.current;
+    getCart().then((nextCart) => {
+      if (mounted && cartRevision.current === initialRevision) setCart(nextCart);
+    }).catch(() => undefined);
     const onOpen = (event: Event) => {
       previousFocus.current = document.activeElement as HTMLElement | null;
       const detail = (event as CustomEvent<CartResponse>).detail;
-      if (detail) setCart(detail);
+      if (detail) { cartRevision.current += 1; setCart(detail); }
       setOpen(true);
       trackEvent("cart_viewed", { item_count: detail?.itemCount ?? cart.itemCount });
     };
     const onUpdate = (event: Event) => {
       const detail = (event as CustomEvent<CartResponse>).detail;
-      if (detail) setCart(detail);
+      if (detail) { cartRevision.current += 1; setCart(detail); }
     };
     window.addEventListener("yafa-cart-open", onOpen);
     window.addEventListener("yafa-cart-updated", onUpdate);
     return () => {
+      mounted = false;
       window.removeEventListener("yafa-cart-open", onOpen);
       window.removeEventListener("yafa-cart-updated", onUpdate);
     };
@@ -88,11 +96,18 @@ export default function CartDrawer() {
   }, [close, open]);
 
   const changeQuantity = async (key: string, quantity: number) => {
-    setBusyKey(key);
+    if (quantity < 0 || pendingKeys.current.has(key)) return;
+    pendingKeys.current.add(key);
+    setBusyKeys((current) => new Set(current).add(key));
+    setCartError("");
     try {
       setCart(quantity < 1 ? await removeCartItem(key) : await updateCartItem(key, quantity));
+    } catch (error) {
+      try { setCart(await getCart()); } catch { /* Keep the last confirmed cart if recovery is unavailable. */ }
+      setCartError(error instanceof Error ? error.message : "We could not update your bag. Please try again.");
     } finally {
-      setBusyKey(null);
+      pendingKeys.current.delete(key);
+      setBusyKeys((current) => { const next = new Set(current); next.delete(key); return next; });
     }
   };
   const foundationMismatch = Boolean(yafaProfile && cart.items.some((item) => item.productType.toLowerCase().includes("foundation")) && !cart.items.some((item) => item.shade === yafaProfile.shade_name));
@@ -107,6 +122,7 @@ export default function CartDrawer() {
         </header>
 
         <div className="site-cart-drawer__body">
+          {cartError ? <p className="site-cart-drawer__error" role="alert">{cartError}</p> : null}
           {foundationMismatch ? <aside className="site-cart-yafa-upsell">Your Yafa shade {yafaProfile?.shade_name} is available. <Link href="/shop" onClick={close}>Find your match</Link></aside> : null}
           {cart.items.length === 0 ? (
             <div className="site-cart-drawer__empty">
@@ -114,7 +130,7 @@ export default function CartDrawer() {
               <button type="button" onClick={close}>Continue shopping</button>
             </div>
           ) : cart.items.map((item) => (
-            <article className="site-cart-line" key={item.key} aria-busy={busyKey === item.key}>
+            <article className="site-cart-line" key={item.key} aria-busy={busyKeys.has(item.key)}>
               <Link className="site-cart-line__image" href={`/products/${item.slug}`} onClick={close}>
                 <Image src={item.image} alt="" fill sizes="104px" />
               </Link>
@@ -127,11 +143,11 @@ export default function CartDrawer() {
                 <strong>{formatCatalogPrice(item.currency, item.unitPrice)}</strong>
                 <div className="site-cart-line__actions">
                   <div aria-label={`Quantity for ${item.name}`}>
-                    <button type="button" disabled={busyKey === item.key} aria-label={`Decrease ${item.name} quantity`} onClick={() => changeQuantity(item.key, item.quantity - 1)}>−</button>
+                    <button type="button" disabled={busyKeys.has(item.key)} aria-label={`Decrease ${item.name} quantity`} onClick={() => changeQuantity(item.key, item.quantity - 1)}>−</button>
                     <span aria-live="polite">{item.quantity}</span>
-                    <button type="button" disabled={busyKey === item.key} aria-label={`Increase ${item.name} quantity`} onClick={() => changeQuantity(item.key, item.quantity + 1)}>+</button>
+                    <button type="button" disabled={busyKeys.has(item.key)} aria-label={`Increase ${item.name} quantity`} onClick={() => changeQuantity(item.key, item.quantity + 1)}>+</button>
                   </div>
-                  <button type="button" disabled={busyKey === item.key} onClick={() => changeQuantity(item.key, 0)}>Remove</button>
+                  <button type="button" disabled={busyKeys.has(item.key)} onClick={() => changeQuantity(item.key, 0)}>Remove</button>
                 </div>
               </div>
             </article>
