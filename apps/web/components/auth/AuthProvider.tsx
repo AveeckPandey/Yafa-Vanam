@@ -4,7 +4,7 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useRef, use
 import AuthModal from "./AuthModal";
 
 export type AuthUser = { id: string; name: string; email: string };
-type AuthContextValue = { user: AuthUser | null; isAuthenticated: boolean; isLoading: boolean; login: (email: string, password: string, remember: boolean) => Promise<void>; register: (name: string, email: string, password: string, remember: boolean) => Promise<void>; logout: () => Promise<void>; requireAuth: (action: () => void | Promise<void>) => void; openAuth: () => void };
+type AuthContextValue = { user: AuthUser | null; isAuthenticated: boolean; isLoading: boolean; login: (email: string, password: string, remember: boolean) => Promise<void>; register: (name: string, email: string, password: string, remember: boolean) => Promise<void>; requestPasswordReset: (email: string) => Promise<string>; resetPassword: (token: string, password: string) => Promise<string>; logout: () => Promise<void>; requireAuth: (action: () => void | Promise<void>) => void; openAuth: () => void };
 const AuthContext = createContext<AuthContextValue | null>(null);
 // Auth is proxied through this same-origin route so secure cookies work when
 // the API remains private inside Railway's network.
@@ -28,6 +28,12 @@ async function authRequest(path: string, body?: unknown) {
   }
   return payload.user;
 }
+async function resetRequest(path: string, body: unknown) {
+  const response = await fetch(`${API}${path}`, { method: "POST", credentials: "include", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
+  const payload = await response.json().catch(() => ({})) as { message?: string; error?: string };
+  if (!response.ok) throw new Error(payload.error || "We could not complete that request. Please try again.");
+  return payload.message || "If an account matches that email, a reset link will arrive shortly.";
+}
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<AuthUser | null>(null);
@@ -38,12 +44,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const complete = useCallback((nextUser: AuthUser) => { setUser(nextUser); setModalOpen(false); const action = deferredAction.current; deferredAction.current = null; void action?.(); }, []);
   const login = useCallback(async (email: string, password: string, remember: boolean) => complete(await authRequest("/auth/login", { email, password, remember })), [complete]);
   const register = useCallback(async (name: string, email: string, password: string, remember: boolean) => complete(await authRequest("/auth/register", { name, email, password, remember })), [complete]);
+  const requestPasswordReset = useCallback((email: string) => resetRequest("/auth/password-reset/request", { email }), []);
+  const resetPassword = useCallback((token: string, password: string) => resetRequest("/auth/password-reset/confirm", { token, password }), []);
   const logout = useCallback(async () => { const token = await csrf(); await fetch(`${API}/auth/logout`, { method: "POST", credentials: "include", headers: { "X-CSRF-Token": token } }); setUser(null); }, []);
   const requireAuth = useCallback((action: () => void | Promise<void>) => { if (user) { void action(); return; } deferredAction.current = action; setModalOpen(true); }, [user]);
-  const value = useMemo(() => ({ user, isAuthenticated: !!user, isLoading, login, register, logout, requireAuth, openAuth: () => setModalOpen(true) }), [user, isLoading, login, register, logout, requireAuth]);
+  const value = useMemo(() => ({ user, isAuthenticated: !!user, isLoading, login, register, requestPasswordReset, resetPassword, logout, requireAuth, openAuth: () => setModalOpen(true) }), [user, isLoading, login, register, requestPasswordReset, resetPassword, logout, requireAuth]);
   const currentPath = typeof window === "undefined" ? "/" : `${window.location.pathname}${window.location.search}`;
   const googleUrl = `${API}/auth/google?return_to=${encodeURIComponent(currentPath)}`;
-  return <AuthContext.Provider value={value}>{children}<AuthModal open={modalOpen} onClose={() => { deferredAction.current = null; setModalOpen(false); }} onLogin={login} onRegister={register} googleUrl={googleUrl} /></AuthContext.Provider>;
+  return <AuthContext.Provider value={value}>{children}<AuthModal open={modalOpen} onClose={() => { deferredAction.current = null; setModalOpen(false); }} onLogin={login} onRegister={register} onRequestPasswordReset={requestPasswordReset} googleUrl={googleUrl} /></AuthContext.Provider>;
 }
 export function useAuth() { const value = useContext(AuthContext); if (!value) throw new Error("useAuth must be used inside AuthProvider"); return value; }
 export function useRequireAuth(action: () => void | Promise<void>) { const { requireAuth } = useAuth(); return useCallback(() => requireAuth(action), [requireAuth, action]); }

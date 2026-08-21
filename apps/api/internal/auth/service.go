@@ -3,7 +3,9 @@ package auth
 import (
 	"context"
 	"crypto/rand"
+	"crypto/sha256"
 	"encoding/base64"
+	"encoding/hex"
 	"errors"
 	"fmt"
 	"strings"
@@ -65,6 +67,72 @@ func (s *Service) Login(ctx context.Context, email, password string) (User, erro
 		return User{}, ErrInvalidCredentials
 	}
 	return user, nil
+}
+
+// CreatePasswordReset issues a cryptographically random, single-use token.
+// Only its SHA-256 digest reaches PostgreSQL, so a database read cannot be
+// turned into a usable reset link.
+func (s *Service) CreatePasswordReset(ctx context.Context, email string) (string, bool, error) {
+	email = strings.ToLower(strings.TrimSpace(email))
+	var userID string
+	err := s.db.QueryRow(ctx, `SELECT u.id::text FROM users u JOIN user_credentials c ON c.user_id=u.id WHERE LOWER(u.email)=LOWER($1) AND u.is_active=true`, email).Scan(&userID)
+	if err != nil {
+		return "", false, nil
+	}
+	raw, err := randomID()
+	if err != nil {
+		return "", false, err
+	}
+	digest := tokenDigest(raw)
+	tx, err := s.db.Begin(ctx)
+	if err != nil {
+		return "", false, err
+	}
+	defer tx.Rollback(ctx)
+	if _, err = tx.Exec(ctx, `UPDATE auth_tokens SET used_at=NOW() WHERE user_id=$1 AND token_type='PASSWORD_RESET' AND used_at IS NULL`, userID); err != nil {
+		return "", false, err
+	}
+	if _, err = tx.Exec(ctx, `INSERT INTO auth_tokens (user_id,token_hash,token_type,expires_at) VALUES ($1,$2,'PASSWORD_RESET',NOW() + INTERVAL '1 hour')`, userID, digest); err != nil {
+		return "", false, err
+	}
+	if err = tx.Commit(ctx); err != nil {
+		return "", false, err
+	}
+	return raw, true, nil
+}
+
+// ResetPassword consumes the matching token in the same statement that finds
+// it, making a token unusable after its first successful submission.
+func (s *Service) ResetPassword(ctx context.Context, rawToken, password string) error {
+	if len(password) < 8 || strings.TrimSpace(rawToken) == "" {
+		return ErrInvalidCredentials
+	}
+	hash, err := bcrypt.GenerateFromPassword([]byte(password), 12)
+	if err != nil {
+		return err
+	}
+	tx, err := s.db.Begin(ctx)
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback(ctx)
+	var userID string
+	err = tx.QueryRow(ctx, `UPDATE auth_tokens SET used_at=NOW() WHERE token_hash=$1 AND token_type='PASSWORD_RESET' AND used_at IS NULL AND expires_at>NOW() RETURNING user_id::text`, tokenDigest(rawToken)).Scan(&userID)
+	if err != nil {
+		return ErrInvalidCredentials
+	}
+	if _, err = tx.Exec(ctx, `UPDATE user_credentials SET password_hash=$1,password_changed_at=NOW(),updated_at=NOW(),failed_attempt_count=0,locked_until=NULL WHERE user_id=$2`, string(hash), userID); err != nil {
+		return err
+	}
+	if err = tx.Commit(ctx); err != nil {
+		return err
+	}
+	return nil
+}
+
+func tokenDigest(token string) string {
+	sum := sha256.Sum256([]byte(token))
+	return hex.EncodeToString(sum[:])
 }
 
 func (s *Service) GoogleUser(ctx context.Context, subject, name, email, picture string) (User, error) {

@@ -20,11 +20,12 @@ const refreshCookie = "yafa_refresh"
 const csrfCookie = "yafa_csrf"
 
 type Handler struct {
-	service                       *Service
-	oauth                         *oauth2.Config
-	secure                        bool
-	frontendURL                   string
-	loginLimiter, registerLimiter *rate.Limiter
+	service                                     *Service
+	oauth                                       *oauth2.Config
+	secure                                      bool
+	frontendURL                                 string
+	mailer                                      Mailer
+	loginLimiter, registerLimiter, resetLimiter *rate.Limiter
 }
 
 func (h *Handler) Middleware(next http.Handler) http.Handler { return h.service.Middleware(next) }
@@ -37,7 +38,11 @@ func (h *Handler) OptionalMiddleware(next http.Handler) http.Handler {
 // obtained a same-site CSRF token before changing server state.
 func (h *Handler) CSRFMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.Method != http.MethodGet && r.Method != http.MethodHead && r.Method != http.MethodOptions && cookie(r, accessCookie) != "" && !h.validCSRF(r) {
+		passwordReset := r.URL.Path == "/auth/password-reset/request" || r.URL.Path == "/auth/password-reset/confirm"
+		// Reset endpoints authenticate with either an opaque reset token or no
+		// account credential at all; requiring a session CSRF cookie would make
+		// a valid emailed link fail for an already signed-in browser.
+		if r.Method != http.MethodGet && r.Method != http.MethodHead && r.Method != http.MethodOptions && !passwordReset && cookie(r, accessCookie) != "" && !h.validCSRF(r) {
 			fail(w, http.StatusForbidden, "Invalid security token.")
 			return
 		}
@@ -45,8 +50,8 @@ func (h *Handler) CSRFMiddleware(next http.Handler) http.Handler {
 	})
 }
 
-func NewHandler(s *Service, clientID, clientSecret, callback, frontendURL string) *Handler {
-	h := &Handler{service: s, secure: s.config.SecureCookies, frontendURL: strings.TrimRight(frontendURL, "/"), loginLimiter: rate.NewLimiter(rate.Every(time.Minute/8), 8), registerLimiter: rate.NewLimiter(rate.Every(time.Minute/5), 5)}
+func NewHandler(s *Service, clientID, clientSecret, callback, frontendURL string, mailer Mailer) *Handler {
+	h := &Handler{service: s, secure: s.config.SecureCookies, frontendURL: strings.TrimRight(frontendURL, "/"), mailer: mailer, loginLimiter: rate.NewLimiter(rate.Every(time.Minute/8), 8), registerLimiter: rate.NewLimiter(rate.Every(time.Minute/5), 5), resetLimiter: rate.NewLimiter(rate.Every(time.Minute/5), 5)}
 	if clientID != "" && clientSecret != "" && callback != "" {
 		h.oauth = &oauth2.Config{ClientID: clientID, ClientSecret: clientSecret, RedirectURL: callback, Endpoint: google.Endpoint, Scopes: []string{"openid", "email", "profile"}}
 	}
@@ -59,8 +64,38 @@ func (h *Handler) Routes(mux *http.ServeMux) {
 	mux.HandleFunc("POST /auth/login", h.login)
 	mux.HandleFunc("POST /auth/refresh", h.refresh)
 	mux.HandleFunc("POST /auth/logout", h.logout)
+	mux.HandleFunc("POST /auth/password-reset/request", h.requestPasswordReset)
+	mux.HandleFunc("POST /auth/password-reset/confirm", h.confirmPasswordReset)
 	mux.HandleFunc("GET /auth/google", h.google)
 	mux.HandleFunc("GET /auth/google/callback", h.callback)
+}
+func (h *Handler) requestPasswordReset(w http.ResponseWriter, r *http.Request) {
+	// Always return the same accepted response: this endpoint must not reveal
+	// whether an account exists, is active, or has a password credential.
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusAccepted)
+	defer json.NewEncoder(w).Encode(map[string]string{"message": "If an account matches that email, a reset link will arrive shortly."})
+	if !h.resetLimiter.Allow() || h.mailer == nil {
+		return
+	}
+	var in struct{ Email string }
+	if !decode(r, &in) {
+		return
+	}
+	raw, found, err := h.service.CreatePasswordReset(r.Context(), in.Email)
+	if err != nil || !found {
+		return
+	}
+	resetURL := h.frontendURL + "/auth/reset-password?token=" + raw
+	_ = h.mailer.SendPasswordReset(strings.TrimSpace(in.Email), resetURL)
+}
+func (h *Handler) confirmPasswordReset(w http.ResponseWriter, r *http.Request) {
+	var in struct{ Token, Password string }
+	if !decode(r, &in) || h.service.ResetPassword(r.Context(), in.Token, in.Password) != nil {
+		fail(w, http.StatusBadRequest, "This reset link is invalid or has expired. Please request a new one.")
+		return
+	}
+	json.NewEncoder(w).Encode(map[string]string{"message": "Your password has been updated. You can now sign in."})
 }
 func (h *Handler) csrf(w http.ResponseWriter, r *http.Request) {
 	token, err := token()

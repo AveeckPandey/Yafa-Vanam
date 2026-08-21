@@ -88,7 +88,7 @@ func main() {
 		defer db.Close()
 		defer redisClient.Close()
 		healthDB, healthRedis = db, redisClient
-		authHandler = auth.NewHandler(auth.New(db, redisClient, auth.Config{JWTSecret: secret, SecureCookies: production, AccessTTL: 15 * time.Minute, RefreshTTL: 24 * time.Hour, RememberRefreshTTL: 30 * 24 * time.Hour}), os.Getenv("GOOGLE_CLIENT_ID"), os.Getenv("GOOGLE_CLIENT_SECRET"), os.Getenv("GOOGLE_CALLBACK_URL"), envOrDefault("APP_URL", "http://localhost:3000"))
+		authHandler = auth.NewHandler(auth.New(db, redisClient, auth.Config{JWTSecret: secret, SecureCookies: production, AccessTTL: 15 * time.Minute, RefreshTTL: 24 * time.Hour, RememberRefreshTTL: 30 * 24 * time.Hour}), os.Getenv("GOOGLE_CLIENT_ID"), os.Getenv("GOOGLE_CLIENT_SECRET"), os.Getenv("GOOGLE_CALLBACK_URL"), envOrDefault("APP_URL", "http://localhost:3000"), auth.NewSMTPMailer(os.Getenv("SMTP_HOST"), os.Getenv("SMTP_PORT"), os.Getenv("SMTP_USERNAME"), os.Getenv("SMTP_PASSWORD"), os.Getenv("SMTP_FROM")))
 		yafaService = yafa.New(db)
 		storage, storageErr := yafa.NewStorage(context.Background(), yafa.StorageConfig{Endpoint: strings.TrimSpace(os.Getenv("YAFA_STORAGE_ENDPOINT")), Region: strings.TrimSpace(os.Getenv("YAFA_STORAGE_REGION")), Bucket: strings.TrimSpace(os.Getenv("YAFA_STORAGE_BUCKET")), AccessKeyID: strings.TrimSpace(os.Getenv("YAFA_STORAGE_ACCESS_KEY_ID")), SecretAccessKey: strings.TrimSpace(os.Getenv("YAFA_STORAGE_SECRET_ACCESS_KEY"))})
 		analyzer, analyzerErr := yafa.NewAnalyzer(strings.TrimSpace(os.Getenv("YAFA_ANALYZER_URL")), strings.TrimSpace(os.Getenv("YAFA_INTERNAL_SERVICE_TOKEN")))
