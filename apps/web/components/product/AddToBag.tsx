@@ -2,7 +2,6 @@
 
 import { useState } from "react";
 import { addCartItem } from "@/components/cart/cart-client";
-import { useRequireAuth } from "@/components/auth/AuthProvider";
 import { trackEvent } from "@/lib/analytics";
 
 export default function AddToBag({ productId, variantId, quantity, className = "" }: { productId: string; variantId: string; quantity: number; className?: string }) {
@@ -22,11 +21,9 @@ export default function AddToBag({ productId, variantId, quantity, className = "
       setBusy(false);
     }
   };
-  const requireAuthThenAdd = useRequireAuth(add);
-
   return (
     <>
-      <button className={className} type="button" disabled={busy} onClick={requireAuthThenAdd}>{busy ? "Adding…" : "Add to Bag"}</button>
+      <button className={className} type="button" disabled={busy} onClick={() => void add()}>{busy ? "Adding…" : "Add to Bag"}</button>
       {message ? <p className={`add-to-bag__message${message === "Added to your bag." ? " is-success" : " is-error"}`} role="status">{message}</p> : null}
     </>
   );

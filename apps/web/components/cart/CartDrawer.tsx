@@ -53,13 +53,6 @@ export default function CartDrawer() {
 
   useEffect(() => {
     if (isLoading) return;
-    if (!user) {
-      // Never leave a previous account's cart visible after logout or before a
-      // different account completes sign-in.
-      setCart(emptyCart);
-      setCartStatus("ready");
-      return;
-    }
     let active = true;
     const initialRevision = cartRevision.current;
     setCartStatus("loading");

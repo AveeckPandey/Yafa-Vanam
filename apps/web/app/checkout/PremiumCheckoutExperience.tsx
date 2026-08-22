@@ -76,7 +76,6 @@ export default function CheckoutExperience() {
 
   useEffect(() => {
     if (isLoading) return;
-    if (!user) { setCart(emptyCart); setCartStatus("ready"); return; }
     let active = true;
     setCartStatus("loading");
     getCart().then((nextCart) => {

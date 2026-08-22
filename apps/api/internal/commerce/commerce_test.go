@@ -111,3 +111,26 @@ func TestCartAndOrderFlow(t *testing.T) {
 		t.Fatalf("RecordRazorpayPayment() = %#v, error %v", captured, err)
 	}
 }
+
+func TestGuestCartCanBeClaimedOnceAndDoesNotLeakAfterLogout(t *testing.T) {
+	store := NewStore(testCatalog(t))
+	guestCart := store.CreateCart()
+	if _, err := store.AddCartItem(guestCart.ID, "p1", "v1", 1); err != nil {
+		t.Fatalf("AddCartItem() error = %v", err)
+	}
+	if err := store.ClaimCartForUser(guestCart.ID, "customer-a"); err != nil {
+		t.Fatalf("ClaimCartForUser() error = %v", err)
+	}
+	if _, err := store.GetCartForUser(guestCart.ID, "customer-a"); err != nil {
+		t.Fatalf("GetCartForUser() error = %v", err)
+	}
+	if _, err := store.GetCart(guestCart.ID); !errors.Is(err, ErrCartAccessDenied) {
+		t.Fatalf("guest GetCart() error = %v, want ErrCartAccessDenied", err)
+	}
+	if _, err := store.AddCartItem(guestCart.ID, "p1", "v1", 1); !errors.Is(err, ErrCartAccessDenied) {
+		t.Fatalf("guest AddCartItem() error = %v, want ErrCartAccessDenied", err)
+	}
+	if err := store.ClaimCartForUser(guestCart.ID, "customer-b"); !errors.Is(err, ErrCartAccessDenied) {
+		t.Fatalf("ClaimCartForUser() error = %v, want ErrCartAccessDenied", err)
+	}
+}

@@ -39,7 +39,7 @@ export async function GET(request: NextRequest) {
     const cart = await commerceApi.getCart(cartId!, request.headers.get("cookie") || undefined);
     return NextResponse.json(toCartResponse(cart));
   } catch (error) {
-    if (error instanceof CommerceApiError && error.status === 404) {
+    if (error instanceof CommerceApiError && (error.status === 404 || error.status === 403)) {
       const response = NextResponse.json(emptyCartResponse);
       response.cookies.delete(CART_COOKIE);
       return response;
