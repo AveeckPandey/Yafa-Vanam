@@ -1,1 +1,5 @@
-export default function Page(){return <main className="route-page"><h1>Shipping</h1><p>YAFA VANAM Shipping.</p></main>}
+export const metadata = { title: "Shipping | YAFA VANAM" };
+
+export default function ShippingPage() {
+  return <main id="main-content" className="info-page"><header className="info-page__hero"><p>YAFA VANAM / Delivery</p><h1>Shipping, thoughtfully handled.</h1><span>Clear delivery choices and careful packaging from our collection to your door.</span></header><div className="info-page__body"><section><h2>Processing</h2><p>Please allow 1–3 business days for an order to be prepared before it ships. During launches and public holidays, preparation may take a little longer.</p></section><section><h2>Delivery options</h2><p>Standard delivery is estimated at 4–6 business days after dispatch. Express delivery is estimated at 2–3 business days. The checkout shows the available option and exact fee for your address.</p></section><section><h2>Tracking</h2><p>When an order leaves us, tracking details are sent to the email used at checkout. Signed-in customers can also revisit order status from their account.</p></section><section><h2>Need help?</h2><p>If a parcel appears delayed or damaged, contact our care team with your order number so we can investigate.</p></section></div></main>;
+}
