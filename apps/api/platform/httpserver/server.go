@@ -137,6 +137,7 @@ func New(catalog *commerce.Catalog, store *commerce.Store, config Config) http.H
 		mux.Handle("PATCH /api/v1/carts/{cartID}/items/{variantID}", config.Auth.Middleware(http.HandlerFunc(server.setCartItem)))
 		mux.Handle("DELETE /api/v1/carts/{cartID}/items/{variantID}", config.Auth.Middleware(http.HandlerFunc(server.removeCartItem)))
 		mux.Handle("POST /api/v1/orders", config.Auth.Middleware(http.HandlerFunc(server.createOrder)))
+		mux.Handle("GET /api/v1/orders", config.Auth.Middleware(http.HandlerFunc(server.listOrders)))
 		mux.Handle("GET /api/v1/orders/{orderNumber}", config.Auth.Middleware(http.HandlerFunc(server.getOrder)))
 	} else {
 		mux.HandleFunc("POST /api/v1/carts", server.createCart)
@@ -145,6 +146,7 @@ func New(catalog *commerce.Catalog, store *commerce.Store, config Config) http.H
 		mux.HandleFunc("PATCH /api/v1/carts/{cartID}/items/{variantID}", server.setCartItem)
 		mux.HandleFunc("DELETE /api/v1/carts/{cartID}/items/{variantID}", server.removeCartItem)
 		mux.HandleFunc("POST /api/v1/orders", server.createOrder)
+		mux.HandleFunc("GET /api/v1/orders", server.listOrders)
 		mux.HandleFunc("GET /api/v1/orders/{orderNumber}", server.getOrder)
 	}
 	mux.HandleFunc("/", server.notFound)
@@ -344,6 +346,15 @@ func (server *Server) getOrder(w http.ResponseWriter, request *http.Request) {
 		return
 	}
 	writeJSON(w, http.StatusOK, order)
+}
+
+func (server *Server) listOrders(w http.ResponseWriter, request *http.Request) {
+	user, ok := requestUser(request)
+	if !ok {
+		writeError(w, http.StatusUnauthorized, "unauthorized", "Sign in is required to continue.")
+		return
+	}
+	writeJSON(w, http.StatusOK, server.store.ListOrdersForUser(user.ID))
 }
 
 func (server *Server) notFound(w http.ResponseWriter, _ *http.Request) {

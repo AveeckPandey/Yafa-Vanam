@@ -380,6 +380,24 @@ func (store *Store) GetOrderForUser(orderNumber, ownerID string) (Order, error) 
 	return result, nil
 }
 
+// ListOrdersForUser returns only orders owned by the authenticated user. It
+// deliberately never accepts an owner id supplied by the browser.
+func (store *Store) ListOrdersForUser(ownerID string) []Order {
+	store.mu.RLock()
+	defer store.mu.RUnlock()
+	orders := make([]Order, 0)
+	for _, order := range store.orders {
+		if ownerID == "" || order.UserID != ownerID {
+			continue
+		}
+		item := *order
+		item.AccessToken = ""
+		orders = append(orders, item)
+	}
+	sort.Slice(orders, func(i, j int) bool { return orders[i].CreatedAt.After(orders[j].CreatedAt) })
+	return orders
+}
+
 func (store *Store) GetOrder(orderNumber, accessToken string) (Order, error) {
 	store.mu.RLock()
 	defer store.mu.RUnlock()
