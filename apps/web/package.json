@@ -9,7 +9,9 @@
   },
   "dependencies": {
     "@hookform/resolvers": "latest",
+    "@elevenlabs/react": "^1.12.4",
     "@sentry/nextjs": "^10.70.0",
+    "@yafa/frontend-types": "*",
     "clsx": "latest",
     "gsap": "latest",
     "next": "^16.3.0",
