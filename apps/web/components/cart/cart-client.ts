@@ -3,7 +3,7 @@ import { csrfToken } from "@/lib/csrf-client";
 import { trackEvent } from "@/lib/analytics";
 
 export async function getCart() {
-  const response = await fetch("/api/cart", { cache: "no-store" });
+  const response = await fetch("/api/cart", { credentials: "include", cache: "no-store" });
   if (!response.ok) throw new Error("Unable to load the bag.");
   return response.json() as Promise<CartResponse>;
 }
@@ -12,6 +12,7 @@ export async function addCartItem(productId: string, variantId: string, quantity
   const token = await csrfToken();
   const response = await fetch("/api/cart", {
     method: "POST",
+    credentials: "include",
     headers: { "Content-Type": "application/json", "X-CSRF-Token": token },
     body: JSON.stringify({ product_id: productId, variant_id: variantId, quantity }),
   });
@@ -29,6 +30,7 @@ export async function updateCartItem(key: string, quantity: number) {
   const token = await csrfToken();
   const response = await fetch(`/api/cart/items/${encodeURIComponent(key)}`, {
     method: "PATCH",
+    credentials: "include",
     headers: { "Content-Type": "application/json", "X-CSRF-Token": token },
     body: JSON.stringify({ quantity }),
   });
@@ -43,7 +45,7 @@ export async function updateCartItem(key: string, quantity: number) {
 
 export async function removeCartItem(key: string) {
   const token = await csrfToken();
-  const response = await fetch(`/api/cart/items/${encodeURIComponent(key)}`, { method: "DELETE", headers: { "X-CSRF-Token": token } });
+  const response = await fetch(`/api/cart/items/${encodeURIComponent(key)}`, { method: "DELETE", credentials: "include", headers: { "X-CSRF-Token": token } });
   if (!response.ok) {
     const payload = await response.json().catch(() => null) as { error?: string } | null;
     throw new Error(payload?.error || "The item could not be removed.");

@@ -47,7 +47,7 @@ export default function Navbar() {
   const [activeMenu, setActiveMenu] = useState<MegaMenuKey | null>(null);
   const [mobileOpen, setMobileOpen] = useState(false);
   const [bagCount, setBagCount] = useState(0);
-  const { isAuthenticated, openAuth, logout } = useAuth();
+  const { isAuthenticated, isLoading, openAuth, logout } = useAuth();
 
   const closeDesktopMenu = useCallback(() => setActiveMenu(null), []);
 
@@ -78,14 +78,15 @@ export default function Navbar() {
   }, [pathname]);
 
   useEffect(() => {
+    if (isLoading) return;
     const updateBagCount = (event?: Event) => {
       const detail = (event as CustomEvent<{ itemCount?: number }> | undefined)?.detail;
       if (typeof detail?.itemCount === "number") {
         setBagCount(detail.itemCount);
         return;
       }
-      fetch("/api/cart", { cache: "no-store" })
-        .then((response) => response.json())
+      fetch("/api/cart", { credentials: "include", cache: "no-store" })
+        .then((response) => response.ok ? response.json() : Promise.reject())
         .then((cart) => setBagCount(Number(cart.itemCount) || 0))
         .catch(() => setBagCount(0));
     };
@@ -95,7 +96,7 @@ export default function Navbar() {
     return () => {
       window.removeEventListener("yafa-cart-updated", updateBagCount);
     };
-  }, []);
+  }, [isAuthenticated, isLoading]);
 
   useEffect(() => {
     const handlePointerDown = (event: PointerEvent) => {

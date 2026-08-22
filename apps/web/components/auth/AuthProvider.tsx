@@ -4,7 +4,8 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useRef, use
 import AuthModal from "./AuthModal";
 
 export type AuthUser = { id: string; name: string; email: string };
-type AuthContextValue = { user: AuthUser | null; isAuthenticated: boolean; isLoading: boolean; login: (email: string, password: string, remember: boolean) => Promise<void>; register: (name: string, email: string, password: string, remember: boolean) => Promise<void>; requestPasswordReset: (email: string) => Promise<string>; resetPassword: (token: string, password: string) => Promise<string>; logout: () => Promise<void>; requireAuth: (action: () => void | Promise<void>) => void; openAuth: () => void };
+type AuthStatus = "loading" | "authenticated" | "unauthenticated" | "error";
+type AuthContextValue = { user: AuthUser | null; authStatus: AuthStatus; isAuthenticated: boolean; isLoading: boolean; login: (email: string, password: string, remember: boolean) => Promise<void>; register: (name: string, email: string, password: string, remember: boolean) => Promise<void>; requestPasswordReset: (email: string) => Promise<string>; resetPassword: (token: string, password: string) => Promise<string>; logout: () => Promise<void>; requireAuth: (action: () => void | Promise<void>) => void; openAuth: () => void };
 const AuthContext = createContext<AuthContextValue | null>(null);
 // Auth is proxied through this same-origin route so secure cookies work when
 // the API remains private inside Railway's network.
@@ -37,10 +38,47 @@ async function resetRequest(path: string, body: unknown) {
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<AuthUser | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
+  const [authStatus, setAuthStatus] = useState<AuthStatus>("loading");
   const [modalOpen, setModalOpen] = useState(false);
   const deferredAction = useRef<(() => void | Promise<void>) | null>(null);
-  useEffect(() => { fetch(`${API}/auth/me`, { credentials: "include" }).then(async (response) => response.ok ? (await response.json() as { user: AuthUser }).user : null).then(setUser).catch(() => setUser(null)).finally(() => setIsLoading(false)); }, []);
+  const isLoading = authStatus === "loading";
+  useEffect(() => {
+    let active = true;
+    const restoreSession = async () => {
+      try {
+        const session = await fetch(`${API}/auth/me`, { credentials: "include", cache: "no-store" });
+        if (session.ok) {
+          const payload = await session.json() as { user?: AuthUser };
+          if (active) {
+            if (payload.user) { setUser(payload.user); setAuthStatus("authenticated"); }
+            else { setAuthStatus("error"); }
+          }
+          return;
+        }
+        // Only an explicit unauthenticated response may use the refresh session.
+        // A network or server failure must not be mistaken for a logged-out user.
+        if (session.status !== 401) { if (active) setAuthStatus("error"); return; }
+        const token = await csrf();
+        const refreshed = await fetch(`${API}/auth/refresh`, { method: "POST", credentials: "include", cache: "no-store", headers: { "X-CSRF-Token": token } });
+        if (refreshed.ok) {
+          const payload = await refreshed.json() as { user?: AuthUser };
+          if (active) {
+            if (payload.user) { setUser(payload.user); setAuthStatus("authenticated"); }
+            else { setAuthStatus("error"); }
+          }
+          return;
+        }
+        if (active) {
+          setUser(null);
+          setAuthStatus(refreshed.status === 401 ? "unauthenticated" : "error");
+        }
+      } catch {
+        if (active) setAuthStatus("error");
+      }
+    };
+    void restoreSession();
+    return () => { active = false; };
+  }, []);
   useEffect(() => {
     if (isLoading || !deferredAction.current) return;
     if (user) {
@@ -51,18 +89,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
     setModalOpen(true);
   }, [isLoading, user]);
-  const complete = useCallback((nextUser: AuthUser) => { setUser(nextUser); setModalOpen(false); const action = deferredAction.current; deferredAction.current = null; void action?.(); }, []);
+  const complete = useCallback((nextUser: AuthUser) => { setUser(nextUser); setAuthStatus("authenticated"); setModalOpen(false); const action = deferredAction.current; deferredAction.current = null; void action?.(); }, []);
   const login = useCallback(async (email: string, password: string, remember: boolean) => complete(await authRequest("/auth/login", { email, password, remember })), [complete]);
   const register = useCallback(async (name: string, email: string, password: string, remember: boolean) => complete(await authRequest("/auth/register", { name, email, password, remember })), [complete]);
   const requestPasswordReset = useCallback((email: string) => resetRequest("/auth/password-reset/request", { email }), []);
   const resetPassword = useCallback((token: string, password: string) => resetRequest("/auth/password-reset/confirm", { token, password }), []);
-  const logout = useCallback(async () => { const token = await csrf(); await fetch(`${API}/auth/logout`, { method: "POST", credentials: "include", headers: { "X-CSRF-Token": token } }); setUser(null); }, []);
+  const logout = useCallback(async () => { const token = await csrf(); await fetch(`${API}/auth/logout`, { method: "POST", credentials: "include", headers: { "X-CSRF-Token": token } }); setUser(null); setAuthStatus("unauthenticated"); }, []);
   const requireAuth = useCallback((action: () => void | Promise<void>) => {
     if (user) { void action(); return; }
     deferredAction.current = action;
     if (!isLoading) setModalOpen(true);
   }, [isLoading, user]);
-  const value = useMemo(() => ({ user, isAuthenticated: !!user, isLoading, login, register, requestPasswordReset, resetPassword, logout, requireAuth, openAuth: () => setModalOpen(true) }), [user, isLoading, login, register, requestPasswordReset, resetPassword, logout, requireAuth]);
+  const value = useMemo(() => ({ user, authStatus, isAuthenticated: !!user, isLoading, login, register, requestPasswordReset, resetPassword, logout, requireAuth, openAuth: () => setModalOpen(true) }), [user, authStatus, isLoading, login, register, requestPasswordReset, resetPassword, logout, requireAuth]);
   const currentPath = typeof window === "undefined" ? "/" : `${window.location.pathname}${window.location.search}`;
   const googleUrl = `${API}/auth/google?return_to=${encodeURIComponent(currentPath)}`;
   return <AuthContext.Provider value={value}>{children}<AuthModal open={modalOpen} onClose={() => { deferredAction.current = null; setModalOpen(false); }} onLogin={login} onRegister={register} onRequestPasswordReset={requestPasswordReset} googleUrl={googleUrl} /></AuthContext.Provider>;
