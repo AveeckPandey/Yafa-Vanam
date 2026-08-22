@@ -16,9 +16,10 @@ const emptyCart: CartResponse = { items: [], itemCount: 0, subtotal: 0, currency
 
 export default function CartDrawer() {
   const router = useRouter();
-  const { user } = useAuth();
+  const { user, isLoading } = useAuth();
   const [open, setOpen] = useState(false);
   const [cart, setCart] = useState<CartResponse>(emptyCart);
+  const [cartStatus, setCartStatus] = useState<"loading" | "ready" | "error">("loading");
   const [busyKeys, setBusyKeys] = useState<Set<string>>(() => new Set());
   const [cartError, setCartError] = useState("");
   const [yafaProfile, setYafaProfile] = useState<ConfirmedYafaProfile | null>(null);
@@ -31,30 +32,49 @@ export default function CartDrawer() {
   const checkout = useRequireAuth(() => { close(); router.push("/checkout"); });
 
   useEffect(() => {
-    let mounted = true;
-    const initialRevision = cartRevision.current;
-    getCart().then((nextCart) => {
-      if (mounted && cartRevision.current === initialRevision) setCart(nextCart);
-    }).catch(() => undefined);
     const onOpen = (event: Event) => {
       previousFocus.current = document.activeElement as HTMLElement | null;
       const detail = (event as CustomEvent<CartResponse>).detail;
-      if (detail) { cartRevision.current += 1; setCart(detail); }
+      if (detail) { cartRevision.current += 1; setCart(detail); setCartStatus("ready"); }
       setOpen(true);
       trackEvent("cart_viewed", { item_count: detail?.itemCount ?? cart.itemCount });
     };
     const onUpdate = (event: Event) => {
       const detail = (event as CustomEvent<CartResponse>).detail;
-      if (detail) { cartRevision.current += 1; setCart(detail); }
+      if (detail) { cartRevision.current += 1; setCart(detail); setCartStatus("ready"); }
     };
     window.addEventListener("yafa-cart-open", onOpen);
     window.addEventListener("yafa-cart-updated", onUpdate);
     return () => {
-      mounted = false;
       window.removeEventListener("yafa-cart-open", onOpen);
       window.removeEventListener("yafa-cart-updated", onUpdate);
     };
   }, []);
+
+  useEffect(() => {
+    if (isLoading) return;
+    if (!user) {
+      // Never leave a previous account's cart visible after logout or before a
+      // different account completes sign-in.
+      setCart(emptyCart);
+      setCartStatus("ready");
+      return;
+    }
+    let active = true;
+    const initialRevision = cartRevision.current;
+    setCartStatus("loading");
+    getCart().then((nextCart) => {
+      if (active && cartRevision.current === initialRevision) {
+        setCart(nextCart);
+        setCartStatus("ready");
+      }
+    }).catch(() => {
+      // Keep the last confirmed cart if the startup request has a transient
+      // failure. An error is not evidence that the cart is empty.
+      if (active) setCartStatus("error");
+    });
+    return () => { active = false; };
+  }, [isLoading, user?.id]);
 
   useEffect(() => {
     if (!user) {
@@ -123,8 +143,10 @@ export default function CartDrawer() {
 
         <div className="site-cart-drawer__body">
           {cartError ? <p className="site-cart-drawer__error" role="alert">{cartError}</p> : null}
+          {cartStatus === "loading" ? <p className="site-cart-drawer__empty">Loading your bag…</p> : null}
+          {cartStatus === "error" ? <p className="site-cart-drawer__error" role="alert">We could not refresh your bag. Please try again.</p> : null}
           {foundationMismatch ? <aside className="site-cart-yafa-upsell">Your Yafa shade {yafaProfile?.shade_name} is available. <Link href="/shop" onClick={close}>Find your match</Link></aside> : null}
-          {cart.items.length === 0 ? (
+          {cartStatus === "ready" && cart.items.length === 0 ? (
             <div className="site-cart-drawer__empty">
               <p>Your fragrance ritual begins here.</p>
               <button type="button" onClick={close}>Continue shopping</button>

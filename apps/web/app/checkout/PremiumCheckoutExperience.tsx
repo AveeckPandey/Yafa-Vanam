@@ -8,6 +8,7 @@ import type { CartResponse } from "@/lib/cart-types";
 import { formatCatalogPrice } from "@/lib/catalog-types";
 import { getCart, updateCartItem } from "@/components/cart/cart-client";
 import { csrfToken } from "@/lib/csrf-client";
+import { useAuth } from "@/components/auth/AuthProvider";
 
 type ShippingMethod = "standard" | "express";
 type CheckoutState = "idle" | "processing" | "complete";
@@ -56,6 +57,7 @@ function ErrorText({ message }: { message: string }) { return message ? <span cl
 
 export default function CheckoutExperience() {
   const router = useRouter();
+  const { user, isLoading } = useAuth();
   const [cart, setCart] = useState<CartResponse>(emptyCart);
   const [cartStatus, setCartStatus] = useState<"loading" | "ready" | "error">("loading");
   const [busyItemKey, setBusyItemKey] = useState<string | null>(null);
@@ -72,7 +74,16 @@ export default function CheckoutExperience() {
   const [state, setState] = useState<CheckoutState>("idle");
   const [notice, setNotice] = useState("");
 
-  useEffect(() => { getCart().then((nextCart) => { setCart(nextCart); setCartStatus("ready"); }).catch(() => setCartStatus("error")); }, []);
+  useEffect(() => {
+    if (isLoading) return;
+    if (!user) { setCart(emptyCart); setCartStatus("ready"); return; }
+    let active = true;
+    setCartStatus("loading");
+    getCart().then((nextCart) => {
+      if (active) { setCart(nextCart); setCartStatus("ready"); }
+    }).catch(() => { if (active) setCartStatus("error"); });
+    return () => { active = false; };
+  }, [isLoading, user?.id]);
 
   const discount = discountCode ? testCoupons[discountCode]?.discount(cart.subtotal) ?? 0 : 0;
   const totals = useMemo(() => calculateTotals(cart.subtotal, shippingMethod, discount), [cart.subtotal, discount, shippingMethod]);
