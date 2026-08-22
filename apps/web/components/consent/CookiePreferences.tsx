@@ -5,7 +5,7 @@ import { getConsent, setConsent } from "../../lib/analytics/consent";
 export function CookiePreferences() {
   const consent = getConsent();
   return (
-    <button
+    <button className="cookie-preferences"
       type="button"
       onClick={() => {
         const next = !(consent?.analytics ?? false);

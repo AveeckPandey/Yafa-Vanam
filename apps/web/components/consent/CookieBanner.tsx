@@ -14,11 +14,11 @@ export function CookieBanner() {
   if (!visible) return null;
 
   return (
-    <div role="dialog" aria-label="Cookie preferences">
-      <p>
+    <div className="cookie-banner" role="dialog" aria-label="Cookie preferences" aria-describedby="cookie-banner-copy">
+      <p id="cookie-banner-copy">
         Essential storage keeps the store working. With your permission, analytics helps YAFA VANAM understand how people use the site and improve the shopping experience.
       </p>
-      <button
+      <div className="cookie-banner__actions"><button
         type="button"
         onClick={() => {
           setConsent({ analytics: false, marketing: false });
@@ -37,7 +37,7 @@ export function CookieBanner() {
       >
         Accept analytics
       </button>
-      <button
+      <button className="cookie-banner__primary"
         type="button"
         onClick={() => {
           setConsent({ analytics: true, marketing: true });
@@ -46,7 +46,7 @@ export function CookieBanner() {
         }}
       >
         Accept all
-      </button>
+      </button></div>
     </div>
   );
 }
