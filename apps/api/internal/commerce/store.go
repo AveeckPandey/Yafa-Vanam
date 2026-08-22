@@ -145,23 +145,76 @@ func (store *Store) GetCartForUser(id, ownerID string) (CartView, error) {
 	}
 	return store.cartViewLocked(cart), nil
 }
+func (store *Store) ClaimCartForUser(id, ownerID string) error {
+	store.mu.Lock()
+	defer store.mu.Unlock()
+	cart, ok := store.carts[id]
+	if !ok {
+		return ErrCartNotFound
+	}
+	if ownerID == "" || (cart.OwnerID != "" && cart.OwnerID != ownerID) {
+		return ErrCartAccessDenied
+	}
+	cart.OwnerID = ownerID
+	cart.UpdatedAt = store.now().UTC()
+	return nil
+}
 func (store *Store) AddCartItemForUser(ownerID, cartID, productID, variantID string, quantity int) (CartView, error) {
-	if _, err := store.GetCartForUser(cartID, ownerID); err != nil {
+	if quantity < 1 || quantity > maxLineQuantity {
+		return CartView{}, ErrInvalidQuantity
+	}
+	_, variant, err := store.catalog.SellableVariant(productID, variantID)
+	if err != nil {
 		return CartView{}, err
 	}
-	return store.AddCartItem(cartID, productID, variantID, quantity)
+	store.mu.Lock()
+	defer store.mu.Unlock()
+	cart, err := store.ownedCart(cartID, ownerID)
+	if err != nil {
+		return CartView{}, err
+	}
+	updatedQuantity := min(cart.Items[variantID]+quantity, maxLineQuantity)
+	if variant.Stock != nil && updatedQuantity > *variant.Stock {
+		return CartView{}, ErrInsufficientStock
+	}
+	cart.Items[variantID] = updatedQuantity
+	cart.UpdatedAt = store.now().UTC()
+	return store.cartViewLocked(cart), nil
 }
 func (store *Store) SetCartItemForUser(ownerID, cartID, variantID string, quantity int) (CartView, error) {
-	if _, err := store.GetCartForUser(cartID, ownerID); err != nil {
+	if quantity < 1 || quantity > maxLineQuantity {
+		return CartView{}, ErrInvalidQuantity
+	}
+	store.mu.Lock()
+	defer store.mu.Unlock()
+	cart, err := store.ownedCart(cartID, ownerID)
+	if err != nil {
 		return CartView{}, err
 	}
-	return store.SetCartItem(cartID, variantID, quantity)
+	if _, ok := cart.Items[variantID]; !ok {
+		return CartView{}, ErrVariantNotFound
+	}
+	ref, ok := store.catalog.variants[variantID]
+	if !ok || !ref.variant.IsActive {
+		return CartView{}, ErrVariantUnavailable
+	}
+	if ref.variant.Stock != nil && quantity > *ref.variant.Stock {
+		return CartView{}, ErrInsufficientStock
+	}
+	cart.Items[variantID] = quantity
+	cart.UpdatedAt = store.now().UTC()
+	return store.cartViewLocked(cart), nil
 }
 func (store *Store) RemoveCartItemForUser(ownerID, cartID, variantID string) (CartView, error) {
-	if _, err := store.GetCartForUser(cartID, ownerID); err != nil {
+	store.mu.Lock()
+	defer store.mu.Unlock()
+	cart, err := store.ownedCart(cartID, ownerID)
+	if err != nil {
 		return CartView{}, err
 	}
-	return store.RemoveCartItem(cartID, variantID)
+	delete(cart.Items, variantID)
+	cart.UpdatedAt = store.now().UTC()
+	return store.cartViewLocked(cart), nil
 }
 
 func (store *Store) GetCart(id string) (CartView, error) {
@@ -170,6 +223,9 @@ func (store *Store) GetCart(id string) (CartView, error) {
 	cart, ok := store.carts[id]
 	if !ok {
 		return CartView{}, ErrCartNotFound
+	}
+	if cart.OwnerID != "" {
+		return CartView{}, ErrCartAccessDenied
 	}
 	return store.cartViewLocked(cart), nil
 }
@@ -187,6 +243,9 @@ func (store *Store) AddCartItem(cartID, productID, variantID string, quantity in
 	cart, ok := store.carts[cartID]
 	if !ok {
 		return CartView{}, ErrCartNotFound
+	}
+	if cart.OwnerID != "" {
+		return CartView{}, ErrCartAccessDenied
 	}
 	updatedQuantity := min(cart.Items[variantID]+quantity, maxLineQuantity)
 	if variant.Stock != nil && updatedQuantity > *variant.Stock {
@@ -206,6 +265,9 @@ func (store *Store) SetCartItem(cartID, variantID string, quantity int) (CartVie
 	cart, ok := store.carts[cartID]
 	if !ok {
 		return CartView{}, ErrCartNotFound
+	}
+	if cart.OwnerID != "" {
+		return CartView{}, ErrCartAccessDenied
 	}
 	if _, ok := cart.Items[variantID]; !ok {
 		return CartView{}, ErrVariantNotFound
@@ -228,6 +290,9 @@ func (store *Store) RemoveCartItem(cartID, variantID string) (CartView, error) {
 	cart, ok := store.carts[cartID]
 	if !ok {
 		return CartView{}, ErrCartNotFound
+	}
+	if cart.OwnerID != "" {
+		return CartView{}, ErrCartAccessDenied
 	}
 	delete(cart.Items, variantID)
 	cart.UpdatedAt = store.now().UTC()

@@ -46,7 +46,7 @@ export async function getOrCreateCart(request: NextRequest) {
     try {
       return { cart: await commerceApi.getCart(existingId, authCookie), created: false };
     } catch (error) {
-      if (!(error instanceof CommerceApiError) || error.status !== 404) throw error;
+      if (!(error instanceof CommerceApiError) || (error.status !== 404 && error.status !== 403)) throw error;
     }
   }
   return { cart: await commerceApi.createCart(authCookie, csrf), created: true };

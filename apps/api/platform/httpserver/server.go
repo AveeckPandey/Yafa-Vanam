@@ -131,11 +131,11 @@ func New(catalog *commerce.Catalog, store *commerce.Store, config Config) http.H
 		mux.HandleFunc("POST /api/v1/yafa/confirm-shade", server.confirmYafaShade)
 	}
 	if config.Auth != nil {
-		mux.Handle("POST /api/v1/carts", config.Auth.Middleware(http.HandlerFunc(server.createCart)))
-		mux.Handle("GET /api/v1/carts/{cartID}", config.Auth.Middleware(http.HandlerFunc(server.getCart)))
-		mux.Handle("POST /api/v1/carts/{cartID}/items", config.Auth.Middleware(http.HandlerFunc(server.addCartItem)))
-		mux.Handle("PATCH /api/v1/carts/{cartID}/items/{variantID}", config.Auth.Middleware(http.HandlerFunc(server.setCartItem)))
-		mux.Handle("DELETE /api/v1/carts/{cartID}/items/{variantID}", config.Auth.Middleware(http.HandlerFunc(server.removeCartItem)))
+		mux.Handle("POST /api/v1/carts", config.Auth.OptionalMiddleware(http.HandlerFunc(server.createCart)))
+		mux.Handle("GET /api/v1/carts/{cartID}", config.Auth.OptionalMiddleware(http.HandlerFunc(server.getCart)))
+		mux.Handle("POST /api/v1/carts/{cartID}/items", config.Auth.OptionalMiddleware(http.HandlerFunc(server.addCartItem)))
+		mux.Handle("PATCH /api/v1/carts/{cartID}/items/{variantID}", config.Auth.OptionalMiddleware(http.HandlerFunc(server.setCartItem)))
+		mux.Handle("DELETE /api/v1/carts/{cartID}/items/{variantID}", config.Auth.OptionalMiddleware(http.HandlerFunc(server.removeCartItem)))
 		mux.Handle("POST /api/v1/orders", config.Auth.Middleware(http.HandlerFunc(server.createOrder)))
 		mux.Handle("GET /api/v1/orders", config.Auth.Middleware(http.HandlerFunc(server.listOrders)))
 		mux.Handle("GET /api/v1/orders/{orderNumber}", config.Auth.Middleware(http.HandlerFunc(server.getOrder)))
@@ -229,6 +229,10 @@ func (server *Server) getCart(w http.ResponseWriter, request *http.Request) {
 	var cart commerce.CartView
 	var err error
 	if user, ok := requestUser(request); ok {
+		if err = server.store.ClaimCartForUser(request.PathValue("cartID"), user.ID); err != nil {
+			server.writeDomainError(w, err)
+			return
+		}
 		cart, err = server.store.GetCartForUser(request.PathValue("cartID"), user.ID)
 	} else {
 		cart, err = server.store.GetCart(request.PathValue("cartID"))
@@ -253,6 +257,10 @@ func (server *Server) addCartItem(w http.ResponseWriter, request *http.Request) 
 	var cart commerce.CartView
 	var err error
 	if user, ok := requestUser(request); ok {
+		if err := server.store.ClaimCartForUser(request.PathValue("cartID"), user.ID); err != nil {
+			server.writeDomainError(w, err)
+			return
+		}
 		cart, err = server.store.AddCartItemForUser(user.ID, request.PathValue("cartID"), input.ProductID, input.VariantID, input.Quantity)
 	} else {
 		cart, err = server.store.AddCartItem(request.PathValue("cartID"), input.ProductID, input.VariantID, input.Quantity)
@@ -275,6 +283,10 @@ func (server *Server) setCartItem(w http.ResponseWriter, request *http.Request) 
 	var cart commerce.CartView
 	var err error
 	if user, ok := requestUser(request); ok {
+		if err := server.store.ClaimCartForUser(request.PathValue("cartID"), user.ID); err != nil {
+			server.writeDomainError(w, err)
+			return
+		}
 		cart, err = server.store.SetCartItemForUser(user.ID, request.PathValue("cartID"), request.PathValue("variantID"), input.Quantity)
 	} else {
 		cart, err = server.store.SetCartItem(request.PathValue("cartID"), request.PathValue("variantID"), input.Quantity)
@@ -290,6 +302,10 @@ func (server *Server) removeCartItem(w http.ResponseWriter, request *http.Reques
 	var cart commerce.CartView
 	var err error
 	if user, ok := requestUser(request); ok {
+		if err := server.store.ClaimCartForUser(request.PathValue("cartID"), user.ID); err != nil {
+			server.writeDomainError(w, err)
+			return
+		}
 		cart, err = server.store.RemoveCartItemForUser(user.ID, request.PathValue("cartID"), request.PathValue("variantID"))
 	} else {
 		cart, err = server.store.RemoveCartItem(request.PathValue("cartID"), request.PathValue("variantID"))

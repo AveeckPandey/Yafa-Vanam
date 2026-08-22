@@ -102,7 +102,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [isLoading, user]);
   const value = useMemo(() => ({ user, authStatus, isAuthenticated: !!user, isLoading, login, register, requestPasswordReset, resetPassword, logout, requireAuth, openAuth: () => setModalOpen(true) }), [user, authStatus, isLoading, login, register, requestPasswordReset, resetPassword, logout, requireAuth]);
   const currentPath = typeof window === "undefined" ? "/" : `${window.location.pathname}${window.location.search}`;
-  const googleUrl = `${API}/auth/google?return_to=${encodeURIComponent(currentPath)}`;
+  // The only deferred protected action is checkout. Returning Google OAuth to
+  // that route lets the server restore the HTTP-only session before the page
+  // renders, rather than retaining a client-side action or any token.
+  const returnPath = deferredAction.current ? "/checkout" : currentPath;
+  const googleUrl = `${API}/auth/google?return_to=${encodeURIComponent(returnPath)}`;
   return <AuthContext.Provider value={value}>{children}<AuthModal open={modalOpen} onClose={() => { deferredAction.current = null; setModalOpen(false); }} onLogin={login} onRegister={register} onRequestPasswordReset={requestPasswordReset} googleUrl={googleUrl} /></AuthContext.Provider>;
 }
 export function useAuth() { const value = useContext(AuthContext); if (!value) throw new Error("useAuth must be used inside AuthProvider"); return value; }
