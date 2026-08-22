@@ -63,7 +63,10 @@ func TestRepositoryCatalogLoadsAllProducts(t *testing.T) {
 
 func TestCartAndOrderFlow(t *testing.T) {
 	store := NewStore(testCatalog(t))
-	cart := store.CreateCart()
+	cart, err := store.CreateCart()
+	if err != nil {
+		t.Fatalf("CreateCart() error = %v", err)
+	}
 	updated, err := store.AddCartItem(cart.ID, "p1", "v1", 2)
 	if err != nil {
 		t.Fatalf("AddCartItem() error = %v", err)
@@ -84,7 +87,11 @@ func TestCartAndOrderFlow(t *testing.T) {
 	if err != nil || replayed {
 		t.Fatalf("CreateOrder() = replayed %v, error %v", replayed, err)
 	}
-	if order.TotalAmount != 1920 || order.DiscountAmount != 480 || order.ShippingAddress.CountryCode != "IN" || order.AccessToken == "" {
+	// YAFA20 removes 480 from a 2400 subtotal; the remaining 1920 sits below
+	// the 1999 free-shipping threshold, so standard 199 shipping applies — same
+	// math as the storefront checkout.
+	if order.TotalAmount != 2119 || order.DiscountAmount != 480 || order.ShippingAmount != 199 ||
+		order.ShippingAddress.CountryCode != "IN" || order.AccessToken == "" {
 		t.Fatalf("order = %#v", order)
 	}
 	replayedOrder, replayed, err := store.CreateOrder(input, "checkout-1")
@@ -114,7 +121,10 @@ func TestCartAndOrderFlow(t *testing.T) {
 
 func TestGuestCartCanBeClaimedOnceAndDoesNotLeakAfterLogout(t *testing.T) {
 	store := NewStore(testCatalog(t))
-	guestCart := store.CreateCart()
+	guestCart, err := store.CreateCart()
+	if err != nil {
+		t.Fatalf("CreateCart() error = %v", err)
+	}
 	if _, err := store.AddCartItem(guestCart.ID, "p1", "v1", 1); err != nil {
 		t.Fatalf("AddCartItem() error = %v", err)
 	}

@@ -109,6 +109,17 @@ func main() {
 	} else {
 		logger.Warn("authentication disabled: set DATABASE_URL, REDIS_URL, and a 32+ character JWT_SECRET to enable it")
 	}
+	// Carts, orders, and payments must survive restarts and deploys, so they
+	// persist through PostgreSQL whenever a pool is configured. Without one
+	// the process falls back to the ephemeral in-memory store for local
+	// development and says so loudly rather than silently losing checkouts.
+	var commerceStore commerce.CommerceStore = commerce.NewStore(catalog)
+	if healthDB != nil {
+		commerceStore = commerce.NewPostgresStore(healthDB, catalog)
+		logger.Info("commerce persistence enabled", "backend", "postgresql")
+	} else {
+		logger.Warn("commerce carts/orders are EPHEMERAL (in-memory): configure DATABASE_URL to persist them across restarts")
+	}
 	if production && strings.EqualFold(strings.TrimSpace(os.Getenv("RAZORPAY_CHECKOUT_ENABLED")), "true") && (strings.TrimSpace(os.Getenv("RAZORPAY_KEY_ID")) == "" || strings.TrimSpace(os.Getenv("RAZORPAY_KEY_SECRET")) == "" || strings.TrimSpace(os.Getenv("RAZORPAY_WEBHOOK_SECRET")) == "") {
 		logger.Error("Razorpay checkout is enabled but payment secrets are incomplete")
 		os.Exit(1)
@@ -129,7 +140,7 @@ func main() {
 		}
 		return result
 	}
-	handler := httpserver.New(catalog, commerce.NewStore(catalog), httpserver.Config{
+	handler := httpserver.New(catalog, commerceStore, httpserver.Config{
 		AllowedOrigins: origins, Logger: logger, DependencyHealth: dependencyHealth, RateLimitStore: healthRedis, Auth: authHandler, Yafa: yafaService,
 		PanicReporter: func(request *http.Request, recovered any, stack []byte) {
 			sentry.WithScope(func(scope *sentry.Scope) {

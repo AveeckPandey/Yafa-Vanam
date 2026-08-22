@@ -2,20 +2,22 @@
   "name": "yafa-vanam",
   "private": true,
   "workspaces": [
-    "apps/web"
+    "apps/web",
+    "packages/*"
   ],
   "scripts": {
     "dev": "npm run dev:web",
     "dev:web": "npm run dev --workspace=@yafa/web",
     "start": "npm run start --workspace=@yafa/web",
     "dev:api": "cd apps/api && go run ./cmd/api",
-    "dev:worker": "cd apps/api && go run ./cmd/worker",
     "build": "npm run build:web",
     "build:web": "npm run build --workspace=@yafa/web",
     "build:api": "cd apps/api && go build ./...",
+    "generate:api-types": "openapi-typescript apps/api/openapi/openapi.yaml -o packages/frontend-types/generated/api-types.ts",
     "typecheck": "npm run typecheck --workspace=@yafa/web"
   },
-  "dependencies": {
-    "@elevenlabs/react": "^1.12.4"
-  }
+  "devDependencies": {
+    "openapi-typescript": "^7.9.1"
+  },
+  "packageManager": "npm@10"
 }

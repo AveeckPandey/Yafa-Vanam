@@ -1,31 +1,17 @@
 import "server-only";
 
+// Response models come from the generated API contract (@yafa/frontend-types,
+// built from apps/api/openapi/openapi.yaml) so the storefront can never drift
+// from what the Go API actually returns. Regenerate after contract changes:
+//   npm run generate:api-types
+import type { ApiCart, RazorpayCheckoutOrder } from "@yafa/frontend-types";
+
 const BASE = (process.env.COMMERCE_API_URL || process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000").replace(/\/$/, "");
 
-export type ApiCartLine = {
-  key: string;
-  product_id: string;
-  variant_id: string;
-  name: string;
-  slug: string;
-  product_type: string;
-  currency: string;
-  unit_price: number;
-  quantity: number;
-  size: string | null;
-  shade: string | null;
-  image: string | null;
-};
+export type { ApiCart, RazorpayCheckoutOrder };
 
-export type ApiCart = {
-  id: string;
-  items: ApiCartLine[];
-  item_count: number;
-  subtotal: number;
-  currency: string;
-  updated_at: string;
-};
-
+// Request shape kept local: it is stricter than the schema requires (enum +
+// mandatory discount_code) because the checkout form always supplies both.
 export type RazorpayCheckoutInput = {
   cart_id: string;
   customer_email: string;
@@ -41,14 +27,6 @@ export type RazorpayCheckoutInput = {
     postal_code: string;
     country_code: "IN";
   };
-};
-
-export type RazorpayCheckoutOrder = {
-  order_number: string;
-  razorpay_order_id: string;
-  amount: number;
-  currency: string;
-  key_id: string;
 };
 
 export class CommerceApiError extends Error {

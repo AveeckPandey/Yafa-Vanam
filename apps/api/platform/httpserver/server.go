@@ -40,7 +40,7 @@ type Config struct {
 
 type Server struct {
 	catalog                 *commerce.Catalog
-	store                   *commerce.Store
+	store                   commerce.CommerceStore
 	logger                  *slog.Logger
 	allowedOrigins          map[string]struct{}
 	startedAt               time.Time
@@ -71,7 +71,7 @@ type errorDetail struct {
 	Message string `json:"message"`
 }
 
-func New(catalog *commerce.Catalog, store *commerce.Store, config Config) http.Handler {
+func New(catalog *commerce.Catalog, store commerce.CommerceStore, config Config) http.Handler {
 	logger := config.Logger
 	if logger == nil {
 		logger = slog.Default()
@@ -219,10 +219,20 @@ func requestUser(request *http.Request) (auth.User, bool) {
 }
 func (server *Server) createCart(w http.ResponseWriter, request *http.Request) {
 	if user, ok := requestUser(request); ok {
-		writeJSON(w, http.StatusCreated, server.store.CreateCartForUser(user.ID))
+		cart, err := server.store.CreateCartForUser(user.ID)
+		if err != nil {
+			server.writeDomainError(w, err)
+			return
+		}
+		writeJSON(w, http.StatusCreated, cart)
 		return
 	}
-	writeJSON(w, http.StatusCreated, server.store.CreateCart())
+	cart, err := server.store.CreateCart()
+	if err != nil {
+		server.writeDomainError(w, err)
+		return
+	}
+	writeJSON(w, http.StatusCreated, cart)
 }
 
 func (server *Server) getCart(w http.ResponseWriter, request *http.Request) {

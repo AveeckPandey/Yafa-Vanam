@@ -1,0 +1,11 @@
+{
+  "name": "@yafa/frontend-types",
+  "version": "1.0.0",
+  "private": true,
+  "description": "TypeScript API types generated from apps/api/openapi/openapi.yaml — the Go API owns this contract.",
+  "type": "module",
+  "exports": {
+    ".": "./index.ts",
+    "./api-types": "./generated/api-types.ts"
+  }
+}

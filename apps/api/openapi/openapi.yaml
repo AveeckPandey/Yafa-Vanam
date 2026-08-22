@@ -1,19 +1,239 @@
 openapi: 3.1.0
 info:
   title: YAFA VANAM Commerce API
-  version: 1.0.0
-  description: Catalogue, anonymous cart, and checkout-order API for the YAFA VANAM storefront.
+  version: 2.0.0
+  description: |
+    The full HTTP contract of the Go commerce API: catalogue, carts, orders,
+    Razorpay payments, session auth, and the YAFA beauty-profile flow.
+
+    Conventions:
+
+    - Commerce and YAFA resources live under `/api/v1`; session auth lives at
+      the root (`/auth/...`) because the storefront proxies it separately.
+    - Errors use two shapes. Commerce/YAFA handlers return
+      `{"error":{"code","message"}}`; auth handlers return `{"error":"message"}`.
+    - Browser mutations while signed in must send `X-CSRF-Token` (double-submit
+      with the `yafa_csrf` cookie obtained from `GET /auth/csrf`).
+    - Money is a decimal number in INR (e.g. 2119.0); Razorpay amounts are paise.
 servers:
-  - url: http://localhost:4000/api/v1
+  - url: http://localhost:4000
+    description: Local development
+tags:
+  - name: System
+  - name: Auth
+  - name: Catalogue
+  - name: Carts
+  - name: Orders
+  - name: Payments
+  - name: Beauty Profile
+
 paths:
-  /categories:
+  /health:
     get:
+      tags: [System]
+      summary: Liveness and dependency health
+      responses:
+        "200":
+          description: Service healthy
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Health" }
+        "503":
+          description: A configured dependency is failing
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Health" }
+  /ready:
+    get: { $ref: "#/paths/~1health/get" }
+
+  /auth/csrf:
+    get:
+      tags: [Auth]
+      summary: Issue a CSRF token (sets the yafa_csrf cookie)
+      responses:
+        "200":
+          description: CSRF token issued
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [csrfToken]
+                properties:
+                  csrfToken: { type: string }
+  /auth/me:
+    get:
+      tags: [Auth]
+      summary: Read the signed-in user from the access cookie
+      responses:
+        "200":
+          description: Session user
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/UserEnvelope" }
+        "401": { $ref: "#/components/responses/SimpleUnauthorized" }
+  /auth/register:
+    post:
+      tags: [Auth]
+      summary: Create an account and start a session
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/RegisterInput" }
+      responses:
+        "200":
+          description: Account created; session cookies set
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/UserEnvelope" }
+        "400": { $ref: "#/components/responses/SimpleBadRequest" }
+        "403": { $ref: "#/components/responses/SimpleForbidden" }
+        "422": { $ref: "#/components/responses/SimpleUnprocessable" }
+        "429": { $ref: "#/components/responses/SimpleRateLimited" }
+  /auth/login:
+    post:
+      tags: [Auth]
+      summary: Sign in with email and password
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/LoginInput" }
+      responses:
+        "200":
+          description: Session cookies set
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/UserEnvelope" }
+        "400": { $ref: "#/components/responses/SimpleBadRequest" }
+        "401": { $ref: "#/components/responses/SimpleUnauthorized" }
+        "403": { $ref: "#/components/responses/SimpleForbidden" }
+        "429": { $ref: "#/components/responses/SimpleRateLimited" }
+  /auth/refresh:
+    post:
+      tags: [Auth]
+      summary: Rotate the refresh cookie into a new access session
+      responses:
+        "200":
+          description: New session cookies set
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/UserEnvelope" }
+        "401": { $ref: "#/components/responses/SimpleUnauthorized" }
+        "403": { $ref: "#/components/responses/SimpleForbidden" }
+  /auth/logout:
+    post:
+      tags: [Auth]
+      summary: Revoke the session and clear cookies
+      responses:
+        "204": { description: Signed out }
+        "403": { $ref: "#/components/responses/SimpleForbidden" }
+  /auth/password-reset/request:
+    post:
+      tags: [Auth]
+      summary: Request a password-reset email
+      description: Always returns 202 with the same body so account existence is never revealed.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email]
+              properties:
+                email: { type: string, format: email }
+      responses:
+        "202":
+          description: Request accepted regardless of account existence
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [message]
+                properties:
+                  message: { type: string }
+        "429": { $ref: "#/components/responses/SimpleRateLimited" }
+  /auth/password-reset/confirm:
+    post:
+      tags: [Auth]
+      summary: Set a new password using an emailed reset token
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [token, password]
+              properties:
+                token: { type: string }
+                password: { type: string, minLength: 8 }
+      responses:
+        "200":
+          description: Password updated
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [message]
+                properties:
+                  message: { type: string }
+        "400": { $ref: "#/components/responses/SimpleBadRequest" }
+  /auth/google:
+    get:
+      tags: [Auth]
+      summary: Begin Google OAuth (302 to Google)
+      parameters:
+        - in: query
+          name: return_to
+          schema: { type: string }
+      responses:
+        "302": { description: Redirect to Google consent }
+        "503": { $ref: "#/components/responses/SimpleUnavailable" }
+  /auth/google/callback:
+    get:
+      tags: [Auth]
+      summary: Google OAuth callback (302 back to the storefront)
+      parameters:
+        - { in: query, name: state, required: true, schema: { type: string } }
+        - { in: query, name: code, required: true, schema: { type: string } }
+      responses:
+        "302": { description: Redirect to the storefront with session cookies set }
+
+  /api/v1:
+    get:
+      tags: [System]
+      summary: API index
+      responses:
+        "200":
+          description: Service metadata
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [name, version, resources]
+                properties:
+                  name: { type: string }
+                  version: { type: string }
+                  resources: { type: array, items: { type: string } }
+  /api/v1/categories:
+    get:
+      tags: [Catalogue]
       summary: List the active catalogue taxonomy
       responses:
         "200":
           description: Category list
-  /products:
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items]
+                properties:
+                  items:
+                    type: array
+                    items: { $ref: "#/components/schemas/Category" }
+  /api/v1/products:
     get:
+      tags: [Catalogue]
       summary: Search and filter active products
       parameters:
         - { in: query, name: category, schema: { type: string } }
@@ -24,8 +244,12 @@ paths:
       responses:
         "200":
           description: Paginated product list
-  /products/{slug}:
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ProductList" }
+  /api/v1/products/{slug}:
     get:
+      tags: [Catalogue]
       summary: Get an active product with its variants
       parameters:
         - in: path
@@ -33,20 +257,35 @@ paths:
           required: true
           schema: { type: string }
       responses:
-        "200": { description: Product }
+        "200":
+          description: Product
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Product" }
         "404": { $ref: "#/components/responses/NotFound" }
-  /carts:
+
+  /api/v1/carts:
     post:
-      summary: Create an anonymous cart
+      tags: [Carts]
+      summary: Create a cart
+      description: Anonymous by default; bound to the signed-in account when a session cookie is present. A signed-in browser must send X-CSRF-Token.
+      security:
+        - cookieAuth: []
+        - {}
       responses:
         "201":
           description: New cart
           content:
             application/json:
               schema: { $ref: "#/components/schemas/Cart" }
-  /carts/{cartId}:
+  /api/v1/carts/{cartId}:
     get:
+      tags: [Carts]
       summary: Read a cart with server-calculated prices
+      description: Guests may read their own cart by ID; a signed-in user may read carts bound to their account. A claimed cart is no longer guest-accessible.
+      security:
+        - cookieAuth: []
+        - {}
       parameters:
         - $ref: "#/components/parameters/CartId"
       responses:
@@ -55,10 +294,16 @@ paths:
           content:
             application/json:
               schema: { $ref: "#/components/schemas/Cart" }
+        "403": { $ref: "#/components/responses/AccessDenied" }
         "404": { $ref: "#/components/responses/NotFound" }
-  /carts/{cartId}/items:
+  /api/v1/carts/{cartId}/items:
     post:
+      tags: [Carts]
       summary: Add a validated product variant to a cart
+      description: Prices and stock come from the server-side catalogue; quantity is capped at 20 per line. If the caller is signed in, an anonymous cart is claimed for their account on first mutation.
+      security:
+        - cookieAuth: []
+        - {}
       parameters:
         - $ref: "#/components/parameters/CartId"
       requestBody:
@@ -79,9 +324,11 @@ paths:
           content:
             application/json:
               schema: { $ref: "#/components/schemas/Cart" }
+        "403": { $ref: "#/components/responses/AccessDenied" }
         "404": { $ref: "#/components/responses/NotFound" }
-        "409": { description: Variant is unavailable }
-  /carts/{cartId}/items/{variantId}:
+        "409": { $ref: "#/components/responses/VariantUnavailable" }
+        "422": { $ref: "#/components/responses/Validation" }
+  /api/v1/carts/{cartId}/items/{variantId}:
     parameters:
       - $ref: "#/components/parameters/CartId"
       - in: path
@@ -89,7 +336,11 @@ paths:
         required: true
         schema: { type: string }
     patch:
-      summary: Set a cart line quantity
+      tags: [Carts]
+      summary: Set a cart line quantity (1-20)
+      security:
+        - cookieAuth: []
+        - {}
       requestBody:
         required: true
         content:
@@ -106,19 +357,51 @@ paths:
           content:
             application/json:
               schema: { $ref: "#/components/schemas/Cart" }
+        "403": { $ref: "#/components/responses/AccessDenied" }
         "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/VariantUnavailable" }
+        "422": { $ref: "#/components/responses/Validation" }
     delete:
+      tags: [Carts]
       summary: Remove a cart line
+      security:
+        - cookieAuth: []
+        - {}
       responses:
         "200":
           description: Updated cart
           content:
             application/json:
               schema: { $ref: "#/components/schemas/Cart" }
+        "403": { $ref: "#/components/responses/AccessDenied" }
         "404": { $ref: "#/components/responses/NotFound" }
-  /orders:
+
+  /api/v1/orders:
+    get:
+      tags: [Orders]
+      summary: List the signed-in user's orders (newest first)
+      security:
+        - cookieAuth: []
+      responses:
+        "200":
+          description: Order list; access tokens are never included
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/Order" }
+        "401": { $ref: "#/components/responses/SimpleUnauthorized" }
     post:
+      tags: [Orders]
       summary: Create a pending-payment order from a server-priced cart
+      description: |
+        Requires sign-in in the production configuration. Shipping is 199
+        standard, 299 express, or free when the discounted subtotal is at least
+        1999. Retries must reuse the same Idempotency-Key: the first call
+        returns 201, a replay returns the original order with 200 and an
+        `Idempotent-Replayed: true` header.
+      security:
+        - cookieAuth: []
       parameters:
         - in: header
           name: Idempotency-Key
@@ -129,38 +412,409 @@ paths:
           application/json:
             schema: { $ref: "#/components/schemas/CreateOrder" }
       responses:
-        "201": { description: Order created }
-        "200": { description: Existing order returned after an idempotent replay }
-        "422": { description: Invalid checkout data or empty cart }
-  /orders/{orderNumber}:
+        "201":
+          description: Order created
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Order" }
+        "200":
+          description: Existing order returned after an idempotent replay
+          headers:
+            Idempotent-Replayed:
+              schema: { type: string, const: "true" }
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Order" }
+        "401": { $ref: "#/components/responses/SimpleUnauthorized" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "422": { $ref: "#/components/responses/Validation" }
+  /api/v1/orders/{orderNumber}:
     get:
-      summary: Read an order using its private access token
+      tags: [Orders]
+      summary: Read one order
+      description: |
+        The signed-in owner reads their order with the session cookie. When the
+        API runs without auth configured (local development only), guests read
+        an order with the X-Order-Access-Token header returned at creation.
+      security:
+        - cookieAuth: []
+        - orderToken: []
       parameters:
         - in: path
           name: orderNumber
           required: true
-          schema: { type: string }
+          schema: { type: string, pattern: "^YV-[0-9]{8}-[A-Z0-9]{4}$" }
         - in: header
           name: X-Order-Access-Token
-          required: true
           schema: { type: string }
       responses:
-        "200": { description: Order }
-        "403": { description: Missing or invalid order access token }
+        "200":
+          description: Order (access token never echoed)
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Order" }
+        "403": { $ref: "#/components/responses/AccessDenied" }
         "404": { $ref: "#/components/responses/NotFound" }
+
+  /api/v1/payments/razorpay/orders:
+    post:
+      tags: [Payments]
+      summary: Create (or reuse) a Razorpay order for a checkout
+      description: Creates the local pending-payment order, then registers it with Razorpay and attaches the gateway ID. Requires Razorpay configuration; otherwise 503.
+      security:
+        - cookieAuth: []
+      parameters:
+        - in: header
+          name: Idempotency-Key
+          schema: { type: string, maxLength: 200 }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/CreateOrder" }
+      responses:
+        "201":
+          description: Razorpay checkout parameters
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/RazorpayCheckoutOrder" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/SimpleUnauthorized" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "422": { $ref: "#/components/responses/Validation" }
+        "502":
+          description: Razorpay gateway call failed
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "503":
+          description: Payments not configured
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+  /api/v1/payments/razorpay/verify:
+    post:
+      tags: [Payments]
+      summary: Verify a checkout's HMAC signature and mark the payment authorized
+      security:
+        - cookieAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/RazorpayVerificationInput" }
+      responses:
+        "200":
+          description: Signature valid; payment recorded as AUTHORIZED
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/RazorpayVerificationResult" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/SimpleUnauthorized" }
+        "404": { $ref: "#/components/responses/NotFound" }
+  /api/v1/payments/razorpay/webhook:
+    post:
+      tags: [Payments]
+      summary: Razorpay webhook (payment.captured / order.paid / payment.failed)
+      description: Authenticated by the X-Razorpay-Signature HMAC of the raw body against RAZORPAY_WEBHOOK_SECRET. Idempotent; unknown events are acknowledged without state changes.
+      parameters:
+        - in: header
+          name: X-Razorpay-Signature
+          required: true
+          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [event, payload]
+              properties:
+                event: { type: string }
+                payload:
+                  type: object
+                  properties:
+                    payment:
+                      type: object
+                      properties:
+                        entity:
+                          type: object
+                          properties:
+                            id: { type: string }
+                            order_id: { type: string }
+                    order:
+                      type: object
+                      properties:
+                        entity:
+                          type: object
+                          properties:
+                            id: { type: string }
+      responses:
+        "200":
+          description: Acknowledged
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [received]
+                properties:
+                  received: { type: boolean }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "503":
+          description: Webhook secret not configured
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+
+  /api/v1/me/beauty-profile:
+    get:
+      tags: [Beauty Profile]
+      summary: The signed-in user's confirmed shade profile
+      security:
+        - cookieAuth: []
+      responses:
+        "200":
+          description: Profile (has_profile false when none confirmed yet)
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/BeautyProfile" }
+        "401": { $ref: "#/components/responses/SimpleUnauthorized" }
+  /api/v1/yafa/session/start:
+    post:
+      tags: [Beauty Profile]
+      summary: Start a shade-finder session
+      description: Anonymous sessions receive a session_token that must travel in the X-Yafa-Session-Token header on subsequent calls; signed-in sessions are authorized by cookie.
+      security:
+        - cookieAuth: []
+        - {}
+      responses:
+        "201":
+          description: Session started
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/YafaSessionStart" }
+        "503": { $ref: "#/components/responses/ServiceUnavailable" }
+  /api/v1/yafa/session/{sessionID}/answer:
+    patch:
+      tags: [Beauty Profile]
+      summary: Save one quiz answer
+      security:
+        - cookieAuth: []
+        - yafaSessionToken: []
+      parameters:
+        - $ref: "#/components/parameters/SessionId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [step_id, answer]
+              properties:
+                step_id: { type: string }
+                answer: { type: string }
+      responses:
+        "204": { description: Answer saved }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "403": { $ref: "#/components/responses/AccessDenied" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "422": { $ref: "#/components/responses/Validation" }
+        "503": { $ref: "#/components/responses/ServiceUnavailable" }
+  /api/v1/yafa/session/{sessionID}/selfie:
+    post:
+      tags: [Beauty Profile]
+      summary: Attach a selfie for analysis (multipart/form-data, JPG/PNG up to 5 MB)
+      security:
+        - cookieAuth: []
+        - yafaSessionToken: []
+      parameters:
+        - $ref: "#/components/parameters/SessionId"
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [image]
+              properties:
+                image:
+                  type: string
+                  format: binary
+      responses:
+        "204": { description: Selfie stored }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "403": { $ref: "#/components/responses/AccessDenied" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "503": { $ref: "#/components/responses/ServiceUnavailable" }
+  /api/v1/yafa/session/{sessionID}/analyze:
+    post:
+      tags: [Beauty Profile]
+      summary: Run shade analysis for the session
+      security:
+        - cookieAuth: []
+        - yafaSessionToken: []
+      parameters:
+        - $ref: "#/components/parameters/SessionId"
+      responses:
+        "200":
+          description: Ranked shade candidates
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/YafaAnalysis" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "403": { $ref: "#/components/responses/AccessDenied" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "422":
+          description: Analysis could not determine a shade
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "503": { $ref: "#/components/responses/ServiceUnavailable" }
+  /api/v1/yafa/session/{sessionID}/confirm:
+    post:
+      tags: [Beauty Profile]
+      summary: Confirm a recommended shade for the session
+      security:
+        - cookieAuth: []
+        - yafaSessionToken: []
+      parameters:
+        - $ref: "#/components/parameters/SessionId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/YafaConfirmInput" }
+      responses:
+        "200":
+          description: Shade confirmed
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/YafaConfirmation" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "403": { $ref: "#/components/responses/AccessDenied" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "422": { $ref: "#/components/responses/Validation" }
+        "503": { $ref: "#/components/responses/ServiceUnavailable" }
+  /api/v1/yafa/confirm-shade:
+    post:
+      tags: [Beauty Profile]
+      summary: Confirm a shade by session ID in the body
+      security:
+        - cookieAuth: []
+        - yafaSessionToken: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              allOf:
+                - $ref: "#/components/schemas/YafaConfirmInput"
+                - type: object
+                  required: [quiz_session_id]
+      responses:
+        "200":
+          description: Shade confirmed
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/YafaConfirmation" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "403": { $ref: "#/components/responses/AccessDenied" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "422": { $ref: "#/components/responses/Validation" }
+        "503": { $ref: "#/components/responses/ServiceUnavailable" }
+
 components:
+  securitySchemes:
+    cookieAuth:
+      type: apiKey
+      in: cookie
+      name: yafa_access
+      description: HTTP-only JWT session cookie issued by /auth/login, /auth/register, /auth/refresh, or the Google callback.
+    orderToken:
+      type: apiKey
+      in: header
+      name: X-Order-Access-Token
+      description: Guest order credential returned as access_token when the order is created (no-auth mode only).
+    yafaSessionToken:
+      type: apiKey
+      in: header
+      name: X-Yafa-Session-Token
+      description: Credential returned by session start for anonymous beauty-profile sessions.
   parameters:
     CartId:
       in: path
       name: cartId
       required: true
       schema: { type: string }
+    SessionId:
+      in: path
+      name: sessionID
+      required: true
+      schema:
+        type: string
+        format: uuid
   responses:
     NotFound:
       description: Resource not found
       content:
         application/json:
           schema: { $ref: "#/components/schemas/Error" }
+    AccessDenied:
+      description: The resource belongs to someone else or a credential is missing/invalid
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/Error" }
+    BadRequest:
+      description: Malformed request body or parameters
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/Error" }
+    Validation:
+      description: Semantically invalid input (empty cart, bad address/email, exhausted stock state)
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/Error" }
+    VariantUnavailable:
+      description: Variant unknown, inactive, or out of stock for the requested quantity
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/Error" }
+    ServiceUnavailable:
+      description: An upstream dependency is unavailable
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/Error" }
+    SimpleUnauthorized:
+      description: Not signed in
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/SimpleError" }
+    SimpleForbidden:
+      description: Missing or invalid CSRF token
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/SimpleError" }
+    SimpleBadRequest:
+      description: Malformed request
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/SimpleError" }
+    SimpleUnprocessable:
+      description: Invalid registration details
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/SimpleError" }
+    SimpleRateLimited:
+      description: Too many attempts; retry later
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/SimpleError" }
+    SimpleUnavailable:
+      description: Feature not configured
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/SimpleError" }
   schemas:
     Error:
       type: object
@@ -170,11 +824,179 @@ components:
           type: object
           required: [code, message]
           properties:
-            code: { type: string }
+            code:
+              type: string
+              enum:
+                - not_found
+                - access_denied
+                - validation_error
+                - variant_unavailable
+                - invalid_request
+                - invalid_idempotency_key
+                - payment_order_not_found
+                - payment_unavailable
+                - payment_provider_error
+                - payment_setup_error
+                - payment_verification_error
+                - invalid_payment_signature
+                - invalid_webhook_signature
+                - webhook_unavailable
+                - service_unavailable
+                - unauthenticated
+                - unauthorized
+                - internal_error
             message: { type: string }
+    SimpleError:
+      type: object
+      required: [error]
+      properties:
+        error: { type: string }
+
+    Health:
+      type: object
+      required: [service, status, catalogue_products, uptime_seconds, time]
+      properties:
+        service: { type: string, const: yafa-api }
+        status: { type: string, enum: [ok, degraded] }
+        catalogue_products: { type: integer }
+        uptime_seconds: { type: integer }
+        time: { type: string, format: date-time }
+        additionalProperties: { type: string }
+
+    User:
+      type: object
+      required: [id, name, email]
+      properties:
+        id: { type: string }
+        name: { type: string }
+        email: { type: string, format: email }
+    UserEnvelope:
+      type: object
+      required: [user]
+      properties:
+        user: { $ref: "#/components/schemas/User" }
+    RegisterInput:
+      type: object
+      additionalProperties: false
+      required: [name, email, password]
+      properties:
+        name: { type: string, minLength: 1 }
+        email: { type: string, format: email }
+        password: { type: string, minLength: 8 }
+        remember: { type: boolean, default: false }
+    LoginInput:
+      type: object
+      additionalProperties: false
+      required: [email, password]
+      properties:
+        email: { type: string, format: email }
+        password: { type: string }
+        remember: { type: boolean, default: false }
+
+    Category:
+      type: object
+      required: [name, subcategories, product_count]
+      properties:
+        name: { type: string }
+        subcategories:
+          type: array
+          items: { type: string }
+        product_count: { type: integer, minimum: 0 }
+
+    Description:
+      type: object
+      required: [short, full]
+      properties:
+        short: { type: string }
+        full: { type: string }
+    CommerceMoney:
+      type: object
+      required: [currency, base_price, compare_at_price]
+      properties:
+        currency: { type: string }
+        base_price: { type: number, minimum: 0 }
+        compare_at_price: { type: [number, "null"], minimum: 0 }
+    Shade:
+      type: object
+      required: [name, code, hex, undertone]
+      properties:
+        name: { type: string }
+        code: { type: [string, "null"] }
+        hex: { type: [string, "null"] }
+        undertone: { type: [string, "null"] }
+    Variant:
+      type: object
+      required: [id, sku, size, shade, price, stock, is_active]
+      properties:
+        id: { type: string }
+        sku: { type: [string, "null"] }
+        size: { type: [string, "null"] }
+        shade: { anyOf: [{ $ref: "#/components/schemas/Shade" }, { type: "null" }] }
+        price: { type: number, minimum: 0 }
+        stock: { type: [integer, "null"], minimum: 0 }
+        is_active: { type: boolean }
+    Images:
+      type: object
+      required: [primary, gallery, lifestyle, detail, texture, alt, paths_verified]
+      properties:
+        primary: { type: [string, "null"] }
+        gallery: { type: array, items: { type: string } }
+        lifestyle: { type: array, items: { type: string } }
+        detail: { type: array, items: { type: string } }
+        texture: { type: [string, "null"] }
+        alt: { type: string }
+        paths_verified: { type: boolean }
+    Usage:
+      type: object
+      required: [how_to_use, amount, when]
+      properties:
+        how_to_use: { type: string }
+        amount: { type: [string, "null"] }
+        when: { type: array, items: { type: string } }
+    Ingredients:
+      type: object
+      required: [full_inci, active_ingredients, ingredient_data_note]
+      properties:
+        full_inci: { type: [string, "null"] }
+        active_ingredients: { type: array, items: {} }
+        ingredient_data_note: { type: [string, "null"] }
+    Product:
+      type: object
+      required:
+        [id, name, slug, brand, category, subcategory, product_type, status, description, commerce, variants, images, benefits, usage, warnings, ingredients]
+      properties:
+        id: { type: string }
+        name: { type: string }
+        slug: { type: string }
+        brand: { type: string }
+        category: { type: string }
+        subcategory: { type: string }
+        product_type: { type: string }
+        status: { type: string, enum: [active, draft, archived] }
+        description: { $ref: "#/components/schemas/Description" }
+        commerce: { $ref: "#/components/schemas/CommerceMoney" }
+        variants:
+          type: array
+          items: { $ref: "#/components/schemas/Variant" }
+        images: { $ref: "#/components/schemas/Images" }
+        benefits: { type: array, items: { type: string } }
+        usage: { $ref: "#/components/schemas/Usage" }
+        warnings: { type: array, items: { type: string } }
+        ingredients: { $ref: "#/components/schemas/Ingredients" }
+    ProductList:
+      type: object
+      required: [items, total, limit, offset]
+      properties:
+        items:
+          type: array
+          items: { $ref: "#/components/schemas/Product" }
+        total: { type: integer, minimum: 0 }
+        limit: { type: integer }
+        offset: { type: integer, minimum: 0 }
+
     CartLine:
       type: object
-      required: [key, product_id, variant_id, name, slug, currency, unit_price, quantity]
+      required: [key, product_id, variant_id, name, slug, product_type, currency, unit_price, quantity, size, shade, image]
       properties:
         key: { type: string }
         product_id: { type: string }
@@ -200,10 +1022,11 @@ components:
         subtotal: { type: number, minimum: 0 }
         currency: { type: string }
         updated_at: { type: string, format: date-time }
+
     Address:
       type: object
       additionalProperties: false
-      required: [recipient_name, line1, city, state_region, postal_code]
+      required: [recipient_name, phone, line1, line2, city, state_region, postal_code, country_code]
       properties:
         recipient_name: { type: string }
         phone: { type: [string, "null"] }
@@ -220,4 +1043,108 @@ components:
       properties:
         cart_id: { type: string }
         customer_email: { type: string, format: email }
+        shipping_method: { type: string, enum: [standard, express], default: standard }
+        discount_code: { type: string, maxLength: 32 }
         shipping_address: { $ref: "#/components/schemas/Address" }
+
+    OrderItem:
+      allOf:
+        - $ref: "#/components/schemas/CartLine"
+    Order:
+      type: object
+      required:
+        [id, order_number, customer_email, items, currency, subtotal, shipping_amount, discount_amount, total_amount, order_status, payment_status, fulfillment_status, shipping_address, created_at]
+      properties:
+        id: { type: string }
+        order_number: { type: string, pattern: "^YV-[0-9]{8}-[A-Z0-9]{4}$" }
+        access_token:
+          type: string
+          description: Present only in the creation response of a guest order; never echoed by reads or listings.
+        customer_email: { type: string, format: email }
+        items:
+          type: array
+          items: { $ref: "#/components/schemas/OrderItem" }
+        currency: { type: string }
+        subtotal: { type: number, minimum: 0 }
+        shipping_amount: { type: number, minimum: 0 }
+        discount_amount: { type: number, minimum: 0 }
+        total_amount: { type: number, minimum: 0 }
+        order_status: { type: string, enum: [PENDING_PAYMENT, PAID] }
+        payment_status: { type: string, enum: [PENDING, AUTHORIZED, CAPTURED, FAILED] }
+        razorpay_order_id: { type: string }
+        razorpay_payment_id: { type: string }
+        fulfillment_status: { type: string, enum: [UNFULFILLED] }
+        shipping_address: { $ref: "#/components/schemas/Address" }
+        created_at: { type: string, format: date-time }
+
+    RazorpayCheckoutOrder:
+      type: object
+      required: [order_number, razorpay_order_id, amount, currency, key_id]
+      properties:
+        order_number: { type: string }
+        razorpay_order_id: { type: string }
+        amount: { type: integer, minimum: 0, description: Total in paise }
+        currency: { type: string }
+        key_id: { type: string }
+    RazorpayVerificationInput:
+      type: object
+      additionalProperties: false
+      required: [razorpay_payment_id, razorpay_order_id, razorpay_signature]
+      properties:
+        razorpay_payment_id: { type: string }
+        razorpay_order_id: { type: string }
+        razorpay_signature: { type: string }
+    RazorpayVerificationResult:
+      type: object
+      required: [verified, order_number, payment_status]
+      properties:
+        verified: { type: boolean, const: true }
+        order_number: { type: string }
+        payment_status: { type: string, const: AUTHORIZED }
+
+    YafaSessionStart:
+      type: object
+      required: [session_id]
+      properties:
+        session_id: { type: string, format: uuid }
+        session_token:
+          type: string
+          description: Present for anonymous sessions only; send as X-Yafa-Session-Token.
+    BeautyProfile:
+      type: object
+      required: [has_profile]
+      properties:
+        has_profile: { type: boolean }
+        shade_id: { type: string }
+        shade_name: { type: string }
+        shade_code: { type: string }
+        hex: { type: string }
+    YafaAnalysisCandidate:
+      type: object
+      required: [shade_id, shade_name, hex, confidence, reason]
+      properties:
+        shade_id: { type: string, format: uuid }
+        shade_name: { type: string }
+        hex: { type: string }
+        confidence: { type: number, minimum: 0, maximum: 1 }
+        reason: { type: string, maxLength: 280 }
+    YafaAnalysis:
+      type: object
+      required: [candidates, primary_recommendation]
+      properties:
+        candidates:
+          type: array
+          items: { $ref: "#/components/schemas/YafaAnalysisCandidate" }
+        primary_recommendation: { type: string, format: uuid }
+    YafaConfirmInput:
+      type: object
+      additionalProperties: false
+      properties:
+        quiz_session_id: { type: string, format: uuid }
+        shade_id: { type: string, format: uuid }
+    YafaConfirmation:
+      type: object
+      required: [shade_id, saved_to_profile]
+      properties:
+        shade_id: { type: string, format: uuid }
+        saved_to_profile: { type: boolean }

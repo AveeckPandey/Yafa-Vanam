@@ -96,6 +96,33 @@ type Order struct {
 	CreatedAt         time.Time  `json:"created_at"`
 }
 
+// CommerceStore is the persistence boundary for carts and orders. Store (in
+// memory) backs tests and database-free development; PostgresStore backs
+// production so carts and paid orders survive restarts and deploys. Handlers
+// depend on this interface only, which keeps behaviour identical no matter
+// where the data lives.
+type CommerceStore interface {
+	CreateCart() (CartView, error)
+	CreateCartForUser(ownerID string) (CartView, error)
+	GetCartForUser(id, ownerID string) (CartView, error)
+	ClaimCartForUser(id, ownerID string) error
+	AddCartItemForUser(ownerID, cartID, productID, variantID string, quantity int) (CartView, error)
+	SetCartItemForUser(ownerID, cartID, variantID string, quantity int) (CartView, error)
+	RemoveCartItemForUser(ownerID, cartID, variantID string) (CartView, error)
+	GetCart(id string) (CartView, error)
+	AddCartItem(cartID, productID, variantID string, quantity int) (CartView, error)
+	SetCartItem(cartID, variantID string, quantity int) (CartView, error)
+	RemoveCartItem(cartID, variantID string) (CartView, error)
+	CreateOrder(input CreateOrderInput, idempotencyKey string) (Order, bool, error)
+	CreateOrderForUser(ownerID string, input CreateOrderInput, idempotencyKey string) (Order, bool, error)
+	GetOrderForUser(orderNumber, ownerID string) (Order, error)
+	ListOrdersForUser(ownerID string) []Order
+	GetOrder(orderNumber, accessToken string) (Order, error)
+	AttachRazorpayOrder(orderNumber, razorpayOrderID string) (Order, error)
+	VerifyRazorpayPayment(razorpayOrderID, paymentID string) (Order, error)
+	RecordRazorpayPayment(razorpayOrderID, paymentID, status string) (Order, error)
+}
+
 type Store struct {
 	mu          sync.RWMutex
 	catalog     *Catalog
@@ -112,17 +139,17 @@ func NewStore(catalog *Catalog) *Store {
 	}
 }
 
-func (store *Store) CreateCart() CartView {
+func (store *Store) CreateCart() (CartView, error) {
 	return store.CreateCartForUser("")
 }
 
-func (store *Store) CreateCartForUser(ownerID string) CartView {
+func (store *Store) CreateCartForUser(ownerID string) (CartView, error) {
 	store.mu.Lock()
 	defer store.mu.Unlock()
 	now := store.now().UTC()
 	cart := &Cart{ID: randomID("cart_", 12), OwnerID: ownerID, Items: make(map[string]int), CreatedAt: now, UpdatedAt: now}
 	store.carts[cart.ID] = cart
-	return store.cartViewLocked(cart)
+	return store.cartViewLocked(cart), nil
 }
 
 func (store *Store) ownedCart(id, ownerID string) (*Cart, error) {
@@ -479,9 +506,16 @@ func (store *Store) GetOrder(orderNumber, accessToken string) (Order, error) {
 }
 
 func (store *Store) cartViewLocked(cart *Cart) CartView {
-	view := CartView{ID: cart.ID, Currency: "INR", UpdatedAt: cart.UpdatedAt, Items: []CartLine{}}
-	for variantID, quantity := range cart.Items {
-		ref, ok := store.catalog.variants[variantID]
+	return buildCartView(store.catalog, cart.ID, cart.Items, cart.UpdatedAt)
+}
+
+// buildCartView renders a raw variant->quantity map through the current
+// catalogue. Both store backends share it so pricing, sellable-item filtering,
+// and line ordering stay identical wherever carts are persisted.
+func buildCartView(catalog *Catalog, id string, items map[string]int, updatedAt time.Time) CartView {
+	view := CartView{ID: id, Currency: "INR", UpdatedAt: updatedAt, Items: []CartLine{}}
+	for variantID, quantity := range items {
+		ref, ok := catalog.variants[variantID]
 		if !ok || !ref.variant.IsActive || (ref.variant.Stock != nil && *ref.variant.Stock <= 0) {
 			continue
 		}

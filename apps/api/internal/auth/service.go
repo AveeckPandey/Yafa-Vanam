@@ -22,7 +22,13 @@ var (
 	ErrEmailTaken         = errors.New("an account already exists for this email")
 )
 
-type User struct{ ID, Name, Email string }
+// JSON tags keep the session payload lowercase on the wire; the storefront's
+// AuthProvider reads user.id/user.name/user.email from these responses.
+type User struct {
+	ID    string `json:"id"`
+	Name  string `json:"name"`
+	Email string `json:"email"`
+}
 type Config struct {
 	JWTSecret                                 string
 	SecureCookies                             bool
