@@ -1,5 +1,12 @@
 # YAFA VANAM — Architecture Update
 
+## Catalogue Pipeline — 2026-08-22
+- Replaced the `data/scripts` scaffold stubs with a working catalogue pipeline: validator, normalizer, SQL seeder, and PostgreSQL importer (see `data/scripts/README.md`).
+- Added `validate_catalogue.py`, enforcing the contract shared by the Go commerce loader, the Next.js catalogue, and the recommendation engine.
+- Added `normalize_products.py`, a deterministic trim/default/key-order pass with atomic writes and a CI-friendly `--check` mode that preserves curated product ordering.
+- Added `seed_database.py` and `import_catalogue.py`, two interchangeable idempotent paths (portable SQL or psycopg upserts) into the migration schema with deterministic UUIDv5 row identity.
+- Corrected the web catalogue types: `active_ingredients` is a list of structured ingredient records, not strings; `mapProduct` now maps the fields explicitly.
+
 ## Updated in this ZIP
 
 - Replaced the Fastify/TypeScript commerce backend scaffold with a Go backend.
@@ -26,4 +33,4 @@
 - Added vision and RAG provider interfaces without fake provider output.
 - Added global Next.js Makeup Advisor launcher, quick replies, uploads, recommendation cards and follow-up modification actions.
 - Added advisor analytics event vocabulary and deterministic tests.
-- Added current 78-product catalogue snapshot under `data/processed/products.json`.
+- Added current 78-product catalogue snapshot under `data/processed/Product.json`.

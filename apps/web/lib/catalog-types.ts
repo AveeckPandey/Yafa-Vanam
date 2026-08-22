@@ -35,6 +35,16 @@ export type BodyCareGroup = "body-moisturizers" | "hand-foot-care";
 
 export type MakeupGroup = "face" | "eyes" | "lips" | "cheeks";
 
+export type CatalogActiveIngredient = {
+  name: string;
+  role: string | null;
+  concentration: string | null;
+  source: string | null;
+  evidenceLevel: string | null;
+  verifiedForFinalFormula: boolean | null;
+  concentrationDependentClaims: boolean | null;
+};
+
 export type CatalogProduct = {
   id: string;
   slug: string;
@@ -60,7 +70,7 @@ export type CatalogProduct = {
   warnings: string[];
   ingredients: {
     fullInci: string | null;
-    activeIngredients: string[];
+    activeIngredients: CatalogActiveIngredient[];
     note: string | null;
   };
   fragranceProfile: FragranceProfile | null;

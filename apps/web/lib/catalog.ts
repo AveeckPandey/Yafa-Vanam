@@ -41,7 +41,15 @@ type SourceProduct = {
   warnings: string[];
   ingredients: {
     full_inci: string | null;
-    active_ingredients: string[];
+    active_ingredients: Array<{
+      name: string;
+      role: string | null;
+      concentration: string | null;
+      source: string | null;
+      evidence_level: string | null;
+      verified_for_final_formula: boolean | null;
+      concentration_dependent_claims: boolean | null;
+    }>;
     ingredient_data_note: string | null;
   };
   fragrance_profile?: {
@@ -230,7 +238,15 @@ function mapProduct(product: SourceProduct): CatalogProduct {
     warnings: product.warnings,
     ingredients: {
       fullInci: product.ingredients.full_inci,
-      activeIngredients: product.ingredients.active_ingredients,
+      activeIngredients: product.ingredients.active_ingredients.map((ingredient) => ({
+        name: ingredient.name,
+        role: ingredient.role,
+        concentration: ingredient.concentration,
+        source: ingredient.source,
+        evidenceLevel: ingredient.evidence_level,
+        verifiedForFinalFormula: ingredient.verified_for_final_formula,
+        concentrationDependentClaims: ingredient.concentration_dependent_claims,
+      })),
       note: product.ingredients.ingredient_data_note,
     },
     fragranceProfile: product.fragrance_profile
