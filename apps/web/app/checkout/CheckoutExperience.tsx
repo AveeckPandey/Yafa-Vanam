@@ -148,7 +148,7 @@ export default function CheckoutExperience() {
       let paymentSubmitted = false;
       const checkout = new window.Razorpay({
         key: order.keyId, amount: order.amount, currency: order.currency, order_id: order.orderId, name: "YAFA VANAM",
-        prefill: { name: validation.values.fullName, email: validation.values.email, contact: validation.values.phone }, theme: { color: "#C9A84C" },
+        prefill: { name: validation.values.fullName, email: validation.values.email, contact: validation.values.phone }, theme: { color: "#985b6a" },
         modal: { ondismiss: () => { if (!paymentSubmitted) { setIsProcessing(false); setPaymentFailed(true); setNotice("Payment was cancelled. Your delivery details are still saved here."); } } },
         handler: async (response) => {
           paymentSubmitted = true;
