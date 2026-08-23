@@ -1,4 +1,5 @@
 import os
+from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
@@ -11,6 +12,7 @@ except ImportError:  # Keeps local development usable before optional monitoring
     SentryAsgiMiddleware = None
 
 from app.api.advisor import router as advisor_router
+from app.api.rag_search import router as rag_search_router, validate_startup_dimensions
 from app.api.yafa_analysis import router as yafa_analysis_router
 from app.advisor.catalogue import load_catalogue
 from app.advisor.models import BeautyProfile
@@ -26,7 +28,20 @@ if sentry_sdk is not None and os.getenv("SENTRY_DSN"):
         send_default_pii=False,
     )
 
-app = FastAPI(title="YAFA VANAM Product Advisor", version="1.0.0")
+
+@asynccontextmanager
+async def lifespan(_: FastAPI):
+    # Startup guard (spec §11): configured EMBEDDING_DIMENSION == provider
+    # output == stored pgvector column dimension. No-op without VECTOR_DATABASE_URL.
+    import asyncio
+
+    status = await asyncio.to_thread(validate_startup_dimensions)
+    if status.get("rag_enabled"):
+        print(f"[rag] embeddings validated: {status}")
+    yield
+
+
+app = FastAPI(title="YAFA VANAM Product Advisor", version="1.0.0", lifespan=lifespan)
 if sentry_sdk is not None and SentryAsgiMiddleware is not None and os.getenv("SENTRY_DSN"):
     app.add_middleware(SentryAsgiMiddleware)
 app.add_middleware(
@@ -38,6 +53,7 @@ app.add_middleware(
 )
 app.include_router(advisor_router)
 app.include_router(yafa_analysis_router)
+app.include_router(rag_search_router)
 app.include_router(v1_router)
 
 

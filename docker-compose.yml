@@ -15,6 +15,25 @@ services:
       timeout: 5s
       retries: 10
 
+  # Product-knowledge RAG store. Must be a pgvector build; the commerce
+  # database above intentionally stays extension-free. Host port 5433 avoids
+  # colliding with the commerce Postgres.
+  rag-postgres:
+    image: pgvector/pgvector:pg16
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: yafa_rag
+    ports:
+      - "5433:5432"
+    volumes:
+      - rag_vector_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d yafa_rag"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
   api:
     build:
       context: .
@@ -52,3 +71,4 @@ services:
 
 volumes:
   postgres_data:
+  rag_vector_data:

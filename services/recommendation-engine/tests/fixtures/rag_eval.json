@@ -1,0 +1,78 @@
+{
+  "cases": [
+    {
+      "id": "usage-question-names-product",
+      "question": "How do I use Fernwing Volume Mascara?",
+      "expected_product": "yv-eye-001",
+      "expected_chunk_types": ["usage"]
+    },
+    {
+      "id": "designed-for-pdp-this",
+      "question": "What is this designed for?",
+      "page_context": { "type": "product", "product_id": "yv-frag-010" },
+      "expected_product": "yv-frag-010",
+      "expected_chunk_types": ["product_overview"]
+    },
+    {
+      "id": "warnings",
+      "question": "What are the product warnings for Soft Ember Warm Fragrance Concept?",
+      "expected_product": "yv-frag-010",
+      "expected_chunk_types": ["warnings"]
+    },
+    {
+      "id": "routine-position-pdp-this",
+      "question": "Where does this fit in my routine?",
+      "page_context": { "type": "product", "product_id": "yv-eye-001" },
+      "expected_product": "yv-eye-001",
+      "expected_chunk_types": ["routine_position"]
+    },
+    {
+      "id": "scent-profile-alias-resolution",
+      "question": "What is the scent profile of Soft Ember?",
+      "expected_product": "yv-frag-010",
+      "expected_chunk_types": ["scent_profile"]
+    },
+    {
+      "id": "verified-ingredients-question-stays-qualified",
+      "question": "Which ingredients are currently verified in this formula?",
+      "page_context": { "type": "product", "product_id": "yv-eye-001" },
+      "expected_product": "yv-eye-001",
+      "allow_empty": false
+    },
+    {
+      "id": "unverified-formula-honesty",
+      "question": "Which information about this formula is still unverified?",
+      "page_context": { "type": "product", "product_id": "yv-skin-020" },
+      "expected_product": "yv-skin-020"
+    },
+    {
+      "id": "global-catalogue-retrieval",
+      "question": "What products have a natural makeup positioning?",
+      "allow_empty": false
+    },
+    {
+      "id": "alias-exact-name",
+      "question": "Tell me about Fernwing Volume Mascara",
+      "expected_product": "yv-eye-001"
+    },
+    {
+      "id": "live-data-inventory-not-from-json",
+      "question": "Is this in stock?",
+      "expect_requires_live_data": ["inventory"],
+      "expect_results_suppressed": true,
+      "allow_empty": true
+    },
+    {
+      "id": "live-data-price-not-from-json",
+      "question": "How much does it cost?",
+      "expect_requires_live_data": ["price"],
+      "allow_empty": true
+    },
+    {
+      "id": "no-cross-product-contamination",
+      "question": "What does Fernwing Volume Mascara do?",
+      "expected_product": "yv-eye-001",
+      "expected_chunk_types": ["product_overview", "benefits"]
+    }
+  ]
+}
