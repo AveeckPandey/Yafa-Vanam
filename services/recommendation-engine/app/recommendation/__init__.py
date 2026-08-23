@@ -9,10 +9,12 @@ from __future__ import annotations
 
 from app.recommendation.canonical import CanonicalProfile, CoordinationHints
 from app.recommendation.canonical.schemas import EngineResult, Recommendation
+from app.recommendation.engines import ENGINE_REGISTRY
 
 __all__ = [
     "CanonicalProfile",
     "CoordinationHints",
     "EngineResult",
+    "ENGINE_REGISTRY",
     "Recommendation",
 ]

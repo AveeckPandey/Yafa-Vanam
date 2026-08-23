@@ -51,6 +51,22 @@ class EyesAdapter(BaseAdapter):
         system_id, _, slug = ref.partition(":")
         return (self.shared_systems.get(system_id, {}).get("profiles") or {}).get(slug)
 
+    def shade_profiles_for_product(self, product_id: str) -> list[dict[str, Any]]:
+        """Per-shade colour profiles of one product's sellable shades.
+
+        Palette products contribute their palette_colors[] pans here — colour
+        data without ever fanning pans out as sellable variants.
+        """
+        product = self.find(product_id)
+        if product and product.get("palette_colors"):
+            return list(product["palette_colors"])
+        profiles: list[dict[str, Any]] = []
+        for variant in (product or {}).get("variants", []):
+            profile = self.shade_profiles_for_variant(variant)
+            if profile:
+                profiles.append(profile)
+        return profiles
+
     def shared_profiles(self, system_id: str) -> dict[str, dict[str, Any]]:
         return self.shared_systems.get(system_id, {}).get("profiles", {})
 

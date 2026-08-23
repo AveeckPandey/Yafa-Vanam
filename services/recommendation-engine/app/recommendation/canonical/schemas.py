@@ -102,7 +102,7 @@ class EngineResult(BaseModel):
 class Candidate:
     """Filter/scorer unit: one sellable product (palettes stay ONE candidate)."""
 
-    __slots__ = ("product", "variants", "shade_profiles", "source_file")
+    __slots__ = ("product", "variants", "shade_profiles", "source_file", "warnings")
 
     def __init__(
         self,
@@ -110,11 +110,13 @@ class Candidate:
         variants: list[dict[str, Any]],
         source_file: str,
         shade_profiles: list[dict[str, Any]] | None = None,
+        warnings: list[str] | None = None,
     ) -> None:
         self.product = product
         self.variants = variants  # empty list means "product-level candidate"
         self.source_file = source_file
         self.shade_profiles = shade_profiles or []
+        self.warnings = warnings or []
 
     @property
     def product_id(self) -> str:
