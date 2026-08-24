@@ -3,21 +3,60 @@
 import Image from "next/image";
 import Link from "next/link";
 import { useEffect, useState } from "react";
-import type { CatalogProduct } from "@/lib/catalog-types";
+import type { CatalogProduct, CatalogVariant } from "@/lib/catalog-types";
 import { formatCatalogPrice } from "@/lib/catalog-types";
-import { getMakeupVariantImage } from "@/lib/makeup-variant-images";
+import { getMakeupVariantImage, getVerifiedShadeImage } from "@/lib/makeup-variant-images";
+import { usesWarmProductFrame } from "@/lib/makeup-assets";
 import AddToBag from "./AddToBag";
-import AskYafa from "./AskYafa";
 import ProductAccordion from "./ProductAccordion";
 import ProductGallery from "./ProductGallery";
 import QuantitySelector from "./QuantitySelector";
 import StickyBuyBar from "./StickyBuyBar";
+import YafaProductGuidance from "@/components/yafa/YafaProductGuidance";
 import { useAuth } from "@/components/auth/AuthProvider";
 import { getConfirmedYafaProfile, type ConfirmedYafaProfile } from "@/lib/yafa-profile";
 import { trackEvent } from "@/lib/analytics";
 
 function pretty(value: string) {
   return value.replaceAll("_", " ");
+}
+
+const masterShadeOrder = [
+  "1C", "1N", "1W", "2C", "2N", "2W", "3C", "3N", "3W", "4N", "4W", "4O",
+  "5N", "5W", "5O", "6N", "6W", "6O", "7C", "7N", "7W", "8N", "8W", "8O",
+];
+
+function titleCase(value: string | null) {
+  return value ? pretty(value).replace(/\b\w/g, (letter) => letter.toUpperCase()) : "";
+}
+
+function shadeName(shade: NonNullable<CatalogVariant["shade"]>) {
+  const withoutCode = shade.name.replace(new RegExp(`^${shade.code ?? ""}\\s*`, "i"), "").trim();
+  return withoutCode || [titleCase(shade.depthFamily), titleCase(shade.undertone)].filter(Boolean).join(" ");
+}
+
+function shadeSummary(shade: NonNullable<CatalogVariant["shade"]>) {
+  const details = [titleCase(shade.depthFamily), titleCase(shade.undertone)].filter(Boolean).join(" · ");
+  const identity = shade.code ? `${shade.code} — ${shadeName(shade)}` : shadeName(shade);
+  return `${identity}${details ? ` · ${details}` : ""}`;
+}
+
+function shadeDescriptor(shade: NonNullable<CatalogVariant["shade"]>) {
+  const depth = titleCase(shade.depthFamily);
+  const undertone = titleCase(shade.undertone).toLowerCase();
+  if (!depth || !undertone) return null;
+  const tone = undertone === "cool"
+    ? "soft rosy-beige"
+    : undertone === "warm"
+      ? "golden-beige"
+      : undertone === "olive"
+        ? "muted olive-golden"
+        : "balanced beige";
+  return `A ${depth.toLowerCase()} ${undertone} shade with ${tone} tones.`;
+}
+
+function shadeControlLabel(shade: NonNullable<CatalogVariant["shade"]>) {
+  return [shade.code, shadeName(shade)].filter(Boolean).join(", ");
 }
 
 export default function ProductPageClient({
@@ -35,12 +74,27 @@ export default function ProductPageClient({
   const [yafaProfile, setYafaProfile] = useState<ConfirmedYafaProfile | null>(null);
   const variantOptions = product.variants.filter((variant) => variant.size || variant.shade);
   const selected = product.variants.find((variant) => variant.id === variantId);
+  const hasShadeOptions = variantOptions.some((variant) => variant.shade);
+  const orderedVariantOptions = hasShadeOptions
+    ? [...variantOptions].sort((left, right) => {
+        const leftIndex = masterShadeOrder.indexOf(left.shade?.code ?? "");
+        const rightIndex = masterShadeOrder.indexOf(right.shade?.code ?? "");
+        return (leftIndex === -1 ? Number.MAX_SAFE_INTEGER : leftIndex) - (rightIndex === -1 ? Number.MAX_SAFE_INTEGER : rightIndex);
+      })
+    : variantOptions;
   const profile = product.fragranceProfile;
   const price = selected?.price ?? product.price;
-  const selectedImage = getMakeupVariantImage(product.id, variantId);
-  const galleryImages = selectedImage
-    ? [selectedImage, ...product.gallery.filter((image) => image !== selectedImage)]
-    : product.gallery;
+  const selectedShadeCode = selected?.shade?.code ?? null;
+  const candidateShadeImage = getVerifiedShadeImage(product.id, selectedShadeCode);
+  const shadeImage =
+    candidateShadeImage?.shadeCode === selectedShadeCode ? candidateShadeImage : null;
+  const variantImage = getMakeupVariantImage(variantId);
+  const displayImage = shadeImage?.src ?? variantImage ?? product.image;
+  const displayImageAlt = shadeImage
+    ? `${product.imageAlt} in shade ${shadeImage.shadeCode}`
+    : variantImage && selected?.shade
+      ? `${product.imageAlt} in shade ${shadeName(selected.shade)}`
+      : product.imageAlt;
 
   useEffect(() => {
     trackEvent("product_viewed", { product_id: product.id, product_slug: product.slug, category: product.category });
@@ -69,36 +123,86 @@ export default function ProductPageClient({
       </nav>
 
       <section className="pdp-hero" aria-labelledby="pdp-product-name">
-        <ProductGallery key={product.id} images={galleryImages} selectedImage={selectedImage} alt={product.imageAlt} />
+        <ProductGallery
+          image={displayImage}
+          alt={displayImageAlt}
+          className={usesWarmProductFrame(product.id) ? "pdp-gallery--warm-frame" : undefined}
+        />
 
         <div className="pdp-sidebar">
           <section className="pdp-info">
             <p className="pdp-info__type">{product.productType}</p>
             <h1 id="pdp-product-name">{product.name}</h1>
+            <p className="pdp-info__description">{product.shortDescription}</p>
             {profile ? <p className="pdp-info__family">{pretty(profile.family)}</p> : null}
             <div className="pdp-info__price">
               {formatCatalogPrice(product.currency, price)}
               {product.compareAtPrice ? <del>{formatCatalogPrice(product.currency, product.compareAtPrice)}</del> : null}
             </div>
-            <p className="pdp-info__description">{product.shortDescription}</p>
-            {yafaProfile ? <aside className="pdp-yafa-match"><span style={{ backgroundColor: yafaProfile.hex }} aria-hidden="true" /><div><strong>{yafaVariantMatch ? "Recommended for you by Yafa" : `Your Yafa match: ${yafaProfile.shade_name}`}</strong><p>{yafaVariantMatch ? `${yafaProfile.shade_name} is selected for this product.` : "This product does not currently offer your exact Yafa shade."} <Link href="/yafa">Change shade</Link></p></div></aside> : <Link className="pdp-yafa-cta" href="/yafa">Find Your Shade with Yafa</Link>}
 
             <div id="pdp-purchase" className="pdp-purchase">
               {variantOptions.length > 0 ? (
-                <fieldset className="pdp-shade-selector">
-                  <legend>{variantOptions.some((variant) => variant.shade) ? "Choose shade" : "Choose option"}</legend>
-                  <div>{variantOptions.map((variant) => <button key={variant.id} type="button" className={variantId === variant.id ? "is-selected" : ""} aria-pressed={variantId === variant.id} aria-label={`Select ${variant.shade?.name ?? variant.size ?? "option"}`} onClick={() => { setVariantId(variant.id); trackEvent("variant_selected", { product_id: product.id, variant_id: variant.id, shade_code: variant.shade?.code || null }); }}>{variant.shade?.hex ? <i style={{ backgroundColor: variant.shade.hex }} aria-hidden="true" /> : null}<span>{variant.size ?? variant.shade?.code ?? variant.shade?.name}</span></button>)}</div>
-                  <p aria-live="polite">Selected: <strong>{selected?.shade?.name ?? selected?.size ?? "Standard option"}</strong></p>
+                <fieldset className={`pdp-shade-selector${hasShadeOptions ? " pdp-shade-selector--shades" : ""}${product.id === "yv-lip-002" ? " pdp-shade-selector--satin" : ""}`}>
+                  <legend>{hasShadeOptions ? "Choose shade" : "Choose option"}</legend>
+                  <div className="pdp-shade-selector__palette">
+                    {orderedVariantOptions.map((variant) => {
+                      const shade = variant.shade;
+                      const isSelected = variantId === variant.id;
+                      return (
+                        <button
+                          key={variant.id}
+                          type="button"
+                          className={isSelected ? "is-selected" : ""}
+                          aria-pressed={isSelected}
+                          aria-label={shade ? `Select shade ${shadeControlLabel(shade)}` : `Select ${variant.size ?? "option"}`}
+                          title={shade ? shadeSummary(shade) : variant.size ?? "Option"}
+                          onClick={() => {
+                            setVariantId(variant.id);
+                            trackEvent("variant_selected", { product_id: product.id, variant_id: variant.id, shade_code: shade?.code || null });
+                          }}
+                        >
+                          {shade?.hex ? <i style={{ backgroundColor: shade.hex }} aria-hidden="true" /> : <span>{variant.size ?? shade?.name}</span>}
+                        </button>
+                      );
+                    })}
+                  </div>
+                  {selected?.shade ? (
+                    <div className="pdp-shade-preview" aria-live="polite">
+                      <p>{`Selected: ${shadeSummary(selected.shade)}`}</p>
+                      {shadeDescriptor(selected.shade) ? <span>{shadeDescriptor(selected.shade)}</span> : null}
+                    </div>
+                  ) : <p aria-live="polite">Selected: <strong>{selected?.size ?? "Standard option"}</strong></p>}
                 </fieldset>
+              ) : null}
+              {product.includedShades.length ? (
+                <section className="pdp-included-shades" aria-labelledby="included-shades-title">
+                  <h2 id="included-shades-title">Included shades</h2>
+                  <ul>
+                    {product.includedShades.map((shade) => (
+                      <li key={shade.id}>
+                        {shade.hex ? <i style={{ backgroundColor: shade.hex }} aria-hidden="true" /> : null}
+                        <span>{shade.name}</span>
+                        {shade.finish ? <small>{titleCase(shade.finish)}</small> : null}
+                      </li>
+                    ))}
+                  </ul>
+                </section>
               ) : null}
               <div className="pdp-purchase__row">
                 <QuantitySelector value={quantity} onChange={setQuantity} />
                 <AddToBag className="pdp-add" productId={product.id} variantId={variantId} quantity={quantity} />
               </div>
             </div>
+            {yafaProfile ? <aside className="pdp-yafa-match"><span style={{ backgroundColor: yafaProfile.hex }} aria-hidden="true" /><div><strong>{yafaVariantMatch ? "Recommended for you by Yafa" : `Your Yafa match: ${yafaProfile.shade_name}`}</strong><p>{yafaVariantMatch ? `${yafaProfile.shade_name} is selected for this product.` : "This product does not currently offer your exact Yafa shade."} <Link href="/yafa">Change shade</Link></p></div></aside> : hasShadeOptions ? <Link className="pdp-yafa-cta" href="/yafa">Find Your Shade with Yafa</Link> : null}
           </section>
 
-          {product.ragQuestions.length > 0 ? <AskYafa productId={product.id} questions={product.ragQuestions} /> : null}
+          {product.ragQuestions.length > 0 ? (
+            <YafaProductGuidance
+              productId={product.id}
+              variantId={variantId}
+              shadeId={selected?.shade?.code ?? null}
+            />
+          ) : null}
 
           <section className="pdp-details" aria-label="Product information">
             <ProductAccordion title="Details">

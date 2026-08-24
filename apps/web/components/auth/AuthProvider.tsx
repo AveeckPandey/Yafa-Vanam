@@ -10,6 +10,17 @@ const AuthContext = createContext<AuthContextValue | null>(null);
 // Auth is proxied through this same-origin route so secure cookies work when
 // the API remains private inside Railway's network.
 const API = "/api";
+const cognitoEnabled = process.env.NEXT_PUBLIC_AUTH_PROVIDER === "cognito";
+
+function cognitoStart(mode: "signin" | "signup" | "forgot") {
+  if (typeof window !== "undefined") {
+    const returnTo = `${window.location.pathname}${window.location.search}`;
+    window.location.assign(`${API}/auth/cognito/start?mode=${mode}&return_to=${encodeURIComponent(returnTo)}`);
+  }
+  // Navigation replaces the current document; retaining a pending promise
+  // prevents a transient client-state update before that hand-off occurs.
+  return new Promise<never>(() => undefined);
+}
 
 async function readError(response: Response, fallback: string) { const payload = await response.json().catch(() => null) as { error?: string } | null; return payload?.error || fallback; }
 async function csrf() {
@@ -20,6 +31,9 @@ async function csrf() {
   return payload.csrfToken;
 }
 async function authRequest(path: string, body?: unknown) {
+  if (cognitoEnabled) {
+    return cognitoStart(path.endsWith("register") ? "signup" : "signin");
+  }
   const token = await csrf();
   const response = await fetch(`${API}${path}`, { method: "POST", credentials: "include", headers: { "Content-Type": "application/json", "X-CSRF-Token": token }, body: body === undefined ? undefined : JSON.stringify(body) });
   const payload = await response.json().catch(() => ({})) as { user?: AuthUser; error?: string };
@@ -30,6 +44,7 @@ async function authRequest(path: string, body?: unknown) {
   return payload.user;
 }
 async function resetRequest(path: string, body: unknown) {
+  if (cognitoEnabled) return cognitoStart("forgot");
   const response = await fetch(`${API}${path}`, { method: "POST", credentials: "include", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
   const payload = await response.json().catch(() => ({})) as { message?: string; error?: string };
   if (!response.ok) throw new Error(payload.error || "We could not complete that request. Please try again.");
@@ -46,7 +61,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     let active = true;
     const restoreSession = async () => {
       try {
-        const session = await fetch(`${API}/auth/me`, { credentials: "include", cache: "no-store" });
+        const authBase = cognitoEnabled ? `${API}/auth/cognito` : `${API}/auth`;
+        const session = await fetch(`${authBase}${cognitoEnabled ? "/session" : "/me"}`, { credentials: "include", cache: "no-store" });
         if (session.ok) {
           const payload = await session.json() as { user?: AuthUser };
           if (active) {
@@ -58,10 +74,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         // Only an explicit unauthenticated response may use the refresh session.
         // A network or server failure must not be mistaken for a logged-out user.
         if (session.status !== 401) { if (active) setAuthStatus("error"); return; }
-        const token = await csrf();
-        const refreshed = await fetch(`${API}/auth/refresh`, { method: "POST", credentials: "include", cache: "no-store", headers: { "X-CSRF-Token": token } });
+        const token = cognitoEnabled ? "" : await csrf();
+        const refreshed = await fetch(`${authBase}/refresh`, { method: "POST", credentials: "include", cache: "no-store", headers: cognitoEnabled ? undefined : { "X-CSRF-Token": token } });
         if (refreshed.ok) {
-          const payload = await refreshed.json() as { user?: AuthUser };
+          const payload = cognitoEnabled
+            ? await (await fetch(`${authBase}/session`, { credentials: "include", cache: "no-store" })).json() as { user?: AuthUser }
+            : await refreshed.json() as { user?: AuthUser };
           if (active) {
             if (payload.user) { setUser(payload.user); setAuthStatus("authenticated"); }
             else { setAuthStatus("error"); }
@@ -94,7 +112,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const register = useCallback(async (name: string, email: string, password: string, remember: boolean) => complete(await authRequest("/auth/register", { name, email, password, remember })), [complete]);
   const requestPasswordReset = useCallback((email: string) => resetRequest("/auth/password-reset/request", { email }), []);
   const resetPassword = useCallback((token: string, password: string) => resetRequest("/auth/password-reset/confirm", { token, password }), []);
-  const logout = useCallback(async () => { const token = await csrf(); await fetch(`${API}/auth/logout`, { method: "POST", credentials: "include", headers: { "X-CSRF-Token": token } }); setUser(null); setAuthStatus("unauthenticated"); }, []);
+  const logout = useCallback(async () => {
+    if (cognitoEnabled) {
+      const response = await fetch(`${API}/auth/cognito/logout`, { method: "POST", credentials: "include" });
+      const payload = await response.json().catch(() => null) as { logoutUrl?: string } | null;
+      setUser(null); setAuthStatus("unauthenticated");
+      if (payload?.logoutUrl && typeof window !== "undefined") window.location.assign(payload.logoutUrl);
+      return;
+    }
+    const token = await csrf(); await fetch(`${API}/auth/logout`, { method: "POST", credentials: "include", headers: { "X-CSRF-Token": token } }); setUser(null); setAuthStatus("unauthenticated");
+  }, []);
   const requireAuth = useCallback((action: () => void | Promise<void>) => {
     if (user) { void action(); return; }
     deferredAction.current = action;
@@ -106,8 +133,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   // that route lets the server restore the HTTP-only session before the page
   // renders, rather than retaining a client-side action or any token.
   const returnPath = deferredAction.current ? "/checkout" : currentPath;
-  const googleUrl = `${API}/auth/google?return_to=${encodeURIComponent(returnPath)}`;
-  return <AuthContext.Provider value={value}>{children}<AuthModal open={modalOpen} onClose={() => { deferredAction.current = null; setModalOpen(false); }} onLogin={login} onRegister={register} onRequestPasswordReset={requestPasswordReset} googleUrl={googleUrl} /></AuthContext.Provider>;
+  const googleUrl = cognitoEnabled ? `${API}/auth/cognito/start?mode=signin&identity_provider=Google&return_to=${encodeURIComponent(returnPath)}` : `${API}/auth/google?return_to=${encodeURIComponent(returnPath)}`;
+  return <AuthContext.Provider value={value}>{children}<AuthModal open={modalOpen} onClose={() => { deferredAction.current = null; setModalOpen(false); }} onLogin={login} onRegister={register} onRequestPasswordReset={requestPasswordReset} googleUrl={googleUrl} cognito={cognitoEnabled} googleEnabled={!cognitoEnabled || process.env.NEXT_PUBLIC_COGNITO_GOOGLE_ENABLED === "true"} /></AuthContext.Provider>;
 }
 export function useAuth() { const value = useContext(AuthContext); if (!value) throw new Error("useAuth must be used inside AuthProvider"); return value; }
 export function useRequireAuth(action: () => void | Promise<void>) { const { requireAuth } = useAuth(); return useCallback(() => requireAuth(action), [requireAuth, action]); }

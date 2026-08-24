@@ -5,7 +5,7 @@ import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 import type { CatalogProduct } from "@/lib/catalog-types";
 import { formatCatalogPrice } from "@/lib/catalog-types";
-import { getMakeupVariantImage } from "@/lib/makeup-variant-images";
+import { getMakeupVariantImage, getVerifiedShadeImage } from "@/lib/makeup-variant-images";
 import AddToBag from "./AddToBag";
 import QuantitySelector from "./QuantitySelector";
 
@@ -43,7 +43,9 @@ export default function QuickShop({ product, onClose }: { product: CatalogProduc
 
   const visibleVariants = product?.variants.filter((variant) => variant.size || variant.shade) ?? [];
   const selected = product?.variants.find((variant) => variant.id === variantId);
-  const selectedImage = product ? getMakeupVariantImage(product.id, variantId) ?? product.image : null;
+  const selectedImage = product
+    ? getVerifiedShadeImage(product.id, selected?.shade?.code ?? null)?.src ?? getMakeupVariantImage(variantId) ?? product.image
+    : null;
 
   return (
     <div className={`quick-shop${product ? " is-open" : ""}`} aria-hidden={!product}>
@@ -59,7 +61,7 @@ export default function QuickShop({ product, onClose }: { product: CatalogProduc
               {product.fragranceProfile ? <span>{product.fragranceProfile.family.replaceAll("_", " ")}</span> : null}
               <strong>{formatCatalogPrice(product.currency, selected?.price ?? product.price)}</strong>
               {visibleVariants.length > 0 ? (
-                <fieldset className="quick-shop__variants"><legend>{visibleVariants.some((variant) => variant.shade) ? "Choose shade" : "Choose option"}</legend><div>{visibleVariants.map((variant) => <button key={variant.id} type="button" className={variantId === variant.id ? "is-selected" : ""} aria-pressed={variantId === variant.id} aria-label={`Select ${variant.shade?.name ?? variant.size ?? "option"}`} onClick={() => setVariantId(variant.id)}>{variant.shade?.hex ? <i style={{ backgroundColor: variant.shade.hex }} aria-hidden="true" /> : null}<span>{variant.size ?? variant.shade?.code ?? variant.shade?.name}</span></button>)}</div><p aria-live="polite">Selected: {selected?.shade?.name ?? selected?.size ?? "Standard option"}</p></fieldset>
+                <fieldset className={`quick-shop__variants${product.id === "yv-lip-002" ? " quick-shop__variants--satin" : ""}`}><legend>{visibleVariants.some((variant) => variant.shade) ? "Choose shade" : "Choose option"}</legend><div>{visibleVariants.map((variant) => <button key={variant.id} type="button" className={variantId === variant.id ? "is-selected" : ""} aria-pressed={variantId === variant.id} aria-label={`Select ${variant.shade?.name ?? variant.size ?? "option"}`} onClick={() => setVariantId(variant.id)}>{variant.shade?.hex ? <i style={{ backgroundColor: variant.shade.hex }} aria-hidden="true" /> : null}<span>{variant.size ?? variant.shade?.code ?? variant.shade?.name}</span></button>)}</div><p aria-live="polite">Selected: {selected?.shade?.name ?? selected?.size ?? "Standard option"}</p></fieldset>
               ) : null}
               <div className="quick-shop__purchase"><QuantitySelector value={quantity} onChange={setQuantity} /><AddToBag className="quick-shop__add" productId={product.id} variantId={variantId || product.defaultVariantId} quantity={quantity} /></div>
               <Link href={`/products/${product.slug}`} onClick={onClose}>View full details <span aria-hidden="true">→</span></Link>

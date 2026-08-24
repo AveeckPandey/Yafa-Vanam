@@ -72,6 +72,7 @@ def lip_coordination(family: str) -> str:
     return f"lip_coordination_{normalize_token(family)}"
 
 
+CHEEK_LIP_FAMILY_COORDINATION = "cheek_lip_family_coordination"
 LIP_LINER_PAIRING_MATCH = "lip_liner_pairing_match"
 
 # -- fragrance ---------------------------------------------------------

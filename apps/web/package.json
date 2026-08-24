@@ -5,29 +5,23 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "validate:catalog": "node scripts/validate-catalog.mjs"
   },
   "dependencies": {
-    "@hookform/resolvers": "latest",
-    "@elevenlabs/react": "^1.12.4",
     "@sentry/nextjs": "^10.70.0",
     "@yafa/frontend-types": "*",
-    "clsx": "latest",
     "gsap": "latest",
     "next": "^16.3.0",
     "posthog-js": "latest",
     "react": "latest",
     "react-dom": "latest",
-    "zod": "latest",
-    "zustand": "latest"
+    "zod": "latest"
   },
   "devDependencies": {
     "@types/node": "latest",
     "@types/react": "latest",
     "@types/react-dom": "latest",
-    "autoprefixer": "latest",
-    "postcss": "latest",
-    "tailwindcss": "latest",
     "typescript": "latest"
   }
 }

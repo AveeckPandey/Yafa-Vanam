@@ -4,7 +4,7 @@
 
 The existing `services/recommendation-engine` is retained and extended as the Product Advisor. It now provides typed advisor sessions, adaptive quiz branching, Beauty Profile state, the 24-shade complexion matcher, deterministic product/variant ranking, supporting-complexion suitability mapping, follow-up preference modifications, vision/RAG provider interfaces, and deterministic tests.
 
-The uploaded catalogue snapshot is stored at `data/processed/products.json` and is the advisor's catalogue source. The service never creates product or shade names.
+The uploaded catalogue snapshot is stored at `data/processed/Product.json` and is the advisor's catalogue source. The service never creates product or shade names.
 
 ## Authority boundaries
 

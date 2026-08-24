@@ -46,3 +46,14 @@ export const makeupProductImageManifest: Record<string, string> = {
   "yv-face-001": "/images/yafavanam/No%20Shades%20Items/Sun%2C%20Prep%20%26%20Finish/Petal_Veil%20_Makeup%20_Setting_Spray.png",
   "yv-face-002": "/images/yafavanam/No%20Shades%20Items/Sun%2C%20Prep%20%26%20Finish/Sunveil_Daily_Glow_Primer.png",
 };
+
+/** Product imagery approved for the warm cream-and-peach presentation frame. */
+export function usesWarmProductFrame(productId: string) {
+  return [
+    "yv-complex-004", // Mistveil Skin Tint
+    "yv-complex-005", // Softcanopy Powder Foundation
+    "yv-complex-009", // Sungrove Soft Bronzer
+    "yv-complex-010", // Shadowroot Contour
+    "yv-complex-011", // Moonbeam Glow Highlighter
+  ].includes(productId);
+}

@@ -173,7 +173,7 @@ export default function CartDrawer() {
           <footer>
             <div><span>Subtotal</span><strong>{formatCatalogPrice(cart.currency, cart.subtotal)}</strong></div>
             <p>Shipping and tax are calculated at checkout.</p>
-            <button type="button" onClick={checkout}>Checkout</button>
+            <button type="button" className="site-cart-drawer__checkout" onClick={checkout}>Checkout</button>
             <button type="button" onClick={close}>Continue shopping</button>
           </footer>
         ) : null}

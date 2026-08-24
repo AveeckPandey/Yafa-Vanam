@@ -1,9 +1,22 @@
 export type CatalogVariant = {
   id: string;
   size: string | null;
-  shade: { name: string; code: string | null; undertone: string | null; hex: string | null } | null;
+  shade: {
+    name: string;
+    code: string | null;
+    undertone: string | null;
+    depthFamily: string | null;
+    hex: string | null;
+  } | null;
   price: number;
   isActive: boolean;
+};
+
+export type CatalogIncludedShade = {
+  id: string;
+  name: string;
+  hex: string | null;
+  finish: string | null;
 };
 
 export type FragranceProfile = {
@@ -59,6 +72,7 @@ export type CatalogProduct = {
   compareAtPrice: number | null;
   defaultVariantId: string;
   variants: CatalogVariant[];
+  includedShades: CatalogIncludedShade[];
   image: string;
   gallery: string[];
   imageAlt: string;

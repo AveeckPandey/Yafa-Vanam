@@ -8,5 +8,5 @@ export default function GlobalError({ error }: { error: Error & { digest?: strin
     Sentry.captureException(error);
   }, [error]);
 
-  return <html lang="en"><body><main className="page-shell"><h1>Something went wrong</h1><p>We could not load this page. Please refresh and try again.</p></main></body></html>;
+  return <html lang="en"><body><main className="route-not-found"><p>YAFA VANAM</p><h1>Something interrupted this ritual.</h1><span>We could not load this page. Please try again.</span><div><button type="button" onClick={() => window.location.reload()}>Try again</button><a href="/">Return home</a></div></main></body></html>;
 }

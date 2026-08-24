@@ -38,6 +38,7 @@ from app.recommendation.reason_codes import (
     LIP_LINER_PAIRING_MATCH,
     REQUESTED_FINISH_OR_PRODUCT_MATCH,
     COMPLEXION_DEPTH_CONTRAST_MATCH,
+    CHEEK_LIP_FAMILY_COORDINATION,
     desired_color_family as desired_color_family_code,
     look_style_priority,
     occasion_match,
@@ -45,7 +46,11 @@ from app.recommendation.reason_codes import (
     undertone_match,
 )
 from app.recommendation.scorer import FactorAccumulator
-from app.recommendation.weights import LIP_WEIGHTS, effective_weights
+from app.recommendation.weights import (
+    CHEEK_LIP_COORDINATION_STRENGTH,
+    LIP_WEIGHTS,
+    effective_weights,
+)
 
 
 def _outfit_recommended_families(adapter: Any, colour: str | None) -> set[str]:
@@ -95,6 +100,26 @@ def score_shade(
     wanted_family = desired_color_family(profile)
     if wanted_family and family_matches(family, wanted_family):
         acc.credit("desired_color_family", True, desired_color_family_code(wanted_family))
+
+    # Cheek->lip orchestration (spec Phase 2 §11): the orchestrator forwards
+    # the selected cheek family; a matching lip family earns a graded boost.
+    # Explicit user family requests above always dominate via max().
+    coordination_family = (
+        normalize_token(coordination.lip_color_family)
+        if coordination and coordination.lip_color_family
+        else None
+    )
+    if (
+        coordination_family
+        and not wanted_family
+        and family
+        and family_matches(family, coordination_family)
+    ):
+        acc.credit(
+            "desired_color_family",
+            CHEEK_LIP_COORDINATION_STRENGTH,
+            CHEEK_LIP_FAMILY_COORDINATION,
+        )
 
     depth = normalize_token(profile.depth)
     compatible_depths = {normalize_token(d) for d in rec.get("complexion_depth_compatibility") or []}

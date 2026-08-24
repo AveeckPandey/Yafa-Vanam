@@ -1,14 +1,14 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useMemo, useState } from "react";
-import VoiceKitAssistant, { type VoiceKitBrief } from "@/components/advisor/VoiceKitAssistant";
-import { advisorApi } from "@/lib/advisor/client";
-import type { Recommendation } from "@/lib/advisor/types";
+import { useEffect, useMemo, useRef, useState } from "react";
 import type { CatalogProduct } from "@/lib/catalog-types";
 import { useAuth } from "@/components/auth/AuthProvider";
 import { getConfirmedYafaProfile, type ConfirmedYafaProfile } from "@/lib/yafa-profile";
 import { trackEvent } from "@/lib/analytics";
+import { transcribeAudio } from "@/lib/yafa-chat";
+import { advisorApi } from "@/lib/advisor/client";
+import type { Recommendation } from "@/lib/advisor/types";
 
 type Answer = { goal: string; finish: string; focus: string; budget: string };
 const steps: Array<{ key: keyof Answer; label: string; question: string; options: Array<{ label: string; value: string }> }> = [
@@ -18,15 +18,53 @@ const steps: Array<{ key: keyof Answer; label: string; question: string; options
   { key: "budget", label: "Your budget", question: "How would you like to build your kit?", options: [{ label: "A considered essential", value: "essential" }, { label: "A complete ritual", value: "complete" }, { label: "Show me both", value: "both" }] },
 ];
 
+type MicState = "idle" | "recording" | "working" | "error";
+
+/** Deterministic keyword parse of a spoken/written brief into quiz answers. */
+export function parseBrief(text: string): Partial<Answer> {
+  const t = ` ${text.toLowerCase()} `;
+  const parsed: Partial<Answer> = {};
+
+  if (/\b(every ?day|daily|office|work|commute)\b/.test(t)) parsed.goal = "everyday";
+  else if (/\b(wedding|occasion|party|event|date|evening out|bridal)\b/.test(t)) parsed.goal = "occasion";
+  else if (/\bglow\b/.test(t)) parsed.goal = "glow";
+
+  if (/\bnatural\b/.test(t)) parsed.finish = "natural";
+  else if (/\b(velvet|soft matte|blurred)\b/.test(t)) parsed.finish = "velvet";
+  else if (/\b(dewy|luminous|radiant|glowy|sheen)\b/.test(t)) parsed.finish = "radiant";
+
+  if (/\b(skincare|skin ?care|serum|cleanser|moisturi[sz]er)\b/.test(t)) parsed.focus = "care";
+  else if (/\b(complexion|foundation|base|skin tint|concealer)\b/.test(t)) parsed.focus = "face";
+  else if (/\b(eyes?|lips?|lipstick|mascara|liner|blush|makeup colou?r)\b/.test(t)) parsed.focus = "colour";
+
+  if (/\b(essential|minimal|just a few|one or two)\b/.test(t)) parsed.budget = "essential";
+  else if (/\b(complete|full|everything|whole ritual)\b/.test(t)) parsed.budget = "complete";
+  else if (/\bboth\b/.test(t)) parsed.budget = "both";
+
+  return parsed;
+}
+
 export default function BuildMyKit({ products }: { products: CatalogProduct[] }) {
   const { user } = useAuth();
   const [step, setStep] = useState(0);
   const [answers, setAnswers] = useState<Answer>({ goal: "", finish: "", focus: "", budget: "" });
-  const [voiceRecommendations, setVoiceRecommendations] = useState<Recommendation[] | null>(null);
   const [yafaProfile, setYafaProfile] = useState<ConfirmedYafaProfile | null>(null);
   const [useYafaMatch, setUseYafaMatch] = useState(true);
+  // Live recommendation-engine results; null until a successful engine call.
+  const [engineRecs, setEngineRecs] = useState<Recommendation[] | null>(null);
+  const [engineError, setEngineError] = useState<string | null>(null);
+  const [seeking, setSeeking] = useState(false);
+
+  // Voice brief state (Go -> Whisper transcription; no third-party voice SDKs).
+  const [micState, setMicState] = useState<MicState>("idle");
+  const [briefText, setBriefText] = useState("");
+  const [micError, setMicError] = useState<string | null>(null);
+  const recorderRef = useRef<MediaRecorder | null>(null);
+  const chunksRef = useRef<Blob[]>([]);
+
   const current = steps[step];
   const complete = step === steps.length;
+
   useEffect(() => {
     if (!user) {
       setYafaProfile(null);
@@ -34,35 +72,193 @@ export default function BuildMyKit({ products }: { products: CatalogProduct[] })
     }
     getConfirmedYafaProfile().then(setYafaProfile).catch(() => setYafaProfile(null));
   }, [user]);
+
   const recommendations = useMemo(() => {
     const preferred = answers.focus === "face" ? products.filter((product) => product.makeupGroup === "face") : answers.focus === "care" ? products.filter((product) => product.category === "Skincare") : products.filter((product) => product.makeupGroup === "eyes" || product.makeupGroup === "lips");
     const yafaProduct = useYafaMatch && yafaProfile?.shade_code ? products.find((product) => product.variants.some((variant) => variant.shade?.code === yafaProfile.shade_code)) : undefined;
     return [...(yafaProduct ? [yafaProduct] : []), ...preferred, ...products.filter((product) => !preferred.includes(product) && product !== yafaProduct)].filter((product, index, list) => list.indexOf(product) === index).slice(0, answers.budget === "essential" ? 3 : 5);
   }, [answers.budget, answers.focus, products, useYafaMatch, yafaProfile]);
+
   const choose = (value: string) => setAnswers((currentAnswers) => ({ ...currentAnswers, [current.key]: value }));
-  const next = () => setStep((currentStep) => { const nextStep = Math.min(steps.length, currentStep + 1); if (nextStep === steps.length) trackEvent("recommendation_viewed", { source: "kit_builder", has_yafa_match: Boolean(yafaProfile && useYafaMatch) }); return nextStep; });
-  const applyVoiceBrief = async (brief: VoiceKitBrief) => {
-    setAnswers((currentAnswers) => ({ ...currentAnswers, ...brief }));
-    setStep(steps.length);
-    // ElevenLabs only collects preferences. The catalogue-grounded advisor still ranks the kit.
-    const session = await advisorApi.create("full_look");
-    const recommended = await advisorApi.modify(session.id, {
-      finish: brief.finish,
-      occasion: brief.goal === "occasion" ? "special_photos" : "everyday",
-      style: brief.goal === "glow" ? "soft_glam" : "natural",
-    });
-    setVoiceRecommendations(recommended.recommendations.slice(0, brief.budget === "essential" ? 3 : 5));
+
+  const applyBriefToQuiz = (text: string) => {
+    const parsed = parseBrief(text);
+    if (!Object.keys(parsed).length) return false;
+    setAnswers((currentAnswers) => ({ ...currentAnswers, ...parsed }));
+    trackEvent("quiz_answered", { source: "voice_brief", fields: Object.keys(parsed).join(",") });
+    return true;
   };
+
+  // --- voice brief ----------------------------------------------------------
+  const startMic = async () => {
+    setMicError(null);
+    if (!navigator.mediaDevices?.getUserMedia || typeof MediaRecorder === "undefined") {
+      setMicError("This browser doesn't support voice input — type your brief instead.");
+      setMicState("error");
+      return;
+    }
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      chunksRef.current = [];
+      const recorder = new MediaRecorder(stream);
+      recorder.ondataavailable = (event) => {
+        if (event.data.size > 0) chunksRef.current.push(event.data);
+      };
+      recorder.onstop = async () => {
+        stream.getTracks().forEach((track) => track.stop());
+        const blob = new Blob(chunksRef.current, { type: recorder.mimeType });
+        chunksRef.current = [];
+        if (blob.size === 0) {
+          setMicState("idle");
+          return;
+        }
+        setMicState("working");
+        try {
+          const result = await transcribeAudio(blob);
+          if (result.text?.trim()) {
+            setBriefText(result.text.trim());
+            applyBriefToQuiz(result.text);
+            setMicState("idle");
+          } else {
+            setMicError("I couldn't hear anything — try recording again.");
+            setMicState("error");
+          }
+        } catch {
+          setMicError("Transcription is unavailable right now. Retry, or fill the quiz manually.");
+          setMicState("error");
+        }
+      };
+      recorderRef.current = recorder;
+      recorder.start();
+      setMicState("recording");
+      trackEvent("quiz_answered", { source: "voice_brief_started" });
+    } catch {
+      setMicError("Microphone access was blocked. Allow it in your browser settings, then retry.");
+      setMicState("error");
+    }
+  };
+
+  const stopMic = () => {
+    const recorder = recorderRef.current;
+    if (recorder && recorder.state !== "inactive") recorder.stop();
+  };
+
+  // --- results: live engine first, static fallback ---------------------------
+  const seekKit = async () => {
+    setStep(steps.length);
+    trackEvent("recommendation_viewed", { source: "kit_builder", has_yafa_match: Boolean(yafaProfile && useYafaMatch) });
+    setSeeking(true);
+    setEngineError(null);
+    try {
+      const session = await advisorApi.create("full_look");
+      await advisorApi.modify(session.id, {
+        finish: answers.finish || undefined,
+        occasion: answers.goal === "occasion" ? "special_photos" : "everyday",
+        style: answers.goal === "glow" ? "soft_glam" : "natural",
+        focus_area: answers.focus || undefined,
+        budget: answers.budget || undefined,
+      });
+      const finalSession = await advisorApi.recommend(session.id);
+      const recs = (finalSession.recommendations || []).slice(0, answers.budget === "essential" ? 3 : 5);
+      setEngineRecs(recs.length ? recs : null);
+      if (!recs.length) setEngineError("The live stylist didn't return picks — showing catalogue suggestions instead.");
+    } catch {
+      setEngineRecs(null);
+      setEngineError("Live stylist is unavailable right now — showing catalogue suggestions instead.");
+    } finally {
+      setSeeking(false);
+    }
+  };
+
+  const resetAll = () => {
+    setStep(0);
+    setAnswers({ goal: "", finish: "", focus: "", budget: "" });
+    setEngineRecs(null);
+    setEngineError(null);
+    setBriefText("");
+  };
+
+  const advance = () => setStep((currentStep) => Math.min(steps.length, currentStep + 1));
 
   return <main id="main-content" className="kit-flow">
     <section className="kit-flow__intro"><p>YAFA VANAM / Personal ritual</p><h1>Build My Kit</h1><span>A small guided edit, shaped around how you want to feel.</span>{yafaProfile && useYafaMatch ? <aside className="kit-flow__yafa">We’ve pre-selected your Yafa shade — {yafaProfile.shade_name}. <button type="button" onClick={() => setUseYafaMatch(false)}>Undo</button></aside> : !yafaProfile ? <Link className="kit-flow__yafa" href="/yafa">Complete your Yafa profile to get your shade pre-selected.</Link> : null}</section>
-    <VoiceKitAssistant onKitReady={applyVoiceBrief} />
+
+    {/* Voice brief — speak it and the quiz fills itself in */}
+    {!complete ? (
+      <section className="kit-flow__step kit-flow__brief" aria-labelledby="kit-brief-title">
+        <h2 id="kit-brief-title">Or just tell Yafa what you need</h2>
+        <div className="kit-brief__controls">
+          {micState === "recording" ? (
+            <>
+              <button type="button" className="kit-brief__stop" onClick={stopMic}>⏹ Stop</button>
+              <span className="kit-brief__status" role="status">Recording…</span>
+            </>
+          ) : (
+            <button type="button" className="kit-brief__mic" onClick={startMic} disabled={micState === "working"} aria-label="Describe your kit with your voice">
+              🎤 Speak your brief
+            </button>
+          )}
+          {micState === "working" ? <span className="kit-brief__status" role="status">Listening back…</span> : null}
+        </div>
+        <label className="visually-hidden" htmlFor="kit-brief-text">Your beauty brief</label>
+        <textarea
+          id="kit-brief-text"
+          rows={2}
+          maxLength={500}
+          placeholder='e.g. “I need an everyday natural kit for office weeks.”'
+          value={briefText}
+          onChange={(event) => setBriefText(event.target.value)}
+        />
+        <div className="kit-brief__actions">
+          <button
+            type="button"
+            onClick={() => {
+              if (!applyBriefToQuiz(briefText)) {
+                setMicError("Tell me a little more — mention a goal, finish, focus or budget.");
+                setMicState("error");
+                return;
+              }
+              setMicState("idle");
+              setMicError(null);
+            }}
+            disabled={!briefText.trim()}
+          >
+            Fill the quiz from this
+          </button>
+          {micState === "error" && micError ? (
+            <>
+              <span className="kit-brief__error" role="alert">{micError}</span>
+              <button type="button" className="kit-brief__retry" onClick={startMic}>Retry</button>
+            </>
+          ) : null}
+        </div>
+      </section>
+    ) : null}
+
     {!complete ? <section className="kit-flow__step" aria-labelledby="kit-question">
       <div className="kit-flow__progress" aria-label={`Step ${step + 1} of ${steps.length}`}><span>Step {step + 1} of {steps.length}</span><ol>{steps.map((item, index) => <li key={item.key} className={index <= step ? "is-active" : ""}><span className="visually-hidden">{item.label}</span></li>)}</ol></div>
       <p>{current.label}</p><h2 id="kit-question">{current.question}</h2>
       <div className="kit-flow__options" role="radiogroup" aria-label={current.question}>{current.options.map((option) => <button key={option.value} type="button" role="radio" aria-checked={answers[current.key] === option.value} className={answers[current.key] === option.value ? "is-selected" : ""} onClick={() => choose(option.value)}>{option.label}</button>)}</div>
-      <div className="kit-flow__actions"><button type="button" onClick={() => setStep((currentStep) => Math.max(0, currentStep - 1))} disabled={step === 0}>Back</button><button type="button" onClick={next} disabled={!answers[current.key]}>{step === steps.length - 1 ? "See my kit" : "Continue"}</button></div>
-      <button type="button" className="kit-flow__skip" onClick={next}>Skip this question</button>
-    </section> : <section className="kit-flow__results" aria-labelledby="kit-results-title"><p>Your personal edit</p><h2 id="kit-results-title">A ritual to begin with.</h2><span>Use this as a starting point, then explore each product and its shades before adding to your bag.</span><div>{voiceRecommendations?.length ? voiceRecommendations.map((product) => <article key={`${product.product_id}-${product.variant_id || "base"}`}><p>{product.category}</p><h3>{product.product_name}</h3><span>{product.shade?.name ? `${product.shade.name}. ` : ""}{product.reason_codes[0]?.replaceAll("_", " ") || "Chosen for your preferences."}</span><Link href={`/shop?product=${product.product_slug}`}>Explore product <span aria-hidden="true">→</span></Link></article>) : recommendations.map((product) => <article key={product.id}><p>{product.productType}</p><h3>{product.name}</h3><span>{product.shortDescription}</span><Link href={`/products/${product.slug}`}>Explore product <span aria-hidden="true">→</span></Link></article>)}</div><button type="button" onClick={() => { setStep(0); setAnswers({ goal: "", finish: "", focus: "", budget: "" }); setVoiceRecommendations(null); }}>Edit answers</button></section>}
+      <div className="kit-flow__actions"><button type="button" onClick={() => setStep((currentStep) => Math.max(0, currentStep - 1))} disabled={step === 0}>Back</button><button type="button" onClick={() => { if (step === steps.length - 1) void seekKit(); else advance(); }} disabled={!answers[current.key]}>{step === steps.length - 1 ? "See my kit" : "Continue"}</button></div>
+      <button type="button" className="kit-flow__skip" onClick={() => { if (step === steps.length - 1) void seekKit(); else advance(); }}>Skip this question</button>
+    </section> : <section className="kit-flow__results" aria-labelledby="kit-results-title"><p>Your personal edit</p><h2 id="kit-results-title">A ritual to begin with.</h2><span>Use this as a starting point, then explore each product and its shades before adding to your bag.</span>
+      {seeking ? <p className="kit-brief__status" role="status">Yafa is assembling your kit…</p> : null}
+      {engineError ? <p className="kit-brief__error" role="alert">{engineError}</p> : null}
+      <div>
+        {engineRecs
+          ? engineRecs.map((recommendation) => (
+            <article key={`${recommendation.product_id}-${recommendation.variant_id || "base"}`}>
+              <p>{recommendation.category}</p>
+              <h3>{recommendation.product_name}</h3>
+              <span>
+                {recommendation.shade?.name ? `${recommendation.shade.name}. ` : ""}
+                {recommendation.reason_codes[0]?.replaceAll("_", " ") || "Chosen for your preferences."}
+              </span>
+              <Link href={`/products/${recommendation.product_slug}`}>Explore product <span aria-hidden="true">→</span></Link>
+            </article>
+          ))
+          : recommendations.map((product) => <article key={product.id}><p>{product.productType}</p><h3>{product.name}</h3><span>{product.shortDescription}</span><Link href={`/products/${product.slug}`}>Explore product <span aria-hidden="true">→</span></Link></article>)}
+      </div>
+      <button type="button" onClick={resetAll}>Edit answers</button></section>}
   </main>;
 }

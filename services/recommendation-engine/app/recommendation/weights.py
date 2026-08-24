@@ -95,6 +95,12 @@ class SkincareScale:
 
 SKINCARE_SCALE = SkincareScale()
 
+# Cheek->lip orchestration boost (spec Phase 2 §11): when the orchestrator
+# passes CoordinationHints.lip_color_family, a matching lip family earns the
+# existing desired_color_family factor at this graded strength (explicit user
+# family requests always outrank it via max() in the accumulator).
+CHEEK_LIP_COORDINATION_STRENGTH = 0.6
+
 # Baseline score when a profile carries no signal at all — mirrors v1's
 # catalogue_fit behaviour: everything degrades gracefully to comparable 0..1.
 CATALOGUE_BASELINE_SCORE = 0.5

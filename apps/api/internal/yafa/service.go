@@ -264,4 +264,3 @@ func randomToken() (string, error) {
 	}
 	return base64.RawURLEncoding.EncodeToString(value), nil
 }
-func EncodeCandidates(candidates any) ([]byte, error) { return json.Marshal(candidates) }

@@ -27,7 +27,7 @@ export default function AnnouncementBar() {
       >
         <span aria-hidden="true">‹</span>
       </button>
-      <p className="announcement-bar__message" aria-live="polite">
+      <p className="announcement-bar__message" aria-live="polite" title={announcements[activeAnnouncement]}>
         {announcements[activeAnnouncement]}
       </p>
       <button

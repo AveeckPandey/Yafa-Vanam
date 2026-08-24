@@ -1,0 +1,30 @@
+{
+  "name": "@yafa/voice-gateway",
+  "version": "0.1.0",
+  "private": true,
+  "description": "YAFA VANAM voice gateway: browser <-> Nova 2 Sonic bidirectional streaming. Adapted from the AWS nova-sonic sample (Apache-2.0), keeping the proven Bedrock protocol handling.",
+  "type": "commonjs",
+  "scripts": {
+    "build": "tsc",
+    "start": "node dist/server.js",
+    "dev": "tsx watch --clear-screen=false src/server.ts"
+  },
+  "dependencies": {
+    "@aws-sdk/client-bedrock-runtime": "^3.956.0",
+    "@aws-sdk/credential-providers": "^3.1116.0",
+    "@smithy/node-http-handler": "^4.0.4",
+    "@smithy/types": "^4.1.0",
+    "dotenv": "^16.3.1",
+    "express": "^4.22.1",
+    "rxjs": "^7.8.2",
+    "socket.io": "^4.8.1",
+    "uuid": "^11.1.0"
+  },
+  "devDependencies": {
+    "@types/express": "^5.0.0",
+    "@types/node": "^22.13.9",
+    "socket.io-client": "^4.8.3",
+    "tsx": "^4.19.3",
+    "typescript": "^5.7.3"
+  }
+}

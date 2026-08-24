@@ -141,7 +141,10 @@ func main() {
 		return result
 	}
 	handler := httpserver.New(catalog, commerceStore, httpserver.Config{
-		AllowedOrigins: origins, Logger: logger, DependencyHealth: dependencyHealth, RateLimitStore: healthRedis, Auth: authHandler, Yafa: yafaService,
+		// healthRedis is a typed nil (*redis.Client) when Redis is not
+		// configured; storing it in the UniversalClient interface would make
+		// the rate limiter's != nil check pass and panic on Incr.
+		AllowedOrigins: origins, Logger: logger, DependencyHealth: dependencyHealth, RateLimitStore: redisRateLimitStore(healthRedis), Auth: authHandler, Yafa: yafaService,
 		PanicReporter: func(request *http.Request, recovered any, stack []byte) {
 			sentry.WithScope(func(scope *sentry.Scope) {
 				scope.SetRequest(request)
@@ -178,6 +181,16 @@ func main() {
 		os.Exit(1)
 	}
 	logger.Info("YAFA VANAM Commerce API stopped")
+}
+
+// redisRateLimitStore avoids storing a typed-nil *redis.Client inside the
+// UniversalClient interface: the rate limiter's nil check would pass and Incr
+// would panic on every request when Redis is not configured.
+func redisRateLimitStore(client *redis.Client) redis.UniversalClient {
+	if client == nil {
+		return nil
+	}
+	return client
 }
 
 func envOrDefault(key, fallback string) string {

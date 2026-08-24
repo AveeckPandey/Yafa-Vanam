@@ -37,3 +37,6 @@ npm-debug.log*
 *.err
 *.err.log
 *.out.log
+
+# Superdesign temporary component templates
+.superdesign/tmp/

@@ -9,18 +9,18 @@ const exactVariantImages: Record<string, string> = {
   "yv-cheek-001-rose-mist": "/images/yafavanam/cheeks/Airbloom/Airbloom-Rose-Mist.png",
   "yv-cheek-001-soft-berry": "/images/yafavanam/cheeks/Airbloom/Airbloom-Soft-Berry.png",
   "yv-cheek-001-sun-clay": "/images/yafavanam/cheeks/Airbloom/Airbloom-Sun-Clay.png",
-  "yv-cheek-002-dawn-petal": "/images/yafavanam/cheeks/Liquid_Blush/Liquid_Blush_Dawn%20Petal.png",
-  "yv-cheek-002-mauve-air": "/images/yafavanam/cheeks/Liquid_Blush/Liquid_Blush_Mauve_Air.png",
-  "yv-cheek-002-peach-moss": "/images/yafavanam/cheeks/Liquid_Blush/Liquid_Blush_Peach_Moss.png",
-  "yv-cheek-002-rose-mist": "/images/yafavanam/cheeks/Liquid_Blush/Liquid_Blush_Rose_Mist.png",
-  "yv-cheek-002-soft-berry": "/images/yafavanam/cheeks/Liquid_Blush/Liquid_Blush_Soft_Berry.png",
-  "yv-cheek-002-sun-clay": "/images/yafavanam/cheeks/Liquid_Blush/Liquid_Blush_Sun_Clay.png",
-  "yv-cheek-003-dawn-petal": "/images/yafavanam/cheeks/Cream_Blush/Cream_Blush_Dawn_Petal.png",
-  "yv-cheek-003-mauve-air": "/images/yafavanam/cheeks/Cream_Blush/Cream_Blush_Mauve_Air.png",
-  "yv-cheek-003-peach-moss": "/images/yafavanam/cheeks/Cream_Blush/Cream_Blush_Peach_Moss.png",
-  "yv-cheek-003-rose-mist": "/images/yafavanam/cheeks/Cream_Blush/Cream_Blush_Rose_Mint.png",
-  "yv-cheek-003-soft-berry": "/images/yafavanam/cheeks/Cream_Blush/Cream_Blush_Soft_Berry.png",
-  "yv-cheek-003-sun-clay": "/images/yafavanam/cheeks/Cream_Blush/Cream_Blush_Sun_Clay.png",
+  "yv-cheek-002-dawn-petal": "/images/yafavanam/cheeks/Rosemist_Blush_Liquid_Blush/Liquid_Blush_Dawn%20Petal.png",
+  "yv-cheek-002-mauve-air": "/images/yafavanam/cheeks/Rosemist_Blush_Liquid_Blush/Liquid_Blush_Mauve_Air.png",
+  "yv-cheek-002-peach-moss": "/images/yafavanam/cheeks/Rosemist_Blush_Liquid_Blush/Liquid_Blush_Peach_Moss.png",
+  "yv-cheek-002-rose-mist": "/images/yafavanam/cheeks/Rosemist_Blush_Liquid_Blush/Liquid_Blush_Rose_Mist.png",
+  "yv-cheek-002-soft-berry": "/images/yafavanam/cheeks/Rosemist_Blush_Liquid_Blush/Liquid_Blush_Soft_Berry.png",
+  "yv-cheek-002-sun-clay": "/images/yafavanam/cheeks/Rosemist_Blush_Liquid_Blush/Liquid_Blush_Sun_Clay.png",
+  "yv-cheek-003-dawn-petal": "/images/yafavanam/cheeks/Sunclay_cheek_Color_Cream_Blush/Cream_Blush_Dawn_Petal.png",
+  "yv-cheek-003-mauve-air": "/images/yafavanam/cheeks/Sunclay_cheek_Color_Cream_Blush/Cream_Blush_Mauve_Air.png",
+  "yv-cheek-003-peach-moss": "/images/yafavanam/cheeks/Sunclay_cheek_Color_Cream_Blush/Cream_Blush_Peach_Moss.png",
+  "yv-cheek-003-rose-mist": "/images/yafavanam/cheeks/Sunclay_cheek_Color_Cream_Blush/Cream_Blush_Rose_Mint.png",
+  "yv-cheek-003-soft-berry": "/images/yafavanam/cheeks/Sunclay_cheek_Color_Cream_Blush/Cream_Blush_Soft_Berry.png",
+  "yv-cheek-003-sun-clay": "/images/yafavanam/cheeks/Sunclay_cheek_Color_Cream_Blush/Cream_Blush_Sun_Clay.png",
   "yv-cheek-004-clay-bloom": "/images/yafavanam/cheeks/cheek_tint/Cheek_tint_Clay_Bloom.png",
   "yv-cheek-004-fern-rose": "/images/yafavanam/cheeks/cheek_tint/Cheek_tint_Fern_Rose.png",
   "yv-cheek-004-meadow-coral": "/images/yafavanam/cheeks/cheek_tint/Cheek_tint_Meadow_Coral.png",
@@ -33,12 +33,12 @@ const exactVariantImages: Record<string, string> = {
   "yv-cheek-005-petal-dew": "/images/yafavanam/cheeks/Multi-Stick/Multi-Stick-Petal%20Dew.png",
   "yv-cheek-005-quiet-berry": "/images/yafavanam/cheeks/Multi-Stick/Multi-Stick-Quiet-Berry.png",
   "yv-cheek-005-roseleaf": "/images/yafavanam/cheeks/Multi-Stick/Multi-Stick-Roseleaf.png",
-  "yv-cheek-006-clay-bloom": "/images/yafavanam/cheeks/cheekl_Balm/Cheek_Balm_05_Clay_Bloom.png",
-  "yv-cheek-006-fern-rose": "/images/yafavanam/cheeks/cheekl_Balm/Cheek_Balm_06_Fern_Rose.png",
-  "yv-cheek-006-meadow-coral": "/images/yafavanam/cheeks/cheekl_Balm/Cheek_Balm_03_Meadow_Coral.png",
-  "yv-cheek-006-petal-dew": "/images/yafavanam/cheeks/cheekl_Balm/Cheek_balm_01_%20Petal%20Dew.png",
-  "yv-cheek-006-quiet-berry": "/images/yafavanam/cheeks/cheekl_Balm/Cheek_Balm_04_Quiet_Berry.png",
-  "yv-cheek-006-roseleaf": "/images/yafavanam/cheeks/cheekl_Balm/Cheek_Balm_02_Roseleaf.png",
+  "yv-cheek-006-clay-bloom": "/images/yafavanam/cheeks/cheek_Balm/Cheek_Balm_05_Clay_Bloom.png",
+  "yv-cheek-006-fern-rose": "/images/yafavanam/cheeks/cheek_Balm/Cheek_Balm_06_Fern_Rose.png",
+  "yv-cheek-006-meadow-coral": "/images/yafavanam/cheeks/cheek_Balm/Cheek_Balm_03_Meadow_Coral.png",
+  "yv-cheek-006-petal-dew": "/images/yafavanam/cheeks/cheek_Balm/Cheek_balm_01_%20Petal%20Dew.png",
+  "yv-cheek-006-quiet-berry": "/images/yafavanam/cheeks/cheek_Balm/Cheek_Balm_04_Quiet_Berry.png",
+  "yv-cheek-006-roseleaf": "/images/yafavanam/cheeks/cheek_Balm/Cheek_Balm_02_Roseleaf.png",
   "yv-complex-007-apricot-mist": "/images/yafavanam/skin/color_corrector/Color_Corrector_Apricot_Mist.png",
   "yv-complex-007-butter-light": "/images/yafavanam/skin/color_corrector/Color_Corrector_Butter_Light.png",
   "yv-complex-007-lilac-air": "/images/yafavanam/skin/color_corrector/Color_Corrector_Lilac_Air.png",
@@ -53,14 +53,14 @@ const exactVariantImages: Record<string, string> = {
   "yv-complex-009-sand-glow": "/images/yafavanam/skin/Sungrove%20Soft%20Bronzer/Sungrove_Soft_Bronzer_Sand_Glow.png",
   "yv-complex-009-sun-clay": "/images/yafavanam/skin/Sungrove%20Soft%20Bronzer/Sungrove_Soft_Bronzer_Sun_Clay.png",
   "yv-complex-009-warm-dune": "/images/yafavanam/skin/Sungrove%20Soft%20Bronzer/Sungrove_Soft_Bronzer_Warm_Dune.png",
-  "yv-complex-010-deep-hollow": "/images/yafavanam/skin/Contour/Shadowroot_Contour_Deep_Hollow.png",
-  "yv-complex-010-mist-shadow": "/images/yafavanam/skin/Contour/Shadowroot_Contour_Mist_shadow.png",
-  "yv-complex-010-stone-branch": "/images/yafavanam/skin/Contour/Shadowroot_Contour_Stone_Branch.png",
-  "yv-complex-010-taupe-root": "/images/yafavanam/skin/Contour/Shadowroot_Contour_Taupe_Root.png",
-  "yv-complex-011-moon-bronze": "/images/yafavanam/skin/Highlighter/Moonbeam_Glow_Highlighter_Moon_Bronze.png",
-  "yv-complex-011-pearl-haze": "/images/yafavanam/skin/Highlighter/Moonbeam_Glow_Highlighter_Pearl_Haze.png",
-  "yv-complex-011-prism-petal": "/images/yafavanam/skin/Highlighter/Moonbeam_Glow_Highlighter_Prism_Petal.png",
-  "yv-complex-011-soft-gold": "/images/yafavanam/skin/Highlighter/Moonbeam_Glow_Highlighter_Soft_Gold.png",
+  "yv-complex-010-deep-hollow": "/images/yafavanam/skin/Shadowroot_Contour/Shadowroot_Contour_Deep_Hollow.png",
+  "yv-complex-010-mist-shadow": "/images/yafavanam/skin/Shadowroot_Contour/Shadowroot_Contour_Mist_shadow.png",
+  "yv-complex-010-stone-branch": "/images/yafavanam/skin/Shadowroot_Contour/Shadowroot_Contour_Stone_Branch.png",
+  "yv-complex-010-taupe-root": "/images/yafavanam/skin/Shadowroot_Contour/Shadowroot_Contour_Taupe_Root.png",
+  "yv-complex-011-moon-bronze": "/images/yafavanam/skin/Moonbeam_Glow_Highlighter/Moonbeam_Glow_Highlighter_Moon_Bronze.png",
+  "yv-complex-011-pearl-haze": "/images/yafavanam/skin/Moonbeam_Glow_Highlighter/Moonbeam_Glow_Highlighter_Pearl_Haze.png",
+  "yv-complex-011-prism-petal": "/images/yafavanam/skin/Moonbeam_Glow_Highlighter/Moonbeam_Glow_Highlighter_Prism_Petal.png",
+  "yv-complex-011-soft-gold": "/images/yafavanam/skin/Moonbeam_Glow_Highlighter/Moonbeam_Glow_Highlighter_Soft_Gold.png",
   "yv-eye-001-black-brown": "/images/yafavanam/eye/mascara/fernwing/fernwing_Black_Brown.png",
   "yv-eye-001-black-plum": "/images/yafavanam/eye/mascara/fernwing/fernwing_Black_Plum.png",
   "yv-eye-001-carbon-black": "/images/yafavanam/eye/mascara/fernwing/fernwing_Carbon_Black.png",
@@ -91,6 +91,13 @@ const exactVariantImages: Record<string, string> = {
   "yv-eye-003-forest-green": "/images/yafavanam/eye/mascara/soft%20wing/soft_wing_Forest_Green.png",
   "yv-eye-003-jet-black": "/images/yafavanam/eye/mascara/soft%20wing/soft_wing_Jet_Black.png",
   "yv-eye-003-midnight-navy": "/images/yafavanam/eye/mascara/soft%20wing/soft_wing_Midnight_Navy.png",
+  "yv-eye-006-antique-gold": "/images/yafavanam/eye/eye%20color%20collection/Moonveil/Antique_Gold.png",
+  "yv-eye-006-aubergine-plum": "/images/yafavanam/eye/eye%20color%20collection/Moonveil/Aubergine_Plum.png",
+  "yv-eye-006-bronze": "/images/yafavanam/eye/eye%20color%20collection/Moonveil/Bronze.png",
+  "yv-eye-006-champagne-gold": "/images/yafavanam/eye/eye%20color%20collection/Moonveil/Champagne_Gold.png",
+  "yv-eye-006-deep-burgundy": "/images/yafavanam/eye/eye%20color%20collection/Moonveil/Deep_Burgundy.png",
+  "yv-eye-006-rose-gold": "/images/yafavanam/eye/eye%20color%20collection/Moonveil/Rose_Gold.png",
+  "yv-eye-006-smoky-charcoal": "/images/yafavanam/eye/eye%20color%20collection/Moonveil/Smoky_Charcoal.png",
   "yv-eye-007-burgundy-raisin": "/images/yafavanam/eye/eye%20liner%20collection/INKROOT%20PRECISION%20LINER/INKROOT_PRECISION_LINER_Burgundy_Raisin.png",
   "yv-eye-007-charcoal": "/images/yafavanam/eye/eye%20liner%20collection/INKROOT%20PRECISION%20LINER/INKROOT_PRECISION_LINER_Charcoal.png",
   "yv-eye-007-cobalt-blue": "/images/yafavanam/eye/eye%20liner%20collection/INKROOT%20PRECISION%20LINER/INKROOT_PRECISION_LINER_Cobalt_Blue.png",
@@ -175,6 +182,7 @@ const exactVariantImages: Record<string, string> = {
   "yv-lip-005-pink-pearl": "/images/yafavanam/lips/Gloss/Pearlglow_Cushion_Gloss_Pink_Pearl.png",
   "yv-lip-005-rose-quartz": "/images/yafavanam/lips/Gloss/Pearlglow_Cushion_Gloss_Rose_Quartz.png",
   "yv-lip-006-berry-root": "/images/yafavanam/lips/lip_liner/lip_liner_Berry_Root.png",
+  "yv-lip-006-clay-line": "/images/yafavanam/lips/lip_liner/lip_liner_Nude_Bark.png",
   "yv-lip-006-cocoa-vine": "/images/yafavanam/lips/lip_liner/lip_liner_Cocoa_Vine.png",
   "yv-lip-006-mauve-stem": "/images/yafavanam/lips/lip_liner/lip_liner_Mauve_Stem.png",
   "yv-lip-007-berry-river": "/images/yafavanam/lips/lip_%20staim/Lip_stain_Berry_River.png",
@@ -190,7 +198,18 @@ const exactVariantImages: Record<string, string> = {
   "yv-lip-008-soft-bronze": "/images/yafavanam/lips/lip_plumper/lip_Plumper_Soft_Bronze.png",
 };
 
-const complexionVariantFolders: Record<string, string> = {
+export function getMakeupVariantImage(variantId: string) {
+  // Only a verified, explicitly mapped asset can be treated as variant-specific.
+  // Missing mappings deliberately fall back to the product's shared image.
+  return exactVariantImages[variantId] ?? null;
+}
+
+type ShadeProductImage = {
+  src: string;
+  shadeCode: string;
+};
+
+const verifiedComplexionFolders: Record<string, string> = {
   "yv-complex-001": "/images/yafavanam/skin/Serum_Foundation",
   "yv-complex-002": "/images/yafavanam/skin/Natural_Foundation",
   "yv-complex-003": "/images/yafavanam/skin/LongWear_Foundation",
@@ -199,17 +218,25 @@ const complexionVariantFolders: Record<string, string> = {
   "yv-complex-006": "/images/yafavanam/skin/Underleaf%20Cover%20Concealer",
 };
 
-const unavailableVariantImages = new Set([
-  "yv-complex-003-1c",
-  "yv-complex-003-1n",
+const masterShadeCodes = new Set([
+  "1C", "1N", "1W", "2C", "2N", "2W", "3C", "3N", "3W", "4N", "4W", "4O",
+  "5N", "5W", "5O", "6N", "6W", "6O", "7C", "7N", "7W", "8N", "8W", "8O",
 ]);
 
-export function getMakeupVariantImage(productId: string, variantId: string) {
-  if (unavailableVariantImages.has(variantId)) return null;
-  const exact = exactVariantImages[variantId];
-  if (exact) return exact;
+// Miststone's two lightest verified files use a reversed filename convention.
+const verifiedShadeFileNames: Record<string, Partial<Record<string, string>>> = {
+  "yv-complex-003": { "1C": "C1", "1N": "N1" },
+};
 
-  const folder = complexionVariantFolders[productId];
-  const shadeCode = variantId.match(/-(\d[cnwo])$/i)?.[1];
-  return folder && shadeCode ? `${folder}/${shadeCode.toUpperCase()}.png` : null;
+/**
+ * Returns a shade image only when its declared shade code is identical to the
+ * selected code. Callers must retain the shared product image when this is null.
+ */
+export function getVerifiedShadeImage(productId: string, selectedShadeCode: string | null): ShadeProductImage | null {
+  const shadeCode = selectedShadeCode?.toUpperCase() ?? "";
+  const folder = verifiedComplexionFolders[productId];
+  if (!folder || !masterShadeCodes.has(shadeCode)) return null;
+
+  const fileName = verifiedShadeFileNames[productId]?.[shadeCode] ?? shadeCode;
+  return { src: `${folder}/${fileName}.png`, shadeCode };
 }

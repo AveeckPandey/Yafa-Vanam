@@ -14,6 +14,7 @@ except ImportError:  # Keeps local development usable before optional monitoring
 from app.api.advisor import router as advisor_router
 from app.api.rag_search import router as rag_search_router, validate_startup_dimensions
 from app.api.yafa_analysis import router as yafa_analysis_router
+from app.api.yafa_chat import router as yafa_chat_router
 from app.advisor.catalogue import load_catalogue
 from app.advisor.models import BeautyProfile
 from app.advisor.recommender import recommend
@@ -54,6 +55,7 @@ app.add_middleware(
 app.include_router(advisor_router)
 app.include_router(yafa_analysis_router)
 app.include_router(rag_search_router)
+app.include_router(yafa_chat_router)
 app.include_router(v1_router)
 
 

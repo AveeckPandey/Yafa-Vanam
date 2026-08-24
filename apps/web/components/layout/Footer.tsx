@@ -2,8 +2,8 @@ import Link from "next/link";
 
 const columns = [
   { title: "Help", links: [["Contact", "/contact"], ["Frequently asked questions", "/faq"], ["Shipping", "/shipping"], ["Returns", "/returns"]] },
-  { title: "About", links: [["Our story", "/about"], ["Journal", "/shop"], ["Build My Kit", "/build-my-kit"], ["Shop all", "/shop"]] },
-  { title: "Orders", links: [["Track order", "/account/orders"], ["My account", "/account"], ["Saved products", "/account/wishlist"], ["Beauty profile", "/account/skin-profile"]] },
+  { title: "About", links: [["Our story", "/about"], ["Build My Kit", "/build-my-kit"], ["Shop all", "/shop"], ["Contact us", "/contact"]] },
+  { title: "Orders", links: [["My account", "/account"], ["Beauty profile", "/yafa"], ["Build my kit", "/build-my-kit"], ["Shop all", "/shop"]] },
 ] as const;
 
 export default function Footer() {

@@ -14,6 +14,14 @@ type ShippingMethod = "standard" | "express";
 type CheckoutState = "idle" | "processing" | "complete";
 type CheckoutForm = { email: string; firstName: string; lastName: string; address: string; apartment: string; city: string; state: string; pin: string; phone: string; giftMessage: string };
 type RazorpayResponse = { razorpay_payment_id: string; razorpay_order_id: string; razorpay_signature: string };
+type RazorpayInstance = { open: () => void };
+type RazorpayConstructor = new (options: {
+  key: string; amount: number; currency: string; name: string; order_id: string;
+  prefill?: { name?: string; email?: string; contact?: string }; theme?: { color?: string };
+  handler: (response: RazorpayResponse) => void | Promise<void>; modal: { ondismiss: () => void };
+}) => RazorpayInstance;
+
+declare global { interface Window { Razorpay?: RazorpayConstructor } }
 
 const emptyCart: CartResponse = { items: [], itemCount: 0, subtotal: 0, currency: "INR" };
 const initialForm: CheckoutForm = { email: "", firstName: "", lastName: "", address: "", apartment: "", city: "", state: "", pin: "", phone: "", giftMessage: "" };

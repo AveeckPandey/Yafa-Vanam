@@ -1,6 +1,11 @@
 import "server-only";
 import productData from "../../../data/processed/Product.json";
-import type { BodyCareGroup, CatalogProduct, MakeupGroup, SkincareGroup } from "./catalog-types";
+import skinShadeData from "../../../services/recommendation-engine/data/skin.json";
+import cheekShadeData from "../../../services/recommendation-engine/data/cheeks.json";
+import lipShadeData from "../../../services/recommendation-engine/data/lips.json";
+import eyeShadeData from "../../../services/recommendation-engine/data/eyes.json";
+import type { BodyCareGroup, CatalogIncludedShade, CatalogProduct, MakeupGroup, SkincareGroup } from "./catalog-types";
+import type { SearchIndexProduct } from "./product-search";
 import { makeupProductImageManifest } from "./makeup-assets";
 
 type SourceProduct = {
@@ -69,7 +74,148 @@ type SourceProduct = {
   rag: {
     customer_questions: Array<{ question: string; answer: string }>;
   };
+  palette_colors?: Array<{
+    name: string;
+    code?: string | null;
+    hex?: string | null;
+    color_profile?: { finish?: { value?: string | null } | null } | null;
+  }>;
+  recommendation_profile?: {
+    skin_types?: { best_for?: string[] };
+    concerns?: { primary?: string[] };
+  };
 };
+
+type ShadeReference = {
+  name?: string | null;
+  hex?: string | null;
+  undertone?: string | null;
+  code?: string | null;
+};
+
+type ShadeReferenceProduct = {
+  variants?: Array<{ id?: string; shade?: ShadeReference | null }>;
+};
+
+type ShadeReferenceChunk = {
+  products?: ShadeReferenceProduct[];
+};
+
+type SourceProductChunk = {
+  products?: SourceProduct[];
+};
+
+type ShadeSystem = {
+  profiles?: Record<string, ShadeReference>;
+  shades?: ShadeReference[] | Record<string, ShadeReference>;
+};
+
+type ShadeSystemsChunk = {
+  shade_systems?: Record<string, ShadeSystem>;
+};
+
+const shadeReferenceByVariantId = new Map<string, ShadeReference>();
+const authoritativeSourceChunks = [skinShadeData, cheekShadeData, lipShadeData, eyeShadeData] as unknown as SourceProductChunk[];
+const authoritativeProductsById = new Map<string, SourceProduct>();
+for (const source of authoritativeSourceChunks) {
+  for (const product of source.products ?? []) authoritativeProductsById.set(product.id, product);
+}
+
+for (const source of authoritativeSourceChunks as ShadeReferenceChunk[]) {
+  for (const product of source.products ?? []) {
+    for (const variant of product.variants ?? []) {
+      if (variant.id && variant.shade?.hex) shadeReferenceByVariantId.set(variant.id, variant.shade);
+    }
+  }
+}
+
+const storefrontVariantIdsByProductId: Record<string, string[]> = {
+  // The active Petal Velvet assortment is the six distinct shades specified for storefront sale.
+  "yv-lip-001": [
+    "yv-lip-001-petal-nude",
+    "yv-lip-001-rose-mist",
+    "yv-lip-001-mauve-wood",
+    "yv-lip-001-clay-rose",
+    "yv-lip-001-berry-soft",
+    "yv-lip-001-terracotta-dream",
+  ],
+};
+
+// These references are product-specific visual fallbacks for source records
+// whose authoritative status explicitly has no sampled HEX yet. They never
+// fall through to the complexion/brown generic shade scale.
+const productShadeVisualOverrides: Record<string, Record<string, ShadeReference>> = {
+  "yv-complex-007": {
+    "Peach Veil": { hex: "#E6A07E" },
+    "Apricot Mist": { hex: "#D9825F" },
+    "Butter Light": { hex: "#E8D36A" },
+    "Sage Calm": { hex: "#9AA878" },
+    "Lilac Air": { hex: "#B9A2D0" },
+  },
+  "yv-complex-008": {
+    "Clear Air": { hex: "#F2E6D7" },
+    "Soft Linen": { hex: "#E9D4C3" },
+    "Golden Mist": { hex: "#D6AF7F" },
+    "Deep Cloud": { hex: "#7B513C" },
+  },
+  "yv-lip-006": {
+    // The legacy local asset is named Nude Bark; the current storefront label is Clay Line.
+    "Clay Line": { hex: "#B86640" },
+  },
+};
+
+const skinShadeSystems = (skinShadeData as unknown as ShadeSystemsChunk).shade_systems ?? {};
+const lipShadeSystems = (lipShadeData as unknown as ShadeSystemsChunk).shade_systems ?? {};
+const shadeSystemByProductId = new Map<string, ShadeSystem>();
+for (const [productId, shadeSystem] of Object.entries(lipShadeSystems)) {
+  if (productId.startsWith("yv-")) shadeSystemByProductId.set(productId, shadeSystem);
+}
+for (const [productId, shadeSystemId] of Object.entries({
+  "yv-complex-007": "tonepetal_corrector_5",
+  "yv-complex-008": "airveil_setting_powder_4",
+  "yv-complex-009": "sungrove_bronzer_5",
+  "yv-complex-010": "shadowroot_contour_4",
+  "yv-complex-011": "moonbeam_highlighter_4",
+})) {
+  const shadeSystem = skinShadeSystems[shadeSystemId];
+  if (shadeSystem) shadeSystemByProductId.set(productId, shadeSystem);
+}
+
+const earthSkinProductIds = new Set([
+  "yv-complex-001",
+  "yv-complex-002",
+  "yv-complex-003",
+  "yv-complex-004",
+  "yv-complex-005",
+  "yv-complex-006",
+]);
+
+const earthSkinMasterShades = new Map<string, ShadeReference>([
+  ["1C", { name: "Pearl Rose", hex: "#F5DFD3" }],
+  ["1N", { name: "Pearl Sand", hex: "#F2DACD" }],
+  ["1W", { name: "Warm Pearl", hex: "#F0D5C5" }],
+  ["2C", { name: "Rose Ivory", hex: "#EED2C2" }],
+  ["2N", { name: "Ivory Veil", hex: "#EBCEB9" }],
+  ["2W", { name: "Golden Ivory", hex: "#E6C8B0" }],
+  ["3C", { name: "Rose Linen", hex: "#E3C2AE" }],
+  ["3N", { name: "Soft Linen", hex: "#DFC0A9" }],
+  ["3W", { name: "Golden Linen", hex: "#DAB59C" }],
+  ["4N", { name: "Almond Veil", hex: "#D1AB90" }],
+  ["4W", { name: "Golden Almond", hex: "#CB9F81" }],
+  ["4O", { name: "Olive Almond", hex: "#C69B78" }],
+  ["5N", { name: "Honey Earth", hex: "#C09270" }],
+  ["5W", { name: "Golden Honey", hex: "#BA8A65" }],
+  ["5O", { name: "Olive Honey", hex: "#B3835B" }],
+  ["6N", { name: "Caramel Earth", hex: "#AB7650" }],
+  ["6W", { name: "Sun Caramel", hex: "#A36B46" }],
+  ["6O", { name: "Olive Caramel", hex: "#986541" }],
+  ["7C", { name: "Deep Rosewood", hex: "#89583E" }],
+  ["7N", { name: "Deep Amber", hex: "#7B4B31" }],
+  ["7W", { name: "Bronze Terra", hex: "#71412A" }],
+  ["8N", { name: "Rich Umber", hex: "#643825" }],
+  ["8W", { name: "Mahogany Earth", hex: "#552F1D" }],
+  ["8O", { name: "Olive Mahogany", hex: "#482718" }],
+]);
 
 const verifiedImages: Record<string, string> = {
   "Forest Rain Body Mist": "/images/yafavanam/No%20Shades%20Items/Body%20Mists/Forest%20Rain_Body_Mist.png",
@@ -164,8 +310,8 @@ function titleCase(value: string) {
   return value.replace(/\b\w/g, (letter) => letter.toUpperCase());
 }
 
-function shadePreviewHex(shade: NonNullable<SourceProduct["variants"][number]["shade"]>) {
-  if (shade.hex) return shade.hex;
+function shadePreviewHex(shade: NonNullable<SourceProduct["variants"][number]["shade"]>, referenceHex?: string | null) {
+  if (referenceHex ?? shade.hex) return referenceHex ?? shade.hex!;
   const depth = Math.max(1, Math.min(shadeDepths.length, Math.round(shade.depth_index ?? 4)));
   const base = shadeDepths[depth - 1];
   if (shade.undertone === "cool") return base.replace("#", "#");
@@ -179,8 +325,38 @@ function shadeLabel(shade: NonNullable<SourceProduct["variants"][number]["shade"
     .join(" ");
 }
 
+function getSystemShadeReference(productId: string, shade: NonNullable<SourceProduct["variants"][number]["shade"]>) {
+  const shadeSystem = shadeSystemByProductId.get(productId);
+  if (!shadeSystem) return null;
+  const systemShades = Array.isArray(shadeSystem.shades)
+    ? shadeSystem.shades
+    : Object.entries(shadeSystem.shades ?? {}).map(([name, value]) => ({ ...value, name }));
+  const candidates = [...Object.values(shadeSystem.profiles ?? {}), ...systemShades];
+  return candidates.find((candidate) => candidate.name === shade.name || candidate.code === shade.code) ?? null;
+}
+
+function getShadeReference(productId: string, variantId: string, shade: NonNullable<SourceProduct["variants"][number]["shade"]>) {
+  if (earthSkinProductIds.has(productId) && shade.code) return earthSkinMasterShades.get(shade.code) ?? null;
+  return productShadeVisualOverrides[productId]?.[shade.name ?? ""]
+    ?? shadeReferenceByVariantId.get(variantId)
+    ?? getSystemShadeReference(productId, shade);
+}
+
 function mapProduct(product: SourceProduct): CatalogProduct {
-  const activeVariants = product.variants.filter((variant) => variant.is_active);
+  const authoritativeProduct = authoritativeProductsById.get(product.id);
+  const variantSource = product.id === "yv-lip-006"
+    ? product
+    : authoritativeProduct ?? product;
+  const storefrontVariantIds = storefrontVariantIdsByProductId[product.id];
+  const activeVariants = variantSource.variants.filter((variant) =>
+    variant.is_active && (!storefrontVariantIds || storefrontVariantIds.includes(variant.id)),
+  );
+  const includedShades: CatalogIncludedShade[] = (authoritativeProduct?.palette_colors ?? []).map((shade, index) => ({
+    id: shade.code ?? `${product.id}-included-${index + 1}`,
+    name: shade.name,
+    hex: shade.hex ?? null,
+    finish: shade.color_profile?.finish?.value ?? null,
+  }));
   const primary = makeupProductImageManifest[product.id]
     ?? verifiedImages[product.name]
     ?? (product.images.paths_verified && product.images.primary
@@ -212,17 +388,21 @@ function mapProduct(product: SourceProduct): CatalogProduct {
     variants: activeVariants.map((variant) => ({
       id: variant.id,
       size: variant.size,
-      shade: variant.shade
-        ? {
-            name: shadeLabel(variant.shade),
-            code: variant.shade.code ?? null,
-            undertone: variant.shade.undertone ?? null,
-            hex: shadePreviewHex(variant.shade),
-          }
-        : null,
+      shade: (() => {
+        if (!variant.shade) return null;
+        const reference = getShadeReference(product.id, variant.id, variant.shade);
+        return {
+          name: reference?.name ?? shadeLabel(variant.shade),
+          code: variant.shade.code ?? null,
+          undertone: variant.shade.undertone ?? reference?.undertone ?? null,
+          depthFamily: variant.shade.depth_family ?? null,
+          hex: shadePreviewHex(variant.shade, reference?.hex),
+        };
+      })(),
       price: variant.price,
       isActive: variant.is_active,
     })),
+    includedShades,
     image: primary,
     gallery: Array.from(new Set([primary, ...verifiedGallery])),
     imageAlt: product.images.alt || `${product.name} by YAFA VANAM`,
@@ -273,6 +453,54 @@ const catalogue = sources.filter((product) => product.status === "active").map(m
 
 export function getAllCatalogProducts() {
   return catalogue;
+}
+
+export function getSearchIndex(): SearchIndexProduct[] {
+  const byId = new Map(catalogue.map((product) => [product.id, product]));
+  return sources
+    .map((source) => byId.get(source.id))
+    .filter((product): product is CatalogProduct => Boolean(product))
+    .map((product) => {
+      const source = sources.find((entry) => entry.id === product.id);
+      const keywords = [
+        product.name,
+        product.category,
+        product.subcategory,
+        product.productType,
+        product.shortDescription,
+        ...product.benefits,
+        ...(source?.recommendation_profile?.skin_types?.best_for ?? []),
+        ...(source?.recommendation_profile?.concerns?.primary ?? []),
+        ...(source?.variants.flatMap((variant) => [
+          variant.shade?.name ?? "",
+          variant.shade?.code ?? "",
+          variant.shade?.undertone ?? "",
+          variant.shade?.depth_family ?? "",
+        ]) ?? []),
+        source?.fragrance_profile?.related_scent_line ?? "",
+        source?.fragrance_profile?.family ?? "",
+        ...(source?.fragrance_profile?.facets ?? []),
+        ...(source?.fragrance_profile?.mood ?? []),
+      ]
+        .join(" ")
+        .toLowerCase();
+
+      return {
+        id: product.id,
+        slug: product.slug,
+        name: product.name,
+        category: product.category,
+        subcategory: product.subcategory,
+        productType: product.productType,
+        shortDescription: product.shortDescription,
+        benefits: product.benefits,
+        currency: product.currency,
+        price: product.price,
+        image: product.image,
+        imageAlt: product.imageAlt,
+        keywords,
+      };
+    });
 }
 
 export function getProductBySlug(slug: string) {

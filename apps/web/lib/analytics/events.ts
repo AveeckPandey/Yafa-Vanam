@@ -1,6 +1,8 @@
 export const analyticsEvents = {
   pageViewed: "page_viewed",
   collectionViewed: "collection_viewed",
+  searchOpened: "search_opened",
+  searchPerformed: "search_performed",
   productClicked: "product_clicked",
   productViewed: "product_viewed",
   shadeSelected: "shade_selected",
@@ -27,6 +29,20 @@ export const analyticsEvents = {
   addToCart: "add_to_cart",
   productReturned: "product_returned",
   shadeExchangeRequested: "shade_exchange_requested",
+  // Yafa assistant lifecycle (Phase 3 section 44)
+  yafaOpened: "yafa_opened",
+  yafaMessageSent: "yafa_message_sent",
+  yafaVoiceStarted: "yafa_voice_started",
+  yafaVoiceTranscribed: "yafa_voice_transcribed",
+  yafaSelfieStarted: "yafa_selfie_started",
+  yafaSelfieRetake: "yafa_selfie_retake",
+  yafaShadePredicted: "yafa_shade_predicted",
+  yafaShadeConfirmed: "yafa_shade_confirmed",
+  yafaShadeCorrected: "yafa_shade_corrected",
+  yafaRecommendationShown: "yafa_recommendation_shown",
+  yafaProductOpened: "yafa_product_opened",
+  yafaAddToBag: "yafa_add_to_bag",
+  yafaRecommendationRejected: "yafa_recommendation_rejected",
 } as const;
 
 export type AnalyticsEventName = typeof analyticsEvents[keyof typeof analyticsEvents];

@@ -2,10 +2,12 @@
 
 import Link from "next/link";
 import { useEffect, useRef } from "react";
+import { useAuth } from "@/components/auth/AuthProvider";
 
 type MobileMenuProps = {
   open: boolean;
   onClose: () => void;
+  onOpenSearch: (trigger: HTMLButtonElement) => void;
 };
 
 const mobileGroups = [
@@ -40,9 +42,19 @@ const mobileGroups = [
   },
 ];
 
-export default function MobileMenu({ open, onClose }: MobileMenuProps) {
+export default function MobileMenu({ open, onClose, onOpenSearch }: MobileMenuProps) {
   const panelRef = useRef<HTMLElement>(null);
   const closeButtonRef = useRef<HTMLButtonElement>(null);
+  const { isAuthenticated, openAuth, logout } = useAuth();
+
+  const handleAuthAction = () => {
+    onClose();
+    if (isAuthenticated) {
+      void logout();
+    } else {
+      openAuth();
+    }
+  };
 
   useEffect(() => {
     if (!open) return;
@@ -153,7 +165,10 @@ export default function MobileMenu({ open, onClose }: MobileMenuProps) {
         </Link>
 
         <div className="mobile-menu__utility">
-          <Link href="/search" onClick={onClose}>Search</Link>
+          <button type="button" onClick={(event) => onOpenSearch(event.currentTarget)}>Search</button>
+          <button type="button" onClick={handleAuthAction}>
+            {isAuthenticated ? "Sign out" : "Sign in"}
+          </button>
           <Link href="/account" onClick={onClose}>My account</Link>
           <Link href="/cart" onClick={onClose}>Shopping bag</Link>
           <Link href="/contact" onClick={onClose}>Stay in touch</Link>

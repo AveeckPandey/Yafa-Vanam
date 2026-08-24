@@ -7,6 +7,10 @@ import AddToBag from "./AddToBag";
 export default function StickyBuyBar({ name, price, currency, productId, variantId }: { name: string; price: number; currency: string; productId: string; variantId: string }) {
   const [visible, setVisible] = useState(false);
   useEffect(() => {
+    if (window.matchMedia("(max-width: 760px)").matches) {
+      setVisible(true);
+      return;
+    }
     const purchase = document.getElementById("pdp-purchase");
     if (!purchase) return;
     const observer = new IntersectionObserver(([entry]) => setVisible(!entry.isIntersecting), { threshold: 0 });
