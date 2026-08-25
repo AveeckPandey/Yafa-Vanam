@@ -4,8 +4,9 @@ import BodyCareCatalog from "./BodyCareCatalog";
 import { getBodyCareProducts } from "@/lib/catalog";
 
 export const metadata: Metadata = {
-  title: "Body Care Collection | YAFA VANAM",
+  title: "Body Care Collection",
   description: "Explore YAFA VANAM body essentials for hands, feet and skin.",
+  alternates: { canonical: "/body-care" },
 };
 
 export default function BodyCarePage() {

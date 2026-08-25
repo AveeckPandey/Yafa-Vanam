@@ -4,12 +4,13 @@ import SearchExperience from "./SearchExperience";
 import { getSearchIndex } from "@/lib/catalog";
 
 export const metadata: Metadata = {
-  title: "Search | YAFA VANAM",
+  title: "Search",
+  robots: { index: false, follow: true },
 };
 
 export default function Page() {
   return (
-    <Suspense fallback={<main id="main-content" className="search-results-page" />}>
+    <Suspense fallback={<main id="main-content" className="search-results-page"><h1 className="visually-hidden">Search the YAFA VANAM collection</h1></main>}>
       <SearchExperience products={getSearchIndex()} />
     </Suspense>
   );

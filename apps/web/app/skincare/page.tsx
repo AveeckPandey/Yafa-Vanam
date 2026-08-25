@@ -4,8 +4,9 @@ import SkinCareCatalog from "./SkinCareCatalog";
 import { getSkincareProducts } from "@/lib/catalog";
 
 export const metadata: Metadata = {
-  title: "Skin Care Collection | YAFA VANAM",
+  title: "Skin Care Collection",
   description: "Explore YAFA VANAM essentials for cleansing, treating, hydrating, protecting and scalp care.",
+  alternates: { canonical: "/skincare" },
 };
 
 export default function SkinCarePage() {

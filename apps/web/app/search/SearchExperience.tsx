@@ -35,6 +35,7 @@ export default function SearchExperience({ products }: { products: SearchIndexPr
   return (
     <main id="main-content" className="search-results-page">
       <div className="site-shell">
+        <h1 className="visually-hidden">Search the YAFA VANAM collection</h1>
         <form
           className="header-search__field-row"
           role="search"

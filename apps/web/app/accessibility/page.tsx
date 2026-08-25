@@ -1,4 +1,4 @@
-export const metadata = { title: "Accessibility | YAFA VANAM" };
+export const metadata = { title: "Accessibility", alternates: { canonical: "/accessibility" } };
 
 export default function AccessibilityPage() {
   return <main id="main-content" className="info-page"><header className="info-page__hero"><p>YAFA VANAM / Accessibility</p><h1>Beauty should welcome everyone.</h1><span>We are working to make YAFA VANAM clear, usable and comfortable across devices and assistive technologies.</span></header><div className="info-page__body"><section><h2>Our approach</h2><p>We aim for keyboard access, visible focus states, meaningful labels, readable contrast, scalable content and reduced-motion support throughout the shopping journey.</p></section><section><h2>Tell us what is not working</h2><p>If a page, control or piece of content creates a barrier, contact our care team and describe the device, browser or assistive technology you are using.</p></section><section><h2>Ongoing improvement</h2><p>Accessibility is part of our design and testing process. We review customer feedback and continue improving as the product changes.</p></section></div></main>;

@@ -4,8 +4,9 @@ import MakeupCatalog from "./MakeupCatalog";
 import { getMakeupProducts } from "@/lib/catalog";
 
 export const metadata: Metadata = {
-  title: "Makeup Collection | YAFA VANAM",
+  title: "Makeup Collection",
   description: "Explore YAFA VANAM complexion, eye, lip and cheek colour.",
+  alternates: { canonical: "/makeup" },
 };
 
 export default function MakeupPage() {
