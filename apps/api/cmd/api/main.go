@@ -89,6 +89,14 @@ func main() {
 		defer redisClient.Close()
 		healthDB, healthRedis = db, redisClient
 		authHandler = auth.NewHandler(auth.New(db, redisClient, auth.Config{JWTSecret: secret, SecureCookies: production, AccessTTL: 15 * time.Minute, RefreshTTL: 24 * time.Hour, RememberRefreshTTL: 30 * 24 * time.Hour}), os.Getenv("GOOGLE_CLIENT_ID"), os.Getenv("GOOGLE_CLIENT_SECRET"), os.Getenv("GOOGLE_CALLBACK_URL"), envOrDefault("APP_URL", "http://localhost:3000"), auth.NewSMTPMailer(os.Getenv("SMTP_HOST"), os.Getenv("SMTP_PORT"), os.Getenv("SMTP_USERNAME"), os.Getenv("SMTP_PASSWORD"), os.Getenv("SMTP_FROM")))
+		// The Cognito bridge needs only public pool identifiers — the client
+		// secret stays in the web tier. Absent settings leave the exchange
+		// endpoint answering 503 instead of half-working.
+		if verifier := auth.NewCognitoVerifier(os.Getenv("COGNITO_REGION"), os.Getenv("COGNITO_USER_POOL_ID"), os.Getenv("COGNITO_CLIENT_ID")); verifier != nil {
+			authHandler.SetCognitoVerifier(verifier)
+		} else {
+			logger.Warn("Cognito sign-in bridge disabled until COGNITO_REGION, COGNITO_USER_POOL_ID, and COGNITO_CLIENT_ID are all set")
+		}
 		yafaService = yafa.New(db)
 		storage, storageErr := yafa.NewStorage(context.Background(), yafa.StorageConfig{Endpoint: strings.TrimSpace(os.Getenv("YAFA_STORAGE_ENDPOINT")), Region: strings.TrimSpace(os.Getenv("YAFA_STORAGE_REGION")), Bucket: strings.TrimSpace(os.Getenv("YAFA_STORAGE_BUCKET")), AccessKeyID: strings.TrimSpace(os.Getenv("YAFA_STORAGE_ACCESS_KEY_ID")), SecretAccessKey: strings.TrimSpace(os.Getenv("YAFA_STORAGE_SECRET_ACCESS_KEY"))})
 		analyzer, analyzerErr := yafa.NewAnalyzer(strings.TrimSpace(os.Getenv("YAFA_ANALYZER_URL")), strings.TrimSpace(os.Getenv("YAFA_INTERNAL_SERVICE_TOKEN")))
@@ -157,7 +165,13 @@ func main() {
 		RazorpayKeySecret:       strings.TrimSpace(os.Getenv("RAZORPAY_KEY_SECRET")),
 		RazorpayWebhookSecret:   strings.TrimSpace(os.Getenv("RAZORPAY_WEBHOOK_SECRET")),
 		RazorpayCheckoutEnabled: strings.EqualFold(strings.TrimSpace(os.Getenv("RAZORPAY_CHECKOUT_ENABLED")), "true"),
+		// Same trust domain as the outbound analyzer call: our own Lambda
+		// presenting the shared secret to mint welcome coupons.
+		InternalServiceToken: strings.TrimSpace(os.Getenv("YAFA_INTERNAL_SERVICE_TOKEN")),
 	})
+	if strings.TrimSpace(os.Getenv("YAFA_INTERNAL_SERVICE_TOKEN")) == "" {
+		logger.Warn("internal lifecycle routes disabled until YAFA_INTERNAL_SERVICE_TOKEN is set")
+	}
 	server := &http.Server{
 		Addr: ":" + port, Handler: handler, ReadHeaderTimeout: 10 * time.Second,
 		ReadTimeout: 15 * time.Second, WriteTimeout: 30 * time.Second, IdleTimeout: 60 * time.Second,

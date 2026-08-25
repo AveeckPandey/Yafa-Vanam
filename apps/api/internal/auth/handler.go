@@ -23,10 +23,12 @@ const csrfCookie = "yafa_csrf"
 type Handler struct {
 	service                                     *Service
 	oauth                                       *oauth2.Config
+	cognito                                     *CognitoVerifier
 	secure                                      bool
 	frontendURL                                 string
 	mailer                                      Mailer
 	loginLimiter, registerLimiter, resetLimiter *rate.Limiter
+	exchangeLimiter                             *rate.Limiter
 }
 
 func (h *Handler) Middleware(next http.Handler) http.Handler { return h.service.Middleware(next) }
@@ -52,7 +54,7 @@ func (h *Handler) CSRFMiddleware(next http.Handler) http.Handler {
 }
 
 func NewHandler(s *Service, clientID, clientSecret, callback, frontendURL string, mailer Mailer) *Handler {
-	h := &Handler{service: s, secure: s.config.SecureCookies, frontendURL: strings.TrimRight(frontendURL, "/"), mailer: mailer, loginLimiter: rate.NewLimiter(rate.Every(time.Minute/8), 8), registerLimiter: rate.NewLimiter(rate.Every(time.Minute/5), 5), resetLimiter: rate.NewLimiter(rate.Every(time.Minute/5), 5)}
+	h := &Handler{service: s, secure: s.config.SecureCookies, frontendURL: strings.TrimRight(frontendURL, "/"), mailer: mailer, loginLimiter: rate.NewLimiter(rate.Every(time.Minute/8), 8), registerLimiter: rate.NewLimiter(rate.Every(time.Minute/5), 5), resetLimiter: rate.NewLimiter(rate.Every(time.Minute/5), 5), exchangeLimiter: rate.NewLimiter(rate.Every(time.Minute/8), 8)}
 	if clientID != "" && clientSecret != "" && callback != "" {
 		h.oauth = &oauth2.Config{ClientID: clientID, ClientSecret: clientSecret, RedirectURL: callback, Endpoint: google.Endpoint, Scopes: []string{"openid", "email", "profile"}}
 	}
@@ -63,6 +65,7 @@ func (h *Handler) Routes(mux *http.ServeMux) {
 	mux.HandleFunc("GET /auth/me", h.me)
 	mux.HandleFunc("POST /auth/register", h.register)
 	mux.HandleFunc("POST /auth/login", h.login)
+	mux.HandleFunc("POST /auth/cognito/exchange", h.cognitoExchange)
 	mux.HandleFunc("POST /auth/refresh", h.refresh)
 	mux.HandleFunc("POST /auth/logout", h.logout)
 	mux.HandleFunc("POST /auth/password-reset/request", h.requestPasswordReset)
@@ -158,6 +161,46 @@ func (h *Handler) login(w http.ResponseWriter, r *http.Request) {
 	u, e := h.service.Login(r.Context(), in.Email, in.Password)
 	if e != nil {
 		fail(w, 401, "Your email or password is incorrect.")
+		return
+	}
+	h.respondSession(w, r.Context(), u, in.Remember)
+}
+
+// cognitoExchange bridges a browser-authenticated Cognito identity into the
+// first-party session system: the id_token is verified against the user pool's
+// public keys, the local user is upserted, and standard session cookies are
+// issued exactly as a native login would. The Cognito client secret never
+// reaches this service.
+func (h *Handler) cognitoExchange(w http.ResponseWriter, r *http.Request) {
+	if !h.exchangeLimiter.Allow() {
+		fail(w, 429, "Too many attempts. Please try again shortly.")
+		return
+	}
+	if !h.validCSRF(r) {
+		fail(w, 403, "Invalid security token.")
+		return
+	}
+	if h.cognito == nil {
+		fail(w, 503, "Cognito sign-in is not configured.")
+		return
+	}
+	var in struct {
+		IDToken  string
+		Remember bool `json:"remember"`
+	}
+	if !decode(r, &in) || strings.TrimSpace(in.IDToken) == "" {
+		fail(w, 400, "Invalid sign in details.")
+		return
+	}
+	identity, e := h.cognito.Verify(strings.TrimSpace(in.IDToken))
+	if e != nil {
+		log.Printf("cognito id_token rejected: %v", e)
+		fail(w, 401, "Sign-in could not be verified. Please try again.")
+		return
+	}
+	u, e := h.service.CognitoUser(r.Context(), identity.Subject, identity.Name, identity.Email)
+	if e != nil {
+		fail(w, 500, "Unable to start your session.")
 		return
 	}
 	h.respondSession(w, r.Context(), u, in.Remember)

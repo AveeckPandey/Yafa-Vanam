@@ -36,6 +36,7 @@ type Config struct {
 	RazorpayKeySecret       string
 	RazorpayWebhookSecret   string
 	RazorpayCheckoutEnabled bool
+	InternalServiceToken    string
 }
 
 type Server struct {
@@ -52,6 +53,7 @@ type Server struct {
 	razorpayWebhookSecret   string
 	razorpayCheckoutEnabled bool
 	razorpayMu              sync.Mutex
+	internalServiceToken    string
 	yafa                    *yafa.Service
 	rateMu                  sync.Mutex
 	clientRates             map[string]*clientRate
@@ -83,6 +85,7 @@ func New(catalog *commerce.Catalog, store commerce.CommerceStore, config Config)
 		razorpayKeySecret:       config.RazorpayKeySecret,
 		razorpayWebhookSecret:   config.RazorpayWebhookSecret,
 		razorpayCheckoutEnabled: config.RazorpayCheckoutEnabled,
+		internalServiceToken:    config.InternalServiceToken,
 		yafa:                    config.Yafa,
 		clientRates:             make(map[string]*clientRate),
 		dependencyHealth:        config.DependencyHealth,
@@ -115,6 +118,10 @@ func New(catalog *commerce.Catalog, store commerce.CommerceStore, config Config)
 		mux.HandleFunc("POST /api/v1/payments/razorpay/verify", server.verifyRazorpayPayment)
 	}
 	mux.HandleFunc("POST /api/v1/payments/razorpay/webhook", server.razorpayWebhook)
+	// Machine-to-machine routes (welcome-coupon Lambda). Guarded by the shared
+	// service token, not user sessions — fail closed when unconfigured.
+	mux.Handle("POST /api/internal/coupons/welcome", server.internalGuard(http.HandlerFunc(server.issueWelcomeCoupon)))
+	mux.Handle("POST /api/internal/messages/record", server.internalGuard(http.HandlerFunc(server.recordLifecycleMessage)))
 	if config.Auth != nil {
 		mux.Handle("GET /api/v1/me/beauty-profile", config.Auth.Middleware(http.HandlerFunc(server.yafaBeautyProfile)))
 		mux.Handle("POST /api/v1/yafa/session/start", config.Auth.OptionalMiddleware(http.HandlerFunc(server.startYafaSession)))

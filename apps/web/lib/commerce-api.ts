@@ -6,7 +6,12 @@ import "server-only";
 //   npm run generate:api-types
 import type { ApiCart, RazorpayCheckoutOrder } from "@yafa/frontend-types";
 
-const BASE = (process.env.COMMERCE_API_URL || process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000").replace(/\/$/, "");
+// Resolved per-request (module scope would freeze the fallback at build time).
+// No localhost default: on Vercel a missing COMMERCE_API_URL must fail loudly
+// (503) instead of silently pointing shoppers at http://localhost:4000 — same
+// contract as the /api/v1 proxy.
+const apiBase = () =>
+  (process.env.COMMERCE_API_URL || process.env.NEXT_PUBLIC_API_URL || "").replace(/\/$/, "");
 
 export type { ApiCart, RazorpayCheckoutOrder };
 
@@ -40,9 +45,14 @@ export class CommerceApiError extends Error {
 }
 
 async function request<T>(path: string, init?: RequestInit, cookie?: string, csrf?: string): Promise<T> {
+  const base = apiBase();
+  if (!base) {
+    throw new CommerceApiError(503, "Commerce API is not configured.");
+  }
+
   let response: Response;
   try {
-    response = await fetch(`${BASE}${path}`, {
+    response = await fetch(`${base}${path}`, {
       ...init,
       cache: "no-store",
       headers: { "Content-Type": "application/json", ...(cookie ? { Cookie: cookie } : {}), ...(csrf ? { "X-CSRF-Token": csrf } : {}), ...(init?.headers || {}) },

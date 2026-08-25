@@ -147,6 +147,16 @@ func (s *Service) GoogleUser(ctx context.Context, subject, name, email, picture 
 	return u, err
 }
 
+// CognitoUser upserts the local user for an already-verified Cognito id_token,
+// mirroring GoogleUser: email is the join key, the stable pool `sub` is linked
+// so later sign-ins resolve the same account, and an empty incoming name never
+// overwrites an existing one.
+func (s *Service) CognitoUser(ctx context.Context, subject, name, email string) (User, error) {
+	var u User
+	err := s.db.QueryRow(ctx, `INSERT INTO users (email,name,cognito_subject,email_verified_at) VALUES ($1,$2,$3,NOW()) ON CONFLICT (email) DO UPDATE SET cognito_subject=EXCLUDED.cognito_subject, name=COALESCE(NULLIF(EXCLUDED.name,''),users.name) RETURNING id::text,name,email`, strings.ToLower(email), name, subject).Scan(&u.ID, &u.Name, &u.Email)
+	return u, err
+}
+
 func (s *Service) Issue(ctx context.Context, user User, remember bool) (string, string, error) {
 	access, err := s.signed(user, "access", "", s.config.AccessTTL)
 	if err != nil {

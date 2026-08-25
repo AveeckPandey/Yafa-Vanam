@@ -94,6 +94,9 @@ type Order struct {
 	FulfillmentStatus string     `json:"fulfillment_status"`
 	ShippingAddress   Address    `json:"shipping_address"`
 	CreatedAt         time.Time  `json:"created_at"`
+	// DiscountCode records which coupon produced DiscountAmount so the
+	// redemption row can be written when payment succeeds. Never serialized.
+	DiscountCode string `json:"-"`
 }
 
 // CommerceStore is the persistence boundary for carts and orders. Store (in
@@ -129,13 +132,20 @@ type Store struct {
 	carts       map[string]*Cart
 	orders      map[string]*Order
 	idempotency map[string]string
+	// coupons mirrors migration 000007's seeded rows; redemptions records
+	// which orders have already burned a coupon so payment retries stay
+	// idempotent. Per-user limits are a Postgres-store concern — guest
+	// orders here have no owner to count against.
+	coupons     map[string]Coupon
+	redemptions map[string]string
 	now         func() time.Time
 }
 
 func NewStore(catalog *Catalog) *Store {
 	return &Store{
 		catalog: catalog, carts: make(map[string]*Cart), orders: make(map[string]*Order),
-		idempotency: make(map[string]string), now: time.Now,
+		idempotency: make(map[string]string), coupons: legacyCoupons(), redemptions: make(map[string]string),
+		now: time.Now,
 	}
 }
 
@@ -352,7 +362,18 @@ func (store *Store) CreateOrder(input CreateOrderInput, idempotencyKey string) (
 	if len(view.Items) == 0 {
 		return Order{}, false, ErrEmptyCart
 	}
-	discount := checkoutDiscount(view.Subtotal, input.DiscountCode)
+	code := NormalizeDiscountCode(input.DiscountCode)
+	discount := 0.0
+	if code != "" {
+		coupon, ok := store.coupons[code]
+		if !ok {
+			return Order{}, false, ErrCouponInvalid
+		}
+		if err := validateCouponForOrder(coupon, view.Subtotal, 0); err != nil {
+			return Order{}, false, err
+		}
+		discount = couponDiscountAmount(coupon, view.Subtotal)
+	}
 	discountedSubtotal := max(0.0, view.Subtotal-discount)
 	shipping := 199.0
 	if strings.EqualFold(strings.TrimSpace(input.ShippingMethod), "express") {
@@ -367,28 +388,13 @@ func (store *Store) CreateOrder(input CreateOrderInput, idempotencyKey string) (
 		Items: append([]CartLine(nil), view.Items...), Currency: view.Currency, Subtotal: view.Subtotal,
 		ShippingAmount: shipping, DiscountAmount: discount, TotalAmount: discountedSubtotal + shipping, OrderStatus: "PENDING_PAYMENT",
 		PaymentStatus: "PENDING", FulfillmentStatus: "UNFULFILLED", ShippingAddress: input.ShippingAddress,
-		CreatedAt: now,
+		CreatedAt: now, DiscountCode: code,
 	}
 	store.orders[order.OrderNumber] = order
 	if idempotencyKey != "" {
 		store.idempotency[idempotencyKey] = order.OrderNumber
 	}
 	return *order, false, nil
-}
-
-func checkoutDiscount(subtotal float64, code string) float64 {
-	switch strings.ToUpper(strings.TrimSpace(code)) {
-	case "YAFA20":
-		return float64(int(subtotal*0.2 + 0.5))
-	case "NATURE15":
-		return float64(int(subtotal*0.15 + 0.5))
-	case "FLAT500":
-		return min(500, subtotal)
-	case "WELCOME10":
-		return float64(int(subtotal*0.1 + 0.5))
-	default:
-		return 0
-	}
 }
 
 func (store *Store) AttachRazorpayOrder(orderNumber, razorpayOrderID string) (Order, error) {
@@ -408,8 +414,18 @@ func (store *Store) VerifyRazorpayPayment(razorpayOrderID, paymentID string) (Or
 	for _, order := range store.orders {
 		if order.RazorpayOrderID == razorpayOrderID {
 			order.RazorpayPaymentID = paymentID
-			if order.PaymentStatus == "PENDING" || order.PaymentStatus == "FAILED" {
+			firstSuccess := order.PaymentStatus == "PENDING" || order.PaymentStatus == "FAILED"
+			if firstSuccess {
 				order.PaymentStatus = "AUTHORIZED"
+			}
+			// A coupon burns exactly once per order, on the first successful
+			// verification — abandoned or retried checkouts never double-spend.
+			if code := order.DiscountCode; firstSuccess && code != "" && store.redemptions[order.OrderNumber] == "" {
+				if coupon, ok := store.coupons[code]; ok {
+					coupon.Uses++
+					store.coupons[code] = coupon
+				}
+				store.redemptions[order.OrderNumber] = code
 			}
 			return *order, nil
 		}

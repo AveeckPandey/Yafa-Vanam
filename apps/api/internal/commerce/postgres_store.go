@@ -530,7 +530,21 @@ func (store *PostgresStore) createOrder(ownerID string, input CreateOrderInput, 
 		return Order{}, false, ErrEmptyCart
 	}
 
-	discount := checkoutDiscount(view.Subtotal, input.DiscountCode)
+	code := NormalizeDiscountCode(input.DiscountCode)
+	discount := 0.0
+	if code != "" {
+		// Resolved inside the order transaction so a coupon crossing its use
+		// limit between validation and commit cannot double-apply: the row is
+		// locked FOR UPDATE and the limit re-checked against committed state.
+		coupon, previousUsesByUser, err := store.lockedCoupon(ctx, tx, code, ownerID)
+		if err != nil {
+			return Order{}, false, err
+		}
+		if err := validateCouponForOrder(coupon, view.Subtotal, previousUsesByUser); err != nil {
+			return Order{}, false, err
+		}
+		discount = couponDiscountAmount(coupon, view.Subtotal)
+	}
 	discountedSubtotal := max(0.0, view.Subtotal-discount)
 	shipping := 199.0
 	if strings.EqualFold(strings.TrimSpace(input.ShippingMethod), "express") {
@@ -550,23 +564,23 @@ func (store *PostgresStore) createOrder(ownerID string, input CreateOrderInput, 
 	}
 
 	order := Order{
-		OrderNumber: "YV-" + now.Format("20060102") + "-" + strings.ToUpper(randomID("", 4)),
+		OrderNumber:   "YV-" + now.Format("20060102") + "-" + strings.ToUpper(randomID("", 4)),
 		CustomerEmail: strings.ToLower(strings.TrimSpace(input.CustomerEmail)), UserID: ownerID,
 		AccessToken: accessToken, Items: append([]CartLine(nil), view.Items...), Currency: view.Currency,
 		Subtotal: view.Subtotal, ShippingAmount: shipping, DiscountAmount: discount,
 		TotalAmount: discountedSubtotal + shipping, OrderStatus: "PENDING_PAYMENT",
 		PaymentStatus: "PENDING", FulfillmentStatus: "UNFULFILLED",
-		ShippingAddress: input.ShippingAddress, CreatedAt: now,
+		ShippingAddress: input.ShippingAddress, CreatedAt: now, DiscountCode: code,
 	}
 
 	err = tx.QueryRow(ctx,
 		`INSERT INTO orders (order_number, user_id, customer_email, currency, subtotal, discount_amount,
 		    shipping_amount, tax_amount, total_amount, order_status, payment_status, fulfillment_status,
-		    shipping_address, access_token, idempotency_key)
-		 VALUES ($1, NULLIF($2,'')::uuid, $3, $4, $5, $6, $7, 0, $8, 'PENDING_PAYMENT', 'PENDING', 'UNFULFILLED', $9, NULLIF($10,''), NULLIF($11,''))
+		    shipping_address, access_token, idempotency_key, discount_code)
+		 VALUES ($1, NULLIF($2,'')::uuid, $3, $4, $5, $6, $7, 0, $8, 'PENDING_PAYMENT', 'PENDING', 'UNFULFILLED', $9, NULLIF($10,''), NULLIF($11,''), $12)
 		 RETURNING id::text, created_at`,
 		order.OrderNumber, ownerID, order.CustomerEmail, order.Currency, order.Subtotal, order.DiscountAmount,
-		order.ShippingAmount, order.TotalAmount, addressJSON, accessToken, idempotencyKey).
+		order.ShippingAmount, order.TotalAmount, addressJSON, accessToken, idempotencyKey, code).
 		Scan(&order.ID, &order.CreatedAt)
 	if isUniqueViolation(err) && idempotencyKey != "" {
 		// A concurrent request with the same key committed first; replay it.
@@ -732,29 +746,6 @@ func (store *PostgresStore) AttachRazorpayOrder(orderNumber, razorpayOrderID str
 		return Order{}, err
 	}
 	if err := tx.Commit(ctx); err != nil {
-		return Order{}, err
-	}
-	order, err := record.assemble()
-	return order, err
-}
-
-func (store *PostgresStore) VerifyRazorpayPayment(razorpayOrderID, paymentID string) (Order, error) {
-	ctx, cancel := store.ctx()
-	defer cancel()
-	record, err := scanOrderRecord(store.db.QueryRow(ctx,
-		`UPDATE orders SET razorpay_payment_id=$2,
-		    payment_status=CASE WHEN payment_status IN ('PENDING','FAILED') THEN 'AUTHORIZED' ELSE payment_status END,
-		    updated_at=NOW()
-		 WHERE razorpay_order_id=$1 RETURNING `+orderReturningColumns, razorpayOrderID, paymentID))
-	if err != nil {
-		if errors.Is(err, pgx.ErrNoRows) {
-			return Order{}, ErrPaymentOrderNotFound
-		}
-		return Order{}, err
-	}
-	if _, err := store.db.Exec(ctx,
-		`UPDATE payments SET provider_payment_id=$2, status='AUTHORIZED', updated_at=NOW()
-		 WHERE provider_order_id=$1 AND status IN ('PENDING','FAILED')`, razorpayOrderID, paymentID); err != nil {
 		return Order{}, err
 	}
 	order, err := record.assemble()

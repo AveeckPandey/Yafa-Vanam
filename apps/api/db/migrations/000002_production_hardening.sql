@@ -16,7 +16,7 @@ ALTER TABLE users
 CREATE UNIQUE INDEX IF NOT EXISTS uq_users_email_lower
     ON users (LOWER(email));
 
--- Custom authentication. Only an Argon2id hash is stored; never store a password.
+-- Custom authentication. Only a bcrypt (cost 12) hash is stored; never store a password.
 CREATE TABLE IF NOT EXISTS user_credentials (
     user_id UUID PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
     password_hash TEXT NOT NULL,
