@@ -19,7 +19,6 @@ export default function WelcomePromo() {
   const [open, setOpen] = useState(false);
   const dialog = useRef<HTMLElement>(null);
   const titleID = `${useId()}-title`;
-  const excluded = EXCLUDED_PREFIXES.some((prefix) => window.location.pathname === prefix || window.location.pathname.startsWith(`${prefix}/`));
 
   const dismiss = useCallback(() => {
     setOpen(false);
@@ -29,10 +28,12 @@ export default function WelcomePromo() {
   useEffect(() => {
     // Only first-time-ish visitors: signed-out, past the loading probe, on a
     // browsable page, and not already waved away this session.
+    const { pathname } = window.location;
+    const excluded = EXCLUDED_PREFIXES.some((prefix) => pathname === prefix || pathname.startsWith(`${prefix}/`));
     if (authStatus !== "unauthenticated" || excluded || readDismissed()) return;
     const timer = setTimeout(() => setOpen(true), OPEN_DELAY_MS);
     return () => clearTimeout(timer);
-  }, [authStatus, excluded]);
+  }, [authStatus]);
 
   useEffect(() => {
     if (!open) return;
@@ -45,8 +46,11 @@ export default function WelcomePromo() {
 
   if (!open) return null;
 
-  const returnTo = `${window.location.pathname}${window.location.search}`;
-  const accept = () => { dismiss(); router.push(`/auth/sign-in?return_to=${encodeURIComponent(returnTo)}`); };
+  const accept = () => {
+    const returnTo = `${window.location.pathname}${window.location.search}`;
+    dismiss();
+    router.push(`/auth/sign-in?return_to=${encodeURIComponent(returnTo)}`);
+  };
 
   return <div className="welcome-promo__backdrop" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) dismiss(); }}>
     <section className="welcome-promo" ref={dialog} role="dialog" aria-modal="true" aria-labelledby={titleID} tabIndex={-1}>
