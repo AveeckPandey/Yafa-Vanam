@@ -1,3 +1,4 @@
+import Image from "next/image";
 import Link from "next/link";
 
 const sets = [
@@ -10,6 +11,6 @@ const sets = [
 export default function FeaturedSets() {
   return <section className="featured-sets" aria-labelledby="featured-sets-title">
     <header className="featured-sets__header"><p>CURATED FOR YOUR RITUAL</p><h2 id="featured-sets-title">Sets worth keeping close.</h2><Link href="/shop">Shop all products <span aria-hidden="true">→</span></Link></header>
-    <div className="featured-sets__grid">{sets.map((set) => <article key={set.title} className="featured-sets__card"><Link href={set.href} className="featured-sets__image"><img src={set.image} alt={set.alt}/></Link><div><span>{set.tag}</span><h3>{set.title}</h3><p>{set.description}</p><Link href={set.href}>Explore set <span aria-hidden="true">→</span></Link></div></article>)}</div>
+    <div className="featured-sets__grid">{sets.map((set) => <article key={set.title} className="featured-sets__card"><Link href={set.href} className="featured-sets__image"><Image src={set.image} alt={set.alt} fill sizes="(max-width: 620px) 100vw, (max-width: 900px) 50vw, 25vw" /></Link><div><span>{set.tag}</span><h3>{set.title}</h3><p>{set.description}</p><Link href={set.href}>Explore set <span aria-hidden="true">→</span></Link></div></article>)}</div>
   </section>;
 }
