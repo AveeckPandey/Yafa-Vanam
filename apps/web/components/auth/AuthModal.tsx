@@ -2,6 +2,14 @@
 
 import { useEffect, useId, useRef, useState } from "react";
 import { ConfirmationRequiredError, VerificationRequiredError, useAuth } from "./AuthProvider";
+import { GENDER_OPTIONS, validateSignUpProfile } from "@/lib/cognito-shared";
+
+const GENDER_LABELS: Record<(typeof GENDER_OPTIONS)[number], string> = {
+  female: "Female",
+  male: "Male",
+  non_binary: "Non-binary",
+  prefer_not_to_say: "Prefer not to say",
+};
 
 type Props = { open: boolean; onClose: () => void; returnTo: string };
 type Mode = "signin" | "signup" | "forgot";
@@ -32,13 +40,31 @@ export default function AuthModal({ open, onClose, returnTo }: Props) {
     const data = new FormData(form);
     const email = String(data.get("email") || "").trim().toLowerCase();
     const nextPassword = String(data.get("password") || "");
-    if (mode === "signup" && nextPassword !== String(data.get("confirmPassword") || "")) { setError("Passwords do not match. Please check and try again."); return; }
+    if (mode === "signup") {
+      if (nextPassword !== String(data.get("confirmPassword") || "")) { setError("Passwords do not match. Please check and try again."); return; }
+      // Pre-flight only; the server re-validates everything as the authority.
+      const checked = validateSignUpProfile({
+        givenName: String(data.get("givenName") || ""),
+        email,
+        gender: String(data.get("gender") || ""),
+        birthDate: String(data.get("birthDate") || ""),
+      });
+      if (!checked.ok) { setError(checked.error); return; }
+      setBusy(true); setError(""); setNotice("");
+      try {
+        await register({ ...checked.profile, password: nextPassword, remember: data.get("remember") === "on" });
+      } catch (reason) {
+        if (reason instanceof ConfirmationRequiredError) enterConfirm(reason.email, nextPassword);
+        else setError(reason instanceof Error ? reason.message : "We could not complete that request. Please try again.");
+      } finally {
+        setBusy(false);
+      }
+      return;
+    }
     setBusy(true); setError(""); setNotice("");
     try {
       if (mode === "signin") {
         await login(email, nextPassword, data.get("remember") === "on");
-      } else if (mode === "signup") {
-        await register(String(data.get("name") || ""), email, nextPassword, data.get("remember") === "on");
       } else {
         setNotice(await requestPasswordReset(email));
         setPendingEmail(email);
@@ -127,8 +153,10 @@ export default function AuthModal({ open, onClose, returnTo }: Props) {
       ) : (
         <>
           <form onSubmit={(event) => { event.preventDefault(); void submitForm(event.currentTarget); }} noValidate>
-            {mode === "signup" && <label htmlFor={`${id}-name`}>Full name<input id={`${id}-name`} name="name" autoComplete="name" required/></label>}
+            {mode === "signup" && <label htmlFor={`${id}-given-name`}>Given name<input id={`${id}-given-name`} name="givenName" autoComplete="given-name" required aria-describedby={error ? errorID : undefined}/></label>}
             <label htmlFor={`${id}-email`}>Email address<input id={`${id}-email`} name="email" type="email" autoComplete="email" required aria-describedby={error ? errorID : undefined}/></label>
+            {mode === "signup" && <label htmlFor={`${id}-gender`}>Gender<select id={`${id}-gender`} name="gender" defaultValue="" required aria-describedby={error ? errorID : undefined}><option value="" disabled>Please select…</option>{GENDER_OPTIONS.map((value) => <option key={value} value={value}>{GENDER_LABELS[value]}</option>)}</select></label>}
+            {mode === "signup" && <label htmlFor={`${id}-birth-date`}>Birthday<input id={`${id}-birth-date`} name="birthDate" type="date" autoComplete="bday" max={new Date().toISOString().slice(0, 10)} required aria-describedby={error ? errorID : undefined}/></label>}
             {mode !== "forgot" && <PasswordField id={`${id}-password`} name="password" label="Password" value={password} onChange={setPassword} autoComplete={mode === "signin" ? "current-password" : "new-password"} describedBy={mode === "signup" || error ? `${mode === "signup" ? `${id}-strength ` : ""}${error ? errorID : ""}`.trim() : undefined}/>}
             {mode === "signup" && <div id={`${id}-strength`} className={`auth-modal__strength is-${strength}`} aria-live="polite"><span><i/><i/><i/></span><b>Password strength: {strength}</b></div>}
             {mode === "signup" && <PasswordField id={`${id}-confirm`} name="confirmPassword" label="Confirm password" autoComplete="new-password" describedBy={error ? errorID : undefined}/>}

@@ -1,8 +1,19 @@
 import "server-only";
 
 import { createHmac, createPublicKey, verify } from "node:crypto";
+import type { NormalizedSignUpProfile } from "./cognito-shared";
 
-export type CognitoUser = { id: string; name: string; email: string };
+export type CognitoUser = {
+  id: string;
+  name: string;
+  email: string;
+  /**
+   * The pool's actual username claim (cognito:username). This — not the
+   * email alias — is the identity Cognito expects inside a refresh-token
+   * SECRET_HASH for every sign-in configuration.
+   */
+  username: string;
+};
 
 export type CognitoConfig = {
   region: string;
@@ -10,7 +21,17 @@ export type CognitoConfig = {
   clientId: string;
   clientSecret: string;
   issuer: string;
+  /**
+   * Which identity Cognito expects inside the refresh-token SECRET_HASH for
+   * this pool's sign-in configuration. "username_claim" fits pools where
+   * users sign in with their username (including email-as-username);
+   * "sub" is required for pools using email/phone aliases, where the
+   * permanent username differs from the sign-in identifier.
+   */
+  refreshUsernameSource: "username_claim" | "sub";
 };
+
+const REFRESH_USERNAME_SOURCES = ["username_claim", "sub"] as const;
 
 export type TokenSet = {
   IdToken?: string;
@@ -36,6 +57,8 @@ type JwtClaims = {
   sub?: string;
   email?: string;
   name?: string;
+  given_name?: string;
+  email_verified?: boolean | string;
   "cognito:username"?: string;
   aud?: string;
   iss?: string;
@@ -43,14 +66,18 @@ type JwtClaims = {
   token_use?: string;
 };
 
-// The username cookie stores only the email Cognito already knows, so the
-// refresh flow can compute its SecretHash even hours after the id_token
-// cookie has expired. Cleared together with the session at logout.
+// The username cookie stores the pool username claim taken from the verified
+// id_token (email alias or pool-native id), so the refresh flow can compute
+// its SecretHash with Cognito's expected identity even after the id_token
+// cookie has expired. The remember cookie preserves the visitor's original
+// "remember me" choice so refreshes never extend a session they did not ask
+// to keep. Cleared together at logout.
 export const cookieNames = {
   access: "yafa_cognito_access",
   id: "yafa_cognito_id",
   refresh: "yafa_cognito_refresh",
   username: "yafa_cognito_username",
+  remember: "yafa_cognito_remember",
 } as const;
 
 const jwks = new Map<string, { expiresAt: number; keys: Map<string, JsonWebKey> }>();
@@ -74,12 +101,17 @@ export function cognitoConfig(): CognitoConfig | null {
   const clientId = required("COGNITO_CLIENT_ID");
   const clientSecret = required("COGNITO_CLIENT_SECRET");
   if (!region || !userPoolId || !clientId || !clientSecret) return null;
+  // An unrecognized value must disable Cognito mode entirely (the capability
+  // endpoint then reports "native") rather than guess and break refreshes.
+  const sourceSetting = required("COGNITO_REFRESH_USERNAME_SOURCE") || "username_claim";
+  if (!(REFRESH_USERNAME_SOURCES as readonly string[]).includes(sourceSetting)) return null;
   return {
     region,
     userPoolId,
     clientId,
     clientSecret,
     issuer: `https://cognito-idp.${region}.amazonaws.com/${userPoolId}`,
+    refreshUsernameSource: sourceSetting as CognitoConfig["refreshUsernameSource"],
   };
 }
 
@@ -89,6 +121,15 @@ export function safeReturnTo(value: string | null | undefined, fallback = "/acco
 
 function secretHash(config: CognitoConfig, username: string) {
   return createHmac("sha256", config.clientSecret).update(`${username}${config.clientId}`).digest("base64");
+}
+
+/**
+ * The identity Cognito expects inside a REFRESH_TOKEN_AUTH SECRET_HASH. Alias
+ * pools require the immutable sub; username-sign-in pools expect the
+ * cognito:username claim. Chosen per deployment via COGNITO_REFRESH_USERNAME_SOURCE.
+ */
+export function secretHashUsername(config: CognitoConfig, user: Pick<CognitoUser, "id" | "username">): string {
+  return config.refreshUsernameSource === "sub" ? user.id : user.username;
 }
 
 const FRIENDLY_ERRORS: Record<string, string> = {
@@ -136,15 +177,22 @@ function authParams(config: CognitoConfig, username: string, password: string) {
   return { USERNAME: username, PASSWORD: password, SECRET_HASH: secretHash(config, username) };
 }
 
-export async function signUp(config: CognitoConfig, name: string, email: string, password: string) {
+/**
+ * Creates the pool account with the exact standard attribute names the user
+ * pool requires. Callers must pass a profile already normalized through
+ * validateSignUpProfile(); this layer never logs attribute values.
+ */
+export async function signUp(config: CognitoConfig, profile: NormalizedSignUpProfile, password: string) {
   return cognitoInvoke<{ UserSub: string }>(config, "SignUp", {
     ClientId: config.clientId,
-    Username: email,
+    Username: profile.email,
     Password: password,
-    SecretHash: secretHash(config, email),
+    SecretHash: secretHash(config, profile.email),
     UserAttributes: [
-      { Name: "email", Value: email },
-      { Name: "name", Value: name },
+      { Name: "email", Value: profile.email },
+      { Name: "given_name", Value: profile.givenName },
+      { Name: "gender", Value: profile.gender },
+      { Name: "birthdate", Value: profile.birthDate },
     ],
   });
 }
@@ -208,8 +256,9 @@ export async function refreshTokens(config: CognitoConfig, username: string, ref
     ClientId: config.clientId,
     AuthParameters: {
       REFRESH_TOKEN: refreshToken,
-      // The username comes from the companion cookie; it only feeds the
-      // SecretHash HMAC — session identity always comes from verified tokens.
+      // The username is the pool username claim persisted from the verified
+      // id_token — Cognito's expected SECRET_HASH identity for every sign-in
+      // configuration. Session identity always comes from verified tokens.
       SECRET_HASH: secretHash(config, username),
     },
   });
@@ -260,7 +309,19 @@ export async function userFromIdToken(config: CognitoConfig, token: string): Pro
   const header = decodePart<JwtHeader>(encodedHeader || "");
   const claims = decodePart<JwtClaims>(encodedClaims || "");
   if (extra.length || !header?.kid || header.alg !== "RS256" || !claims?.sub || !claims.email || claims.iss !== config.issuer || claims.aud !== config.clientId || claims.token_use !== "id" || !claims.exp || claims.exp * 1000 <= Date.now()) throw new Error("Invalid Cognito session.");
+  // Mirrors the Go bridge: only an explicitly verified address may open a
+  // session. Cognito issues booleans; some admin flows emit string forms.
+  const emailVerified = claims.email_verified === true || claims.email_verified === "true";
+  if (!emailVerified) throw new Error("Cognito account email is not verified.");
   const jwk = await keyFor(config, header.kid);
   if (!jwk || !verify("RSA-SHA256", Buffer.from(`${encodedHeader}.${encodedClaims}`), createPublicKey({ key: jwk, format: "jwk" }), Buffer.from(encodedSignature || "", "base64url"))) throw new Error("Invalid Cognito session.");
-  return { id: claims.sub, email: claims.email, name: claims.name || claims["cognito:username"] || claims.email };
+  // Display name prefers the full name claim, then falls back to given_name —
+  // pools collecting only the new required attributes have no name claim.
+  const name = claims.name || claims.given_name || claims["cognito:username"] || claims.email;
+  return {
+    id: claims.sub,
+    email: claims.email,
+    name,
+    username: claims["cognito:username"] || claims.sub!,
+  };
 }

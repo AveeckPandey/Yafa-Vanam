@@ -35,6 +35,10 @@ export function setCognitoSessionCookies(headers: Headers, tokens: TokenSet, use
   // Non-sensitive (the pool already knows it) but kept HttpOnly anyway; feeds
   // the SecretHash on refresh after the id_token cookie is long gone.
   headers.append("set-cookie", `${cookieNames.username}=${encodeURIComponent(username)};${baseAttributes(refreshMaxAge)}`);
+  // "1"/"0" companion with the same lifetime as the refresh cookie so the
+  // original remember-me choice survives token refreshes verbatim instead of
+  // being silently upgraded to the 30-day horizon.
+  headers.append("set-cookie", `${cookieNames.remember}=${remember ? "1" : "0"};${baseAttributes(refreshMaxAge)}`);
 }
 
 export function clearCognitoCookies(headers: Headers) {

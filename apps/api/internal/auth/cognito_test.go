@@ -101,6 +101,10 @@ func TestCognitoVerifierRejectsInvalidTokens(t *testing.T) {
 	if _, err := verifier.Verify(valid); err != nil {
 		t.Fatalf("valid id_token must verify: %v", err)
 	}
+	stringVerified := signCognitoIDToken(t, jwks.key, "test-key", func(c jwt.MapClaims) { c["email_verified"] = "true" })
+	if _, err := verifier.Verify(stringVerified); err != nil {
+		t.Fatalf("string-verified id_token must verify: %v", err)
+	}
 
 	hs256Forgery, err := jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.MapClaims{"iss": testIssuer}).SignedString([]byte("secret"))
 	if err != nil {
@@ -111,16 +115,20 @@ func TestCognitoVerifierRejectsInvalidTokens(t *testing.T) {
 	wrongAudience := signCognitoIDToken(t, jwks.key, "test-key", func(c jwt.MapClaims) { c["aud"] = "someone-elses-client" })
 	accessTokenKind := signCognitoIDToken(t, jwks.key, "test-key", func(c jwt.MapClaims) { c["token_use"] = "access" })
 	unverifiedEmail := signCognitoIDToken(t, jwks.key, "test-key", func(c jwt.MapClaims) { c["email_verified"] = false })
+	stringUnverified := signCognitoIDToken(t, jwks.key, "test-key", func(c jwt.MapClaims) { c["email_verified"] = "false" })
+	missingEmailVerified := signCognitoIDToken(t, jwks.key, "test-key", func(c jwt.MapClaims) { delete(c, "email_verified") })
 	missingSub := signCognitoIDToken(t, jwks.key, "test-key", func(c jwt.MapClaims) { delete(c, "sub") })
 
 	for name, token := range map[string]string{
-		"HS256 forgery":    hs256Forgery,
-		"expired":          expired,
-		"wrong issuer":     wrongIssuer,
-		"wrong audience":   wrongAudience,
-		"access token_use": accessTokenKind,
-		"unverified email": unverifiedEmail,
-		"missing subject":  missingSub,
+		"HS256 forgery":        hs256Forgery,
+		"expired":              expired,
+		"wrong issuer":         wrongIssuer,
+		"wrong audience":       wrongAudience,
+		"access token_use":     accessTokenKind,
+		"unverified email":     unverifiedEmail,
+		"string unverified":    stringUnverified,
+		"missing email_verify": missingEmailVerified,
+		"missing subject":      missingSub,
 		"tampered payload": valid[:len(valid)-4] + "AAAA",
 		"unknown kid":      signCognitoIDToken(t, jwks.key, "never-published", nil),
 	} {

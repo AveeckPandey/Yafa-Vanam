@@ -18,7 +18,7 @@ export async function POST(request: NextRequest) {
   try {
     const tokens = await signIn(config, email, body.password);
     const headers = new Headers();
-    const { user } = await finishCognitoSignIn(request, headers, config, tokens, email, body.remember === true);
+    const { user } = await finishCognitoSignIn(request, headers, config, tokens, body.remember === true);
     return jsonWithCookies({ user }, headers);
   } catch (reason) {
     if (reason instanceof CognitoError) {

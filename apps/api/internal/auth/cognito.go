@@ -104,15 +104,17 @@ func (v *CognitoVerifier) Verify(rawToken string) (cognitoIdentity, error) {
 	if subject == "" || email == "" {
 		return cognitoIdentity{}, errors.New("cognito id_token is missing sub or email")
 	}
-	switch verified := claims["email_verified"].(type) {
+	// Only an explicitly verified address may open a session. Cognito issues
+	// booleans; some admin flows emit string forms.
+	verified := false
+	switch claim := claims["email_verified"].(type) {
 	case bool:
-		if !verified {
-			return cognitoIdentity{}, errors.New("cognito account email is not verified")
-		}
+		verified = claim
 	case string:
-		if strings.EqualFold(verified, "false") {
-			return cognitoIdentity{}, errors.New("cognito account email is not verified")
-		}
+		verified = strings.EqualFold(claim, "true")
+	}
+	if !verified {
+		return cognitoIdentity{}, errors.New("cognito id_token email is not verified")
 	}
 	name, _ := claims["name"].(string)
 	if name == "" {

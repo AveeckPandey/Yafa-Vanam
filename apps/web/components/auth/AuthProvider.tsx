@@ -4,12 +4,22 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useRef, use
 import AuthModal from "./AuthModal";
 
 export type AuthUser = { id: string; name: string; email: string };
+/** Values collected by the sign-up form for Cognito's required attributes. */
+export type SignUpCredentials = {
+  givenName: string;
+  email: string;
+  gender: string;
+  /** Strict YYYY-MM-DD, as Cognito birthdate requires. */
+  birthDate: string;
+  password: string;
+  remember: boolean;
+};
 type AuthStatus = "loading" | "authenticated" | "unauthenticated" | "error";
 type Provider = "cognito" | "native";
 type AuthContextValue = {
   user: AuthUser | null; authStatus: AuthStatus; isAuthenticated: boolean; isLoading: boolean; provider: Provider | null;
   login: (email: string, password: string, remember: boolean) => Promise<void>;
-  register: (name: string, email: string, password: string, remember: boolean) => Promise<void>;
+  register: (credentials: SignUpCredentials) => Promise<void>;
   confirmRegistration: (email: string, code: string, password: string, remember: boolean) => Promise<void>;
   resendConfirmationCode: (email: string) => Promise<string>;
   requestPasswordReset: (email: string) => Promise<string>;
@@ -124,23 +134,30 @@ function useAuthApi() {
     return payload.user;
   }, [resolveProvider, cognitoPost]);
 
-  const register = useCallback(async (name: string, email: string, password: string, remember: boolean): Promise<AuthUser> => {
+  const register = useCallback(async (credentials: SignUpCredentials): Promise<void> => {
     const activeProvider = await resolveProvider();
     if (activeProvider === "cognito") {
       // Cognito sign-up ends at "check your email": no session exists until
       // the emailed code confirms the address (and fires the welcome coupon).
-      const response = await cognitoPost("/auth/cognito/signup", { name, email, password });
-      if (response.ok) throw new ConfirmationRequiredError(email.trim().toLowerCase());
+      const response = await cognitoPost("/auth/cognito/signup", {
+        givenName: credentials.givenName,
+        email: credentials.email,
+        gender: credentials.gender,
+        birthDate: credentials.birthDate,
+        password: credentials.password,
+      });
+      if (response.ok) throw new ConfirmationRequiredError(credentials.email.trim().toLowerCase());
       const payload = await response.json().catch(() => ({})) as { error?: string };
       throw new Error(payload.error || "We could not create your account. Please try again.");
     }
-    const response = await post("/auth/register", { name, email, password, remember }, await csrf());
+    // Native accounts keep their single display-name field; the given name
+    // fills it until the visitor adds more in their profile.
+    const response = await post("/auth/register", { name: credentials.givenName, email: credentials.email, password: credentials.password, remember: credentials.remember }, await csrf());
     const payload = await response.json().catch(() => ({})) as { user?: AuthUser; error?: string };
     if (!response.ok || !payload.user) {
       if (response.status === 401) throw new Error("Incorrect email or password. Please try again.");
       throw new Error(payload.error || "We could not complete that request. Please try again.");
     }
-    return payload.user;
   }, [resolveProvider, cognitoPost]);
 
   const confirmRegistration = useCallback(async (email: string, code: string, password: string, remember: boolean) => {
@@ -240,7 +257,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const complete = useCallback((nextUser: AuthUser) => { setUser(nextUser); setAuthStatus("authenticated"); setModalOpen(false); const action = deferredAction.current; deferredAction.current = null; void action?.(); }, []);
   const login = useCallback(async (email: string, password: string, remember: boolean) => complete(await api.login(email, password, remember)), [api, complete]);
-  const register = useCallback(async (name: string, email: string, password: string, remember: boolean) => complete(await api.register(name, email, password, remember)), [api, complete]);
+  const register = useCallback(async (credentials: SignUpCredentials) => api.register(credentials), [api, complete]);
   const confirmRegistration = useCallback(async (email: string, code: string, password: string, remember: boolean) => complete(await api.confirmRegistration(email, code, password, remember)), [api, complete]);
   const requireAuth = useCallback((action: () => void | Promise<void>) => {
     if (user) { void action(); return; }

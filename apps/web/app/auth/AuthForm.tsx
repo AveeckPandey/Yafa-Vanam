@@ -4,6 +4,14 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { FormEvent, useEffect, useState } from "react";
 import { ConfirmationRequiredError, VerificationRequiredError, useAuth } from "../../components/auth/AuthProvider";
+import { GENDER_OPTIONS, validateSignUpProfile } from "@/lib/cognito-shared";
+
+const GENDER_LABELS: Record<(typeof GENDER_OPTIONS)[number], string> = {
+  female: "Female",
+  male: "Male",
+  non_binary: "Non-binary",
+  prefer_not_to_say: "Prefer not to say",
+};
 
 function PasswordInput({ id, name = "password", label = "Password", autoComplete, value, onChange }: { id: string; name?: string; label?: string; autoComplete: string; value?: string; onChange?: (value: string) => void }) {
   const [visible, setVisible] = useState(false);
@@ -47,7 +55,14 @@ export default function AuthForm({ mode }: { mode: "sign-in" | "sign-up" | "rese
       } else if (reset) {
         setNotice(cognito ? await submitResetCode(email, String(data.get("code") || "").trim(), entered) : await (() => { if (!token) throw new Error("This reset link is invalid or has expired. Please request a new one."); return resetPassword(token, entered); })());
       } else if (create) {
-        try { await register(String(data.get("name") || ""), email, entered, false); router.push(returnTo); }
+        const checked = validateSignUpProfile({
+          givenName: String(data.get("givenName") || ""),
+          email,
+          gender: String(data.get("gender") || ""),
+          birthDate: String(data.get("birthDate") || ""),
+        });
+        if (!checked.ok) { setError(checked.error); return; }
+        try { await register({ ...checked.profile, password: entered, remember: false }); router.push(returnTo); }
         catch (reason) { if (reason instanceof ConfirmationRequiredError) armConfirm(reason.email, entered); else throw reason; }
       } else {
         try { await login(email, entered, false); router.push(returnTo); }
@@ -90,8 +105,10 @@ export default function AuthForm({ mode }: { mode: "sign-in" | "sign-up" | "rese
       </form>
     ) : (
       <form onSubmit={submit}>
-        {create && <label htmlFor="auth-name">Name<input id="auth-name" name="name" autoComplete="name" required/></label>}
+        {create && <label htmlFor="auth-given-name">Given name<input id="auth-given-name" name="givenName" autoComplete="given-name" required/></label>}
         {(!reset || cognito) && <label htmlFor="auth-email">Email<input id="auth-email" name="email" type="email" autoComplete="email" defaultValue={pendingEmail || undefined} required/></label>}
+        {create && <label htmlFor="auth-gender">Gender<select id="auth-gender" name="gender" defaultValue="" required><option value="" disabled>Please select…</option>{GENDER_OPTIONS.map((value) => <option key={value} value={value}>{GENDER_LABELS[value]}</option>)}</select></label>}
+        {create && <label htmlFor="auth-birth-date">Birthday<input id="auth-birth-date" name="birthDate" type="date" autoComplete="bday" max={new Date().toISOString().slice(0, 10)} required/></label>}
         {!resetAwaitingCode && <PasswordInput id="auth-password" autoComplete={create || reset ? "new-password" : "current-password"}/>}
         {resetRequestsCode && resetReady && <label htmlFor="auth-reset-code">Reset code<input id="auth-reset-code" name="code" inputMode="numeric" autoComplete="one-time-code" maxLength={6} pattern="[0-9]*" placeholder="••••••" required/></label>}
         {(create || (reset && !resetAwaitingCode)) && <PasswordInput id="auth-confirm-password" name="confirmPassword" label="Confirm password" autoComplete="new-password"/>}

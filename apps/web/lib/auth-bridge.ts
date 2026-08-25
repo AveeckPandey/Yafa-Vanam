@@ -1,7 +1,7 @@
 import "server-only";
 
 import { NextResponse, type NextRequest } from "next/server";
-import { userFromIdToken, type CognitoConfig, type TokenSet } from "./cognito-server";
+import { userFromIdToken, secretHashUsername, type CognitoConfig, type TokenSet } from "./cognito-server";
 import { setCognitoSessionCookies } from "./cognito-session";
 
 /**
@@ -104,18 +104,23 @@ export function jsonWithCookies(body: unknown, headers: Headers, status = 200) {
 /**
  * Shared tail of login and signup-confirm: verify the fresh id_token, write
  * the Cognito cookie family onto `headers`, then bridge to Go for its session
- * cookies. Route modules may only export HTTP handlers, so this lives here.
+ * cookies. The username cookie stores the configuration-chosen refresh
+ * identity (sub or username claim) taken from the verified token — never a
+ * value the browser simply asserted. Route modules may only export HTTP
+ * handlers, so this lives here.
  */
 export async function finishCognitoSignIn(
   request: NextRequest,
   headers: Headers,
   config: CognitoConfig,
   tokens: TokenSet,
-  username: string,
   remember: boolean,
 ) {
   const user = await userFromIdToken(config, tokens.IdToken!); // signIn/refreshTokens guarantee IdToken
-  setCognitoSessionCookies(headers, tokens, username, remember);
+  // The stored identity must match what Cognito's refresh SECRET_HASH expects
+  // for this pool's sign-in configuration: the sub for alias pools, the
+  // username claim otherwise. Never a browser-asserted value.
+  setCognitoSessionCookies(headers, tokens, secretHashUsername(config, user), remember);
   await exchangeGoSession(headers, request, tokens.IdToken!, remember);
   return { user };
 }

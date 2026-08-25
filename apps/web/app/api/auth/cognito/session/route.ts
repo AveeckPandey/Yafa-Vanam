@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { cognitoConfig, cookieNames, refreshTokens, userFromIdToken } from "@/lib/cognito-server";
 import { clearCognitoCookies, setCognitoSessionCookies } from "@/lib/cognito-session";
 import { exchangeGoSession, jsonWithCookies } from "@/lib/auth-bridge";
+import { parseRememberFlag } from "@/lib/cognito-shared";
 
 function readCookie(request: NextRequest, name: string) {
   return request.cookies.get(name)?.value ?? "";
@@ -42,7 +43,9 @@ export async function GET(request: NextRequest) {
 
   const refreshToken = readCookie(request, cookieNames.refresh);
   const username = decodeURIComponent(readCookie(request, cookieNames.username));
-  if (!refreshToken || !username.includes("@")) {
+  // The username may be an email alias or a pool-native id; any non-empty
+  // value persisted from a verified token is acceptable.
+  if (!refreshToken || !username) {
     return NextResponse.json({ error: "Not signed in." }, { status: 401 });
   }
   try {
@@ -50,9 +53,10 @@ export async function GET(request: NextRequest) {
     // Refreshed tokens carry the same identity; verifying keeps that promise explicit.
     const user = await userFromIdToken(config, tokens.IdToken!);
     const headers = new Headers();
-    // Whether "remember me" was chosen is unknowable here; keep the longer
-    // horizon so an idle visitor is not logged out by this call itself.
-    setCognitoSessionCookies(headers, tokens, username, true);
+    // Re-use the visitor's original choice; sessions created before the
+    // companion cookie existed default to non-persistent rather than being
+    // silently upgraded to the longer horizon.
+    setCognitoSessionCookies(headers, tokens, username, parseRememberFlag(readCookie(request, cookieNames.remember)));
     if (!goAccessPresent) {
       await exchangeGoSession(headers, request, tokens.IdToken!, false);
     }
