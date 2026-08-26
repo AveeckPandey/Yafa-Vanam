@@ -7,7 +7,8 @@
     "start": "next start",
     "typecheck": "tsc --noEmit",
     "test": "node --experimental-transform-types --import ./tests/helpers/register.mjs --test tests/signup-validation.test.ts tests/cognito-server.test.ts tests/session-cookies.test.ts",
-    "test:e2e": "playwright test --config playwright.config.ts",
+    "test:e2e": "playwright test --config playwright.config.ts e2e/storefront.spec.ts",
+    "test:a11y": "playwright test --config playwright.config.ts e2e/accessibility.spec.ts --project=chromium",
     "validate:catalog": "node scripts/validate-catalog.mjs"
   },
   "dependencies": {
@@ -21,6 +22,7 @@
     "zod": "latest"
   },
   "devDependencies": {
+    "@axe-core/playwright": "^4.13.0",
     "@playwright/test": "^1.62.1",
     "@types/node": "latest",
     "@types/react": "latest",

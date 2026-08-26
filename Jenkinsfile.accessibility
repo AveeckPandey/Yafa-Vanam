@@ -1,0 +1,52 @@
+pipeline {
+  agent any
+
+  tools {
+    nodejs 'Node 24'
+  }
+
+  options {
+    timestamps()
+    disableConcurrentBuilds()
+    timeout(time: 25, unit: 'MINUTES')
+    buildDiscarder(logRotator(numToKeepStr: '20'))
+  }
+
+  environment {
+    CI = 'true'
+  }
+
+  stages {
+    stage('Checkout project') {
+      steps {
+        checkout scm
+      }
+    }
+
+    stage('Install dependencies') {
+      steps {
+        sh 'npm ci'
+      }
+    }
+
+    stage('Install Chromium') {
+      steps {
+        sh 'npx playwright install chromium'
+      }
+    }
+
+    stage('WCAG accessibility tests') {
+      steps {
+        sh 'npm run test:a11y --workspace=@yafa/web'
+      }
+    }
+  }
+
+  post {
+    always {
+      junit allowEmptyResults: true, testResults: 'apps/web/test-results/e2e.xml'
+      archiveArtifacts allowEmptyArchive: true, artifacts: 'apps/web/playwright-report/**, apps/web/test-results/**'
+      deleteDir()
+    }
+  }
+}
