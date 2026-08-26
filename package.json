@@ -14,7 +14,8 @@
     "build:web": "npm run build --workspace=@yafa/web",
     "build:api": "cd apps/api && go build ./...",
     "generate:api-types": "openapi-typescript apps/api/openapi/openapi.yaml -o packages/frontend-types/generated/api-types.ts",
-    "typecheck": "npm run typecheck --workspace=@yafa/web"
+    "typecheck": "npm run typecheck --workspace=@yafa/web",
+    "scan:secrets": "node scripts/security/scan-secrets.mjs"
   },
   "devDependencies": {
     "openapi-typescript": "^7.9.1"

@@ -1,0 +1,70 @@
+pipeline {
+  agent any
+
+  tools {
+    nodejs 'Node 24'
+    go 'Go 1.23'
+  }
+
+  options {
+    timestamps()
+    disableConcurrentBuilds()
+    timeout(time: 20, unit: 'MINUTES')
+    buildDiscarder(logRotator(numToKeepStr: '20'))
+  }
+
+  environment {
+    // Go 1.25.13 contains the standard-library security fixes required by
+    // govulncheck. Go downloads this toolchain once and caches it for later builds.
+    GOTOOLCHAIN = 'go1.25.13'
+  }
+
+  stages {
+    stage('Checkout project') {
+      steps {
+        checkout scm
+      }
+    }
+
+    stage('Install dependencies') {
+      steps {
+        sh 'npm ci'
+      }
+    }
+
+    stage('Repository secret scan') {
+      steps {
+        sh 'npm run scan:secrets'
+      }
+    }
+
+    stage('Web dependency audit') {
+      steps {
+        sh 'npm audit --audit-level=high'
+      }
+    }
+
+    stage('API authentication and payment security tests') {
+      steps {
+        dir('apps/api') {
+          sh 'go test ./internal/auth ./platform/httpserver ./internal/commerce -count=1'
+        }
+      }
+    }
+
+    stage('Go static security checks') {
+      steps {
+        dir('apps/api') {
+          sh 'go vet ./...'
+          sh 'go run golang.org/x/vuln/cmd/govulncheck@v1.1.4 ./...'
+        }
+      }
+    }
+  }
+
+  post {
+    always {
+      deleteDir()
+    }
+  }
+}
