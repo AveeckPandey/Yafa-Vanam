@@ -7,6 +7,7 @@
     "start": "next start",
     "typecheck": "tsc --noEmit",
     "test": "node --experimental-transform-types --import ./tests/helpers/register.mjs --test tests/signup-validation.test.ts tests/cognito-server.test.ts tests/session-cookies.test.ts",
+    "test:e2e": "playwright test --config playwright.config.ts",
     "validate:catalog": "node scripts/validate-catalog.mjs"
   },
   "dependencies": {
@@ -20,6 +21,7 @@
     "zod": "latest"
   },
   "devDependencies": {
+    "@playwright/test": "^1.62.1",
     "@types/node": "latest",
     "@types/react": "latest",
     "@types/react-dom": "latest",

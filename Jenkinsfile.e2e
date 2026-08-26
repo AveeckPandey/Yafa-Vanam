@@ -1,0 +1,52 @@
+pipeline {
+  agent any
+
+  tools {
+    nodejs 'Node 24'
+  }
+
+  options {
+    timestamps()
+    disableConcurrentBuilds()
+    timeout(time: 25, unit: 'MINUTES')
+    buildDiscarder(logRotator(numToKeepStr: '20'))
+  }
+
+  environment {
+    CI = 'true'
+  }
+
+  stages {
+    stage('Checkout project') {
+      steps {
+        git branch: 'main', url: 'https://github.com/AveeckPandey/YAFA_VANAM.git'
+      }
+    }
+
+    stage('Install dependencies') {
+      steps {
+        sh 'npm ci'
+      }
+    }
+
+    stage('Install Chromium') {
+      steps {
+        sh 'npx playwright install --with-deps chromium'
+      }
+    }
+
+    stage('End-to-end browser tests') {
+      steps {
+        sh 'npm run test:e2e --workspace=@yafa/web'
+      }
+    }
+  }
+
+  post {
+    always {
+      junit allowEmptyResults: true, testResults: 'apps/web/test-results/e2e.xml'
+      archiveArtifacts allowEmptyArchive: true, artifacts: 'apps/web/playwright-report/**, apps/web/test-results/**'
+      deleteDir()
+    }
+  }
+}
