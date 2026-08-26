@@ -2,7 +2,6 @@ package httpserver
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"net/http"
 	"net/http/httptest"
@@ -78,56 +77,14 @@ func TestInternalRoutesRequireBearerToken(t *testing.T) {
 	}
 }
 
-func TestIssueWelcomeCouponIsIdempotentAndValidatesInput(t *testing.T) {
-	store := &stubLifecycleStore{Store: commerce.NewStore(nil)}
-	handler := newInternalTestServer(t, "secret-token", store)
-	call := func(body string) *httptest.ResponseRecorder {
-		request := httptest.NewRequest(http.MethodPost, "/api/internal/coupons/welcome", strings.NewReader(body))
-		request.Header.Set("Authorization", "Bearer secret-token")
-		request.Header.Set("Content-Type", "application/json")
-		response := httptest.NewRecorder()
-		handler.ServeHTTP(response, request)
-		return response
-	}
-
-	badEmail := call(`{"cognito_sub":"sub-1","email":"not-an-email"}`)
-	if badEmail.Code != http.StatusBadRequest || !strings.Contains(badEmail.Body.String(), "validation_error") {
-		t.Fatalf("bad email status = %d body = %s", badEmail.Code, badEmail.Body.String())
-	}
-
-	first := call(`{"cognito_sub":"sub-1","email":"new@example.com"}`)
-	if first.Code != http.StatusOK {
-		t.Fatalf("issue status = %d, body = %s", first.Code, first.Body.String())
-	}
-	var coupon struct {
-		Code            string  `json:"code"`
-		DiscountPercent float64 `json:"discount_percent"`
-	}
-	if err := json.Unmarshal(first.Body.Bytes(), &coupon); err != nil {
-		t.Fatalf("decode issue response error = %v", err)
-	}
-	if !strings.HasPrefix(coupon.Code, "WELCOME10-") || coupon.DiscountPercent != 10 {
-		t.Fatalf("coupon = %#v, want WELCOME10- prefix at 10%%", coupon)
-	}
-
-	retry := call(`{"cognito_sub":"sub-1","email":"new@example.com"}`)
-	var retried struct {
-		Code string `json:"code"`
-	}
-	if err := json.Unmarshal(retry.Body.Bytes(), &retried); err != nil || retried.Code != coupon.Code {
-		t.Fatalf("duplicate trigger must return the SAME code, got %s vs %s (err %v)", retried.Code, coupon.Code, err)
-	}
-}
-
-func TestIssueWelcomeCouponSurfacesInfrastructureErrors(t *testing.T) {
-	store := &stubLifecycleStore{Store: commerce.NewStore(nil), failWelcome: true}
-	handler := newInternalTestServer(t, "secret-token", store)
+func TestWelcomeCouponEndpointIsRetired(t *testing.T) {
+	handler := newInternalTestServer(t, "secret-token", commerce.NewStore(nil))
 	request := httptest.NewRequest(http.MethodPost, "/api/internal/coupons/welcome", strings.NewReader(`{"cognito_sub":"sub-1","email":"new@example.com"}`))
 	request.Header.Set("Authorization", "Bearer secret-token")
 	response := httptest.NewRecorder()
 	handler.ServeHTTP(response, request)
-	if response.Code != http.StatusInternalServerError {
-		t.Fatalf("infrastructure failure status = %d, want 500 so the Lambda retries/alerts", response.Code)
+	if response.Code != http.StatusGone || !strings.Contains(response.Body.String(), "promotion_retired") {
+		t.Fatalf("retired endpoint status = %d body = %s", response.Code, response.Body.String())
 	}
 }
 

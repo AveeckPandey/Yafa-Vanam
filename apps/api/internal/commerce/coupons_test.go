@@ -108,16 +108,13 @@ func TestOrderRejectsUnknownAndUnusableCodes(t *testing.T) {
 	}
 }
 
-func TestLegacyCodesStillPriceIdentically(t *testing.T) {
+// Migration 000009 deactivated every shared public code, so the storefront
+// has nothing shareable to leak: all four legacy codes must now reject.
+func TestLegacyPublicCodesAreDeactivated(t *testing.T) {
 	store := NewStore(testCatalog(t))
-	expectations := map[string]float64{"YAFA20": 480, "NATURE15": 360, "FLAT500": 500, "WELCOME10": 240}
-	for code, want := range expectations {
-		order := fullOrderFlow(t, store, strings.ToLower(code)) // client casing is normalized
-		if order.DiscountAmount != want {
-			t.Errorf("%s discount = %v, want %v", code, order.DiscountAmount, want)
-		}
-		if order.DiscountCode != code {
-			t.Errorf("%s stored DiscountCode = %q, want normalized %q", code, order.DiscountCode, code)
+	for _, code := range []string{"YAFA20", "NATURE15", "FLAT500", "WELCOME10"} {
+		if err := attemptOrder(t, store, strings.ToLower(code)); !errors.Is(err, ErrCouponInvalid) {
+			t.Errorf("deactivated public code %s error = %v, want ErrCouponInvalid", code, err)
 		}
 	}
 }
@@ -144,9 +141,30 @@ func TestWelcomeCodeGenerationShape(t *testing.T) {
 	}
 }
 
+func TestRecoveryVoucherCodeGenerationShape(t *testing.T) {
+	seen := map[string]bool{}
+	for attempt := 0; attempt < 200; attempt++ {
+		code, err := generateRecoveryCode()
+		if err != nil {
+			t.Fatalf("generateRecoveryCode() error = %v", err)
+		}
+		if !strings.HasPrefix(code, recoveryCodePrefix) || len(code) != len(recoveryCodePrefix)+8 {
+			t.Fatalf("code = %q, want YV20- plus 8 characters", code)
+		}
+		seen[code] = true
+	}
+	if len(seen) < 199 {
+		t.Fatalf("expected near-zero collisions across 200 draws, got %d unique codes", len(seen))
+	}
+}
+
+// The memory store keeps a burn-once ledger per order so payment retries and
+// duplicate verifications cannot double-spend an injected coupon.
 func TestMemoryStoreRedeemsCouponOncePerPaymentVerification(t *testing.T) {
 	store := NewStore(testCatalog(t))
-	order := fullOrderFlow(t, store, "WELCOME10")
+	store.coupons["SUPPORT20"] = Coupon{Code: "SUPPORT20", PromotionType: "PERCENTAGE", Value: 20,
+		MaxUses: 1, Uses: 0, PerUserLimit: 1, IsActive: true}
+	order := fullOrderFlow(t, store, "support20")
 	if _, err := store.AttachRazorpayOrder(order.OrderNumber, "order_verify_1"); err != nil {
 		t.Fatalf("AttachRazorpayOrder() error = %v", err)
 	}
@@ -156,10 +174,70 @@ func TestMemoryStoreRedeemsCouponOncePerPaymentVerification(t *testing.T) {
 	if _, err := store.VerifyRazorpayPayment("order_verify_1", "pay_1"); err != nil {
 		t.Fatalf("second VerifyRazorpayPayment() error = %v", err)
 	}
-	if uses := store.coupons["WELCOME10"].Uses; uses != 1 {
-		t.Fatalf("WELCOME10 uses after double verification = %d, want 1", uses)
+	if uses := store.coupons["SUPPORT20"].Uses; uses != 1 {
+		t.Fatalf("SUPPORT20 uses after double verification = %d, want 1", uses)
 	}
-	if redeemed := store.redemptions[order.OrderNumber]; redeemed != "WELCOME10" {
-		t.Fatalf("redemptions[%s] = %q, want WELCOME10", order.OrderNumber, redeemed)
+	if redeemed := store.redemptions[order.OrderNumber]; redeemed != "SUPPORT20" {
+		t.Fatalf("redemptions[%s] = %q, want SUPPORT20", order.OrderNumber, redeemed)
+	}
+}
+
+// FIRST_ORDER_10 in the memory store mirrors the Postgres rules: automatic for
+// signed-in users with no paid history, once ever, invisible to guests.
+func TestMemoryStoreFirstOrderPromotionIsAutomaticAndOnce(t *testing.T) {
+	store := NewStore(testCatalog(t))
+	owner := "user-a"
+
+	cart, err := store.CreateCartForUser(owner)
+	if err != nil {
+		t.Fatalf("CreateCartForUser() error = %v", err)
+	}
+	if _, err := store.AddCartItemForUser(owner, cart.ID, "p1", "v1", 2); err != nil {
+		t.Fatalf("AddCartItemForUser() error = %v", err)
+	}
+	first, replayed, err := store.CreateOrderForUser(owner, CreateOrderInput{
+		CartID: cart.ID, CustomerEmail: "a@example.com",
+		ShippingAddress: Address{RecipientName: "A", Line1: "1 Road", City: "Pune", StateRegion: "MH", PostalCode: "411001"},
+	}, "")
+	if err != nil || replayed {
+		t.Fatalf("first CreateOrderForUser() replayed=%v error=%v", replayed, err)
+	}
+	if first.DiscountAmount != 240 || first.DiscountCode != PromotionFirstOrder {
+		t.Fatalf("first order discount = %v (%s), want 240 (FIRST_ORDER_10)", first.DiscountAmount, first.DiscountCode)
+	}
+
+	if _, err := store.AttachRazorpayOrder(first.OrderNumber, "order_mem_first"); err != nil {
+		t.Fatalf("AttachRazorpayOrder() error = %v", err)
+	}
+	for attempt := 0; attempt < 2; attempt++ {
+		if _, err := store.VerifyRazorpayPayment("order_mem_first", "pay_mem_first"); err != nil {
+			t.Fatalf("VerifyRazorpayPayment() attempt %d error = %v", attempt+1, err)
+		}
+	}
+
+	secondCart, err := store.CreateCartForUser(owner)
+	if err != nil {
+		t.Fatalf("second CreateCartForUser() error = %v", err)
+	}
+	if _, err := store.AddCartItemForUser(owner, secondCart.ID, "p1", "v1", 2); err != nil {
+		t.Fatalf("second AddCartItemForUser() error = %v", err)
+	}
+	second, _, err := store.CreateOrderForUser(owner, CreateOrderInput{
+		CartID: secondCart.ID, CustomerEmail: "a@example.com",
+		ShippingAddress: Address{RecipientName: "A", Line1: "1 Road", City: "Pune", StateRegion: "MH", PostalCode: "411001"},
+	}, "")
+	if err != nil {
+		t.Fatalf("second CreateOrderForUser() error = %v", err)
+	}
+	if second.DiscountAmount != 0 || second.DiscountCode != "" {
+		t.Fatalf("second order discount = %v (%q), want none after a paid order exists", second.DiscountAmount, second.DiscountCode)
+	}
+
+	guestOrder, _, err := store.CreateOrder(orderInput(filledCart(t, store), ""), "")
+	if err != nil {
+		t.Fatalf("guest CreateOrder() error = %v", err)
+	}
+	if guestOrder.DiscountAmount != 0 || guestOrder.DiscountCode != "" {
+		t.Fatalf("guest order discount = %v (%q), want none — promotions require sign-in", guestOrder.DiscountAmount, guestOrder.DiscountCode)
 	}
 }

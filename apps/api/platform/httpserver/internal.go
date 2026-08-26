@@ -34,6 +34,83 @@ func (server *Server) lifecycleStore() (commerce.LifecycleStore, bool) {
 	return lifecycle, ok
 }
 
+func (server *Server) recoveryStore() (commerce.RecoveryStore, bool) {
+	recovery, ok := server.store.(commerce.RecoveryStore)
+	return recovery, ok
+}
+
+// retiredWelcomeCoupon makes an old Cognito/Lambda callback safe after the
+// programme was replaced by the automatic first-order discount. Returning a
+// clear 410 prevents a retry from silently minting a usable legacy voucher.
+func retiredWelcomeCoupon(w http.ResponseWriter, _ *http.Request) {
+	writeError(w, http.StatusGone, "promotion_retired", "Welcome coupon codes have been retired.")
+}
+
+// issueRecoveryVoucher lets support mint a YV_20 service-recovery voucher for
+// one specific account. The voucher is single-use, bound to that user, and
+// expires in 30 days; only its owner can ever redeem it.
+func (server *Server) issueRecoveryVoucher(w http.ResponseWriter, request *http.Request) {
+	recovery, ok := server.recoveryStore()
+	if !ok {
+		writeError(w, http.StatusServiceUnavailable, "not_supported", "This store does not support recovery vouchers.")
+		return
+	}
+	var input struct {
+		Email string `json:"email"`
+	}
+	if err := decodeJSON(w, request, &input); err != nil {
+		writeError(w, http.StatusBadRequest, "invalid_request", err.Error())
+		return
+	}
+	voucher, err := recovery.IssueRecoveryVoucher(request.Context(), input.Email)
+	if err != nil {
+		server.writeRecoveryError(w, err)
+		return
+	}
+	// Only log shape, never contents — codes and addresses stay out of logs.
+	server.logger.Info("recovery voucher issued", "voucher_expires_at", voucher.ExpiresAt.Format(http.TimeFormat))
+	writeJSON(w, http.StatusCreated, voucher)
+}
+
+// revokeRecoveryVoucher deactivates an unredeemed YV_20 voucher (for example
+// when a customer forwards the email to the wrong address).
+func (server *Server) revokeRecoveryVoucher(w http.ResponseWriter, request *http.Request) {
+	recovery, ok := server.recoveryStore()
+	if !ok {
+		writeError(w, http.StatusServiceUnavailable, "not_supported", "This store does not support recovery vouchers.")
+		return
+	}
+	var input struct {
+		Email string `json:"email"`
+		Code  string `json:"code"`
+	}
+	if err := decodeJSON(w, request, &input); err != nil {
+		writeError(w, http.StatusBadRequest, "invalid_request", err.Error())
+		return
+	}
+	if err := recovery.RevokeRecoveryVoucher(request.Context(), input.Email, input.Code); err != nil {
+		server.writeRecoveryError(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]bool{"revoked": true})
+}
+
+func (server *Server) writeRecoveryError(w http.ResponseWriter, err error) {
+	switch {
+	case errors.Is(err, commerce.ErrInvalidEmail):
+		writeError(w, http.StatusBadRequest, "validation_error", "A valid customer email is required.")
+	case errors.Is(err, commerce.ErrUserNotFound):
+		writeError(w, http.StatusNotFound, "user_not_found", "No account exists for that email.")
+	case errors.Is(err, commerce.ErrCouponInvalid):
+		writeError(w, http.StatusNotFound, "not_found", "No matching voucher was found for that account.")
+	case errors.Is(err, commerce.ErrVoucherRedeemed):
+		writeError(w, http.StatusConflict, "already_redeemed", "That voucher has already been redeemed and cannot be revoked.")
+	default:
+		server.logger.Error("recovery voucher operation failed", "error", err)
+		writeError(w, http.StatusInternalServerError, "internal_error", "An unexpected error occurred.")
+	}
+}
+
 // issueWelcomeCoupon is called by the Cognito PostConfirmation Lambda after a
 // confirmed sign-up. It is idempotent: retries and duplicate triggers return
 // the customer's existing coupon instead of minting another one.

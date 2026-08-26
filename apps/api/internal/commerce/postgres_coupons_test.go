@@ -42,12 +42,17 @@ func TestPostgresIssueWelcomeCouponIsIdempotent(t *testing.T) {
 func TestPostgresOrderValidatesAndRedeemsCouponAtVerifyTime(t *testing.T) {
 	store := newTestPostgresStore(t)
 	ctx := context.Background()
-	userID := "11111111-1111-1111-1111-111111111111"
-	seedTestUser(t, store.db, userID)
 
 	coupon, err := store.IssueWelcomeCoupon(ctx, "redeemer@example.com", "cognito-sub-3")
 	if err != nil {
 		t.Fatalf("IssueWelcomeCoupon() error = %v", err)
+	}
+	// Personalised coupons are owner-bound: resolve the account the welcome
+	// upsert created and order as that user.
+	var userID string
+	if err := store.db.QueryRow(ctx,
+		`SELECT id::text FROM users WHERE email = 'redeemer@example.com'`).Scan(&userID); err != nil {
+		t.Fatal(err)
 	}
 
 	cart, err := store.CreateCartForUser(userID)

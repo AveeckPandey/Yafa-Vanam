@@ -40,23 +40,37 @@ func newTestPostgresStore(t *testing.T) *PostgresStore {
 	if err := database.ApplyPending(ctx, pool, migrationsPath); err != nil {
 		t.Fatalf("ApplyPending() error = %v", err)
 	}
-	// Commerce tables start each test empty; users/auth data is left alone.
-	if _, err := pool.Exec(ctx, `TRUNCATE carts, orders CASCADE`); err != nil {
+	// Commerce tables start each test empty; users/auth data remain available
+	// across cases. TRUNCATE ... CASCADE clears dependent payments,
+	// coupon_redemptions, and user_promotion_redemptions rows too.
+	if _, err := pool.Exec(ctx, `TRUNCATE carts, orders, lifecycle_messages CASCADE`); err != nil {
 		t.Fatalf("truncate error = %v", err)
+	}
+	if _, err := pool.Exec(ctx, `DELETE FROM coupons WHERE user_id IS NOT NULL`); err != nil {
+		t.Fatalf("delete test coupons error = %v", err)
 	}
 	return NewPostgresStore(pool, testCatalog(t))
 }
 
 // seedTestUser inserts a users row because carts.user_id and orders.user_id
 // are foreign keys into the auth user table — exactly as production receives
-// owner ids from authenticated sessions.
+// owner ids from authenticated sessions. The account is created email-verified
+// because every real sign-in path confirms the address first.
 func seedTestUser(t *testing.T, pool *pgxpool.Pool, id string) {
+	t.Helper()
+	seedVerifiedUser(t, pool, id, "test-"+id+"@yafa.local")
+}
+
+// seedVerifiedUser seeds an account with a specific address so promotion
+// tests can target the exact user a voucher is bound to.
+func seedVerifiedUser(t *testing.T, pool *pgxpool.Pool, id, email string) {
 	t.Helper()
 	ctx, cancel := context.WithTimeout(context.Background(), postgresTestTimeout)
 	defer cancel()
 	_, err := pool.Exec(ctx,
-		`INSERT INTO users (id, email) VALUES ($1::uuid, $2) ON CONFLICT (id) DO NOTHING`,
-		id, "test-"+id+"@yafa.local")
+		`INSERT INTO users (id, email, email_verified_at) VALUES ($1::uuid, $2, NOW())
+		 ON CONFLICT (id) DO NOTHING`,
+		id, email)
 	if err != nil {
 		t.Fatalf("seed user %s error = %v", id, err)
 	}
@@ -123,7 +137,6 @@ func TestPostgresOrderFlowIdempotencyAndRazorpay(t *testing.T) {
 	}
 	input := CreateOrderInput{
 		CartID: guestCart.ID, CustomerEmail: "customer@example.com",
-		DiscountCode:    "YAFA20",
 		ShippingAddress: Address{RecipientName: "A Customer", Line1: "1 Forest Road", City: "Pune", StateRegion: "Maharashtra", PostalCode: "411001"},
 	}
 
@@ -131,9 +144,9 @@ func TestPostgresOrderFlowIdempotencyAndRazorpay(t *testing.T) {
 	if err != nil || replayed {
 		t.Fatalf("CreateOrder() = replayed %v, error %v", replayed, err)
 	}
-	// Discounted subtotal 1920 stays below the 1999 free-shipping threshold,
-	// matching the storefront's own checkout math.
-	if order.TotalAmount != 2119 || order.DiscountAmount != 480 || order.ShippingAmount != 199 ||
+	// Guest checkouts receive no promotion; the 2400 subtotal crosses the
+	// 1999 free-shipping threshold, matching the storefront's own checkout math.
+	if order.TotalAmount != 2400 || order.DiscountAmount != 0 || order.ShippingAmount != 0 ||
 		order.ShippingAddress.CountryCode != "IN" || order.AccessToken == "" {
 		t.Fatalf("order amounts/token wrong: total=%v discount=%v shipping=%v token-set=%v country=%q",
 			order.TotalAmount, order.DiscountAmount, order.ShippingAmount, order.AccessToken != "", order.ShippingAddress.CountryCode)

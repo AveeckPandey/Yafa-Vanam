@@ -536,6 +536,8 @@ func (store *PostgresStore) createOrder(ownerID string, input CreateOrderInput, 
 		// Resolved inside the order transaction so a coupon crossing its use
 		// limit between validation and commit cannot double-apply: the row is
 		// locked FOR UPDATE and the limit re-checked against committed state.
+		// Ownership is enforced by lockedCoupon itself: personalised rows
+		// resolve only for their owner, so leaked vouchers fail closed.
 		coupon, previousUsesByUser, err := store.lockedCoupon(ctx, tx, code, ownerID)
 		if err != nil {
 			return Order{}, false, err
@@ -595,6 +597,34 @@ func (store *PostgresStore) createOrder(ownerID string, input CreateOrderInput, 
 	}
 	if err != nil {
 		return Order{}, false, err
+	}
+
+	// Reserve FIRST_ORDER_10 only after the order has an id. The reservation
+	// is one row per user, so a second tab receives a normal-priced order
+	// rather than another discounted Razorpay amount.
+	if code == "" {
+		reserved, err := store.reserveFirstOrderPromotion(ctx, tx, ownerID, order.ID)
+		if err != nil {
+			return Order{}, false, err
+		}
+		if reserved {
+			order.DiscountCode = PromotionFirstOrder
+			order.DiscountAmount = couponDiscountAmount(Coupon{PromotionType: "PERCENTAGE", Value: firstOrderDiscountPercent}, order.Subtotal)
+			discountedSubtotal := max(0.0, order.Subtotal-order.DiscountAmount)
+			if !strings.EqualFold(strings.TrimSpace(input.ShippingMethod), "express") {
+				if discountedSubtotal >= 1999 {
+					order.ShippingAmount = 0
+				} else {
+					order.ShippingAmount = 199
+				}
+			}
+			order.TotalAmount = discountedSubtotal + order.ShippingAmount
+			if _, err := tx.Exec(ctx,
+				`UPDATE orders SET discount_code=$2, discount_amount=$3, shipping_amount=$4, total_amount=$5, updated_at=NOW()
+				 WHERE id=$1::uuid`, order.ID, order.DiscountCode, order.DiscountAmount, order.ShippingAmount, order.TotalAmount); err != nil {
+				return Order{}, false, err
+			}
+		}
 	}
 
 	for _, line := range order.Items {
@@ -770,6 +800,27 @@ func (store *PostgresStore) RecordRazorpayPayment(razorpayOrderID, paymentID, st
 		return Order{}, err
 	}
 	defer tx.Rollback(ctx)
+	// Lock the order and read its PRE-update state so only the transition that
+	// first confirms payment records the promotion redemption — duplicate
+	// webhook deliveries and verify/webhook races become harmless no-ops via
+	// the redemption tables' unique constraints.
+	var (
+		priorStatus    string
+		discountCode   string
+		orderID        string
+		userID         string
+		discountAmount float64
+	)
+	err = tx.QueryRow(ctx,
+		`SELECT id::text, payment_status, COALESCE(discount_code,''), COALESCE(user_id::text,''), discount_amount::float8
+		 FROM orders WHERE razorpay_order_id=$1 FOR UPDATE`,
+		razorpayOrderID).Scan(&orderID, &priorStatus, &discountCode, &userID, &discountAmount)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return Order{}, ErrPaymentOrderNotFound
+	}
+	if err != nil {
+		return Order{}, err
+	}
 	record, err := scanOrderRecord(tx.QueryRow(ctx,
 		`UPDATE orders SET
 		    razorpay_payment_id=CASE WHEN $2<>'' THEN $2 ELSE razorpay_payment_id END,
@@ -779,9 +830,6 @@ func (store *PostgresStore) RecordRazorpayPayment(razorpayOrderID, paymentID, st
 		 WHERE razorpay_order_id=$1 RETURNING `+orderReturningColumns,
 		razorpayOrderID, paymentID, paymentStatus, capturedOrPaid))
 	if err != nil {
-		if errors.Is(err, pgx.ErrNoRows) {
-			return Order{}, ErrPaymentOrderNotFound
-		}
 		return Order{}, err
 	}
 	if _, err := tx.Exec(ctx,
@@ -793,6 +841,12 @@ func (store *PostgresStore) RecordRazorpayPayment(razorpayOrderID, paymentID, st
 		 WHERE provider_order_id=$1`,
 		razorpayOrderID, paymentID, paymentStatus, capturedOrPaid); err != nil {
 		return Order{}, err
+	}
+	firstCapture := capturedOrPaid && (priorStatus == "PENDING" || priorStatus == "FAILED")
+	if firstCapture && discountCode != "" {
+		if err := redeemOrderPromotion(ctx, tx, orderID, userID, discountCode, discountAmount); err != nil {
+			return Order{}, err
+		}
 	}
 	if err := tx.Commit(ctx); err != nil {
 		return Order{}, err

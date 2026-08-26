@@ -132,12 +132,15 @@ type Store struct {
 	carts       map[string]*Cart
 	orders      map[string]*Order
 	idempotency map[string]string
-	// coupons mirrors migration 000007's seeded rows; redemptions records
-	// which orders have already burned a coupon so payment retries stay
-	// idempotent. Per-user limits are a Postgres-store concern — guest
-	// orders here have no owner to count against.
+	// coupons mirrors the seeded coupon rows; redemptions records which orders
+	// have already burned a coupon so payment retries stay idempotent.
+	// paidUsers/firstGrants back the automatic FIRST_ORDER_10 promotion with
+	// the same rules as PostgresStore: verified signed-in users only, one
+	// grant ever, derived from each account's own history.
 	coupons     map[string]Coupon
 	redemptions map[string]string
+	paidUsers   map[string]bool
+	firstGrants map[string]bool
 	now         func() time.Time
 }
 
@@ -145,6 +148,7 @@ func NewStore(catalog *Catalog) *Store {
 	return &Store{
 		catalog: catalog, carts: make(map[string]*Cart), orders: make(map[string]*Order),
 		idempotency: make(map[string]string), coupons: legacyCoupons(), redemptions: make(map[string]string),
+		paidUsers: make(map[string]bool), firstGrants: make(map[string]bool),
 		now: time.Now,
 	}
 }
@@ -427,6 +431,14 @@ func (store *Store) VerifyRazorpayPayment(razorpayOrderID, paymentID string) (Or
 				}
 				store.redemptions[order.OrderNumber] = code
 			}
+			// FIRST_ORDER_10 is granted once per user at payment confirmation;
+			// later paid orders see the history and stop qualifying.
+			if firstSuccess && order.UserID != "" {
+				if order.DiscountCode == PromotionFirstOrder {
+					store.firstGrants[order.UserID] = true
+				}
+				store.paidUsers[order.UserID] = true
+			}
 			return *order, nil
 		}
 	}
@@ -443,12 +455,22 @@ func (store *Store) RecordRazorpayPayment(razorpayOrderID, paymentID, status str
 		if paymentID != "" {
 			order.RazorpayPaymentID = paymentID
 		}
+		firstCapture := false
 		switch status {
 		case "captured", "paid":
+			firstCapture = order.PaymentStatus == "PENDING" || order.PaymentStatus == "FAILED"
 			order.PaymentStatus = "CAPTURED"
 			order.OrderStatus = "PAID"
 		case "failed":
 			order.PaymentStatus = "FAILED"
+		}
+		// Mirror the Postgres webhook path: the first capture burns the
+		// promotion exactly once and marks the account as having paid.
+		if code := order.DiscountCode; firstCapture && code != "" && store.redemptions[order.OrderNumber] == "" {
+			store.redemptions[order.OrderNumber] = code
+		}
+		if firstCapture && order.UserID != "" {
+			store.paidUsers[order.UserID] = true
 		}
 		return *order, nil
 	}
@@ -467,10 +489,31 @@ func (store *Store) CreateOrderForUser(ownerID string, input CreateOrderInput, i
 	if stored := store.orders[order.OrderNumber]; stored != nil {
 		stored.UserID = ownerID
 		stored.AccessToken = ""
+		// Automatic FIRST_ORDER_10 mirrors the Postgres flow: signed-in users
+		// with no paid history get 10% without presenting a code. Explicit
+		// codes always win so promotions never stack.
+		if !replayed && NormalizeDiscountCode(input.DiscountCode) == "" && store.firstOrderEligibleLocked(ownerID) {
+			discount := couponDiscountAmount(Coupon{PromotionType: "PERCENTAGE", Value: firstOrderDiscountPercent}, stored.Subtotal)
+			discountedSubtotal := max(0.0, stored.Subtotal-discount)
+			shipping := stored.ShippingAmount
+			if !strings.EqualFold(strings.TrimSpace(input.ShippingMethod), "express") && discountedSubtotal < 1999 {
+				shipping = 199
+			} else if !strings.EqualFold(strings.TrimSpace(input.ShippingMethod), "express") {
+				shipping = 0
+			}
+			stored.DiscountAmount = discount
+			stored.DiscountCode = PromotionFirstOrder
+			stored.ShippingAmount = shipping
+			stored.TotalAmount = discountedSubtotal + shipping
+		}
 		order = *stored
 	}
 	store.mu.Unlock()
 	return order, replayed, nil
+}
+
+func (store *Store) firstOrderEligibleLocked(ownerID string) bool {
+	return ownerID != "" && !store.paidUsers[ownerID] && !store.firstGrants[ownerID]
 }
 
 func (store *Store) GetOrderForUser(orderNumber, ownerID string) (Order, error) {

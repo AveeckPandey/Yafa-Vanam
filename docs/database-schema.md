@@ -19,3 +19,12 @@ A product is the customer-facing item; a variant is the exact sellable combinati
   applied at checkout, so later catalogue or batch changes do not rewrite history.
 - `products.vector_id` is the external Qdrant reference; vectors are not stored
   in Railway PostgreSQL.
+- Promotions are account-bound (migration `000009`). There are exactly two
+  programmes: `FIRST_ORDER_10` applies automatically to a signed-in,
+  email-verified user's first successfully paid order — no coupon code exists —
+  with the once-per-user guarantee enforced by `UNIQUE (user_id, promotion_kind)`
+  on `user_promotion_redemptions`; `YV_20` service-recovery vouchers are
+  per-user coupon rows (`coupons.user_id`) that require sign-in to redeem, are
+  single-use, expire in 30 days, and can be revoked until redeemed. The shared
+  public codes (`YAFA20`, `NATURE15`, `FLAT500`, `WELCOME10`) are deactivated;
+  their rows remain only so historical redemptions keep their references.

@@ -80,17 +80,15 @@ func TestCartAndOrderFlow(t *testing.T) {
 
 	input := CreateOrderInput{
 		CartID: cart.ID, CustomerEmail: "customer@example.com",
-		DiscountCode:    "YAFA20",
 		ShippingAddress: Address{RecipientName: "A Customer", Line1: "1 Forest Road", City: "Pune", StateRegion: "Maharashtra", PostalCode: "411001"},
 	}
 	order, replayed, err := store.CreateOrder(input, "checkout-1")
 	if err != nil || replayed {
 		t.Fatalf("CreateOrder() = replayed %v, error %v", replayed, err)
 	}
-	// YAFA20 removes 480 from a 2400 subtotal; the remaining 1920 sits below
-	// the 1999 free-shipping threshold, so standard 199 shipping applies — same
-	// math as the storefront checkout.
-	if order.TotalAmount != 2119 || order.DiscountAmount != 480 || order.ShippingAmount != 199 ||
+	// Guest checkouts receive no promotion; the 2400 subtotal crosses the
+	// 1999 free-shipping threshold so standard shipping is complimentary.
+	if order.TotalAmount != 2400 || order.DiscountAmount != 0 || order.ShippingAmount != 0 ||
 		order.ShippingAddress.CountryCode != "IN" || order.AccessToken == "" {
 		t.Fatalf("order = %#v", order)
 	}

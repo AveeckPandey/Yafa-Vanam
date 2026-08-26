@@ -118,9 +118,12 @@ func New(catalog *commerce.Catalog, store commerce.CommerceStore, config Config)
 		mux.HandleFunc("POST /api/v1/payments/razorpay/verify", server.verifyRazorpayPayment)
 	}
 	mux.HandleFunc("POST /api/v1/payments/razorpay/webhook", server.razorpayWebhook)
-	// Machine-to-machine routes (welcome-coupon Lambda). Guarded by the shared
-	// service token, not user sessions — fail closed when unconfigured.
-	mux.Handle("POST /api/internal/coupons/welcome", server.internalGuard(http.HandlerFunc(server.issueWelcomeCoupon)))
+	// Machine-to-machine routes (welcome-coupon Lambda and support tooling).
+	// Guarded by the shared service token, not user sessions — fail closed
+	// when unconfigured.
+	mux.Handle("POST /api/internal/coupons/welcome", server.internalGuard(http.HandlerFunc(retiredWelcomeCoupon)))
+	mux.Handle("POST /api/internal/coupons/recovery", server.internalGuard(http.HandlerFunc(server.issueRecoveryVoucher)))
+	mux.Handle("POST /api/internal/coupons/recovery/revoke", server.internalGuard(http.HandlerFunc(server.revokeRecoveryVoucher)))
 	mux.Handle("POST /api/internal/messages/record", server.internalGuard(http.HandlerFunc(server.recordLifecycleMessage)))
 	if config.Auth != nil {
 		mux.Handle("GET /api/v1/me/beauty-profile", config.Auth.Middleware(http.HandlerFunc(server.yafaBeautyProfile)))
@@ -405,6 +408,12 @@ func (server *Server) writeDomainError(w http.ResponseWriter, err error) {
 	case errors.Is(err, commerce.ErrEmptyCart), errors.Is(err, commerce.ErrInvalidQuantity),
 		errors.Is(err, commerce.ErrInvalidEmail), errors.Is(err, commerce.ErrInvalidAddress):
 		writeError(w, http.StatusUnprocessableEntity, "validation_error", err.Error())
+	case errors.Is(err, commerce.ErrCouponInvalid), errors.Is(err, commerce.ErrCouponExpired),
+		errors.Is(err, commerce.ErrCouponLimitReached), errors.Is(err, commerce.ErrCouponMinimumOrder),
+		errors.Is(err, commerce.ErrVoucherRedeemed):
+		// Invalid codes answer identically whether unknown, expired, or owned
+		// by someone else — probing for voucher existence gains nothing.
+		writeError(w, http.StatusUnprocessableEntity, "invalid_discount_code", err.Error())
 	case errors.Is(err, commerce.ErrOrderAccessDenied), errors.Is(err, commerce.ErrCartAccessDenied):
 		writeError(w, http.StatusForbidden, "access_denied", "The order access token is missing or invalid.")
 	default:

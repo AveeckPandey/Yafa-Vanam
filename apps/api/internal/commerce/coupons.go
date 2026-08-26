@@ -11,17 +11,34 @@ import (
 
 // Discount validation used to be a hardcoded switch in checkoutDiscount().
 // It now resolves against real promotion/coupon rows so codes can expire,
-// cap, and be personalised without redeploying the API. The legacy public
-// codes are seeded by migration 000007 with enormous limits, which preserves
-// the old behaviour exactly.
+// cap, and be personalised without redeploying the API.
+//
+// Promotion model (migration 000009): exactly two account-bound programmes —
+//   - FIRST_ORDER_10 applies automatically at checkout for signed-in, verified
+//     users with no prior paid order. It never has a public code to share.
+//   - YV_20 is a service-recovery voucher support issues for one specific
+//     user; the code alone is worthless on any other account.
+//
+// The shared public launch codes seeded by migration 000007 are deactivated
+// by migration 000009, so no reusable public code exists anymore.
 var (
 	ErrCouponInvalid      = errors.New("this discount code is not valid")
 	ErrCouponExpired      = errors.New("this discount code has expired")
 	ErrCouponLimitReached = errors.New("this discount code has reached its usage limit")
 	ErrCouponMinimumOrder = errors.New("order does not meet this code's minimum amount")
+	ErrUserNotFound       = errors.New("no account exists for that email")
+	ErrVoucherRedeemed    = errors.New("that voucher has already been redeemed")
 )
 
-const welcomeCodePrefix = "WELCOME10-"
+// Internal programme identifiers. FIRST_ORDER_10 doubles as the value stored
+// in orders.discount_code and user_promotion_redemptions.promotion_kind.
+const (
+	PromotionFirstOrder = "FIRST_ORDER_10"
+	PromotionRecovery   = "YV_20"
+
+	welcomeCodePrefix  = "WELCOME10-"
+	recoveryCodePrefix = "YV20-"
+)
 
 type Coupon struct {
 	ID                 string     `json:"id"`
@@ -41,6 +58,15 @@ type Coupon struct {
 // It deliberately carries no internal identifiers — only what the customer
 // email needs.
 type WelcomeCoupon struct {
+	Code            string    `json:"code"`
+	DiscountPercent float64   `json:"discount_percent"`
+	ExpiresAt       time.Time `json:"expires_at"`
+}
+
+// RecoveryVoucher is the support-issued YV_20 voucher. The code is safe to
+// hand to the customer because redemption also requires their sign-in: a
+// leaked code fails on every other account.
+type RecoveryVoucher struct {
 	Code            string    `json:"code"`
 	DiscountPercent float64   `json:"discount_percent"`
 	ExpiresAt       time.Time `json:"expires_at"`
@@ -91,10 +117,10 @@ func validateCouponForOrder(coupon Coupon, subtotal float64, previousUsesByUser 
 
 func subtotalBefore(expiresAt *time.Time) bool { return time.Now().UTC().Before(*expiresAt) }
 
-// generateWelcomeCode returns WELCOME10-<8 chars> from an unambiguous
-// base32 alphabet (no 0/O/1/I/L) — roughly 32^8 possibilities, unguessable
-// and safe to read aloud from an email.
-func generateWelcomeCode() (string, error) {
+// generatePersonalCode returns <prefix><8 chars> from an unambiguous base32
+// alphabet (no 0/O/1/I/L) — roughly 32^8 possibilities, unguessable and safe
+// to read aloud from an email.
+func generatePersonalCode(prefix string) (string, error) {
 	const alphabet = "23456789ABCDEFGHJKMNPQRSTUVWXYZ"
 	code := make([]byte, 8)
 	for index := range code {
@@ -104,13 +130,19 @@ func generateWelcomeCode() (string, error) {
 		}
 		code[index] = alphabet[draw.Int64()]
 	}
-	return welcomeCodePrefix + string(code), nil
+	return prefix + string(code), nil
 }
 
-// legacyCoupons mirrors migration 000007's seeds for the in-memory store, so
-// database-free development and tests price discounts identically to prod.
+func generateWelcomeCode() (string, error) { return generatePersonalCode(welcomeCodePrefix) }
+
+func generateRecoveryCode() (string, error) { return generatePersonalCode(recoveryCodePrefix) }
+
+// legacyCoupons mirrors the seeded rows for the in-memory store, so
+// database-free development and tests behave like prod: migration 000009
+// deactivated every shared public code (rows kept for redemption history),
+// so they resolve but never discount. Personalised coupons are real rows and
+// never appear here.
 func legacyCoupons() map[string]Coupon {
-	unlimited := 1_000_000
 	definitions := []struct {
 		code  string
 		kind  string
@@ -123,7 +155,7 @@ func legacyCoupons() map[string]Coupon {
 	for _, definition := range definitions {
 		coupons[definition.code] = Coupon{
 			Code: definition.code, PromotionType: definition.kind, Value: definition.value,
-			MaxUses: unlimited, Uses: 0, PerUserLimit: unlimited, IsActive: true,
+			MaxUses: 1_000_000, Uses: 0, PerUserLimit: 1_000_000, IsActive: false,
 		}
 	}
 	return coupons
@@ -135,6 +167,13 @@ func legacyCoupons() map[string]Coupon {
 type LifecycleStore interface {
 	IssueWelcomeCoupon(ctx context.Context, email, cognitoSubject string) (WelcomeCoupon, error)
 	RecordLifecycleMessage(ctx context.Context, message LifecycleMessageInput) (string, error)
+}
+
+// RecoveryStore is the support-facing surface for YV_20 service-recovery
+// vouchers: issue one for a specific account, revoke it before redemption.
+type RecoveryStore interface {
+	IssueRecoveryVoucher(ctx context.Context, email string) (RecoveryVoucher, error)
+	RevokeRecoveryVoucher(ctx context.Context, email, code string) error
 }
 
 type LifecycleMessageInput struct {
