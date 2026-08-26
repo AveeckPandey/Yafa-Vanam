@@ -19,7 +19,7 @@ pipeline {
   stages {
     stage('Checkout project') {
       steps {
-        git branch: 'main', url: 'https://github.com/AveeckPandey/YAFA_VANAM.git'
+        checkout scm
       }
     }
 
@@ -31,7 +31,7 @@ pipeline {
 
     stage('Install Chromium') {
       steps {
-        sh 'npx playwright install --with-deps chromium'
+        sh 'npx playwright install chromium'
       }
     }
 
