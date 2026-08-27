@@ -121,7 +121,9 @@ func New(catalog *commerce.Catalog, store commerce.CommerceStore, config Config)
 	// Machine-to-machine routes (welcome-coupon Lambda and support tooling).
 	// Guarded by the shared service token, not user sessions — fail closed
 	// when unconfigured.
-	mux.Handle("POST /api/internal/coupons/welcome", server.internalGuard(http.HandlerFunc(retiredWelcomeCoupon)))
+	// Cognito PostConfirmation calls this endpoint to issue the customer's
+	// idempotent, account-bound welcome coupon before SES sends the email.
+	mux.Handle("POST /api/internal/coupons/welcome", server.internalGuard(http.HandlerFunc(server.issueWelcomeCoupon)))
 	mux.Handle("POST /api/internal/coupons/recovery", server.internalGuard(http.HandlerFunc(server.issueRecoveryVoucher)))
 	mux.Handle("POST /api/internal/coupons/recovery/revoke", server.internalGuard(http.HandlerFunc(server.revokeRecoveryVoucher)))
 	mux.Handle("POST /api/internal/messages/record", server.internalGuard(http.HandlerFunc(server.recordLifecycleMessage)))

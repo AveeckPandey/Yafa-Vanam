@@ -1,6 +1,8 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
+  // Produces a minimal self-contained Node server for the ECS web task.
+  output: "standalone",
   reactStrictMode: true,
   async headers() {
     return [

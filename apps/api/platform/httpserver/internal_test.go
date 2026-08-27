@@ -77,14 +77,14 @@ func TestInternalRoutesRequireBearerToken(t *testing.T) {
 	}
 }
 
-func TestWelcomeCouponEndpointIsRetired(t *testing.T) {
-	handler := newInternalTestServer(t, "secret-token", commerce.NewStore(nil))
+func TestWelcomeCouponEndpointIssuesCoupon(t *testing.T) {
+	handler := newInternalTestServer(t, "secret-token", &stubLifecycleStore{Store: commerce.NewStore(nil)})
 	request := httptest.NewRequest(http.MethodPost, "/api/internal/coupons/welcome", strings.NewReader(`{"cognito_sub":"sub-1","email":"new@example.com"}`))
 	request.Header.Set("Authorization", "Bearer secret-token")
 	response := httptest.NewRecorder()
 	handler.ServeHTTP(response, request)
-	if response.Code != http.StatusGone || !strings.Contains(response.Body.String(), "promotion_retired") {
-		t.Fatalf("retired endpoint status = %d body = %s", response.Code, response.Body.String())
+	if response.Code != http.StatusOK || !strings.Contains(response.Body.String(), "WELCOME10-TESTCODE") {
+		t.Fatalf("welcome endpoint status = %d body = %s", response.Code, response.Body.String())
 	}
 }
 

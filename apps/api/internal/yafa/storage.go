@@ -29,11 +29,23 @@ type Storage struct {
 }
 
 func NewStorage(ctx context.Context, value StorageConfig) (*Storage, error) {
-	if strings.TrimSpace(value.Endpoint) == "" || strings.TrimSpace(value.Region) == "" || strings.TrimSpace(value.Bucket) == "" || strings.TrimSpace(value.AccessKeyID) == "" || strings.TrimSpace(value.SecretAccessKey) == "" {
+	if strings.TrimSpace(value.Region) == "" || strings.TrimSpace(value.Bucket) == "" {
 		return nil, errors.New("incomplete private object storage configuration")
 	}
 	endpoint := strings.TrimRight(value.Endpoint, "/")
-	awsConfig, err := config.LoadDefaultConfig(ctx, config.WithRegion(value.Region), config.WithCredentialsProvider(credentials.NewStaticCredentialsProvider(value.AccessKeyID, value.SecretAccessKey, "")), config.WithBaseEndpoint(endpoint))
+	options := []func(*config.LoadOptions) error{config.WithRegion(value.Region)}
+	// ECS task roles use the SDK default credential chain. Static credentials
+	// remain supported for S3-compatible providers such as R2 in local setups.
+	if strings.TrimSpace(value.AccessKeyID) != "" || strings.TrimSpace(value.SecretAccessKey) != "" {
+		if strings.TrimSpace(value.AccessKeyID) == "" || strings.TrimSpace(value.SecretAccessKey) == "" {
+			return nil, errors.New("incomplete static object storage credentials")
+		}
+		options = append(options, config.WithCredentialsProvider(credentials.NewStaticCredentialsProvider(value.AccessKeyID, value.SecretAccessKey, "")))
+	}
+	if endpoint != "" {
+		options = append(options, config.WithBaseEndpoint(endpoint))
+	}
+	awsConfig, err := config.LoadDefaultConfig(ctx, options...)
 	if err != nil {
 		return nil, err
 	}
