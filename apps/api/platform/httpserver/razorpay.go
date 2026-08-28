@@ -154,6 +154,9 @@ func (server *Server) verifyRazorpayPayment(w http.ResponseWriter, request *http
 		writeError(w, http.StatusInternalServerError, "payment_verification_error", "Payment verification could not be completed.")
 		return
 	}
+	// The queue is intentionally best-effort: an email delivery issue must
+	// never turn a verified customer payment into an error response.
+	server.enqueueOrderConfirmation(request.Context(), order)
 	writeJSON(w, http.StatusOK, map[string]any{"verified": true, "order_number": order.OrderNumber, "payment_status": order.PaymentStatus})
 }
 
@@ -209,10 +212,12 @@ func (server *Server) razorpayWebhook(w http.ResponseWriter, request *http.Reque
 		writeJSON(w, http.StatusOK, map[string]bool{"received": true})
 		return
 	}
-	if _, err := server.store.RecordRazorpayPayment(orderID, event.Payload.Payment.Entity.ID, status); err != nil {
+	if order, err := server.store.RecordRazorpayPayment(orderID, event.Payload.Payment.Entity.ID, status); err != nil {
 		if !errors.Is(err, commerce.ErrPaymentOrderNotFound) {
 			server.logger.Error("razorpay webhook update failed", "event", event.Event, "error", err)
 		}
+	} else if status == "captured" {
+		server.enqueueOrderConfirmation(request.Context(), order)
 	}
 	writeJSON(w, http.StatusOK, map[string]bool{"received": true})
 }

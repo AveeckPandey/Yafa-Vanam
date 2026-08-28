@@ -16,6 +16,8 @@ import (
 	"github.com/BuildWithAveeck/yafa-vanam/apps/api/internal/database"
 	"github.com/BuildWithAveeck/yafa-vanam/apps/api/internal/yafa"
 	"github.com/BuildWithAveeck/yafa-vanam/apps/api/platform/httpserver"
+	awsconfig "github.com/aws/aws-sdk-go-v2/config"
+	"github.com/aws/aws-sdk-go-v2/service/sqs"
 	"github.com/getsentry/sentry-go"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/redis/go-redis/v9"
@@ -148,6 +150,15 @@ func main() {
 		}
 		return result
 	}
+	var orderConfirmationPublisher httpserver.OrderConfirmationPublisher
+	if queueURL := strings.TrimSpace(os.Getenv("ORDER_CONFIRMATION_QUEUE_URL")); queueURL != "" {
+		awsConfig, awsErr := awsconfig.LoadDefaultConfig(context.Background())
+		if awsErr != nil {
+			logger.Error("order confirmation queue disabled", "error", awsErr)
+		} else {
+			orderConfirmationPublisher = httpserver.NewSQSOrderConfirmationPublisher(sqs.NewFromConfig(awsConfig), queueURL)
+		}
+	}
 	handler := httpserver.New(catalog, commerceStore, httpserver.Config{
 		// healthRedis is a typed nil (*redis.Client) when Redis is not
 		// configured; storing it in the UniversalClient interface would make
@@ -167,7 +178,8 @@ func main() {
 		RazorpayCheckoutEnabled: strings.EqualFold(strings.TrimSpace(os.Getenv("RAZORPAY_CHECKOUT_ENABLED")), "true"),
 		// Same trust domain as the outbound analyzer call: our own Lambda
 		// presenting the shared secret to mint welcome coupons.
-		InternalServiceToken: strings.TrimSpace(os.Getenv("YAFA_INTERNAL_SERVICE_TOKEN")),
+		InternalServiceToken:       strings.TrimSpace(os.Getenv("YAFA_INTERNAL_SERVICE_TOKEN")),
+		OrderConfirmationPublisher: orderConfirmationPublisher,
 	})
 	if strings.TrimSpace(os.Getenv("YAFA_INTERNAL_SERVICE_TOKEN")) == "" {
 		logger.Warn("internal lifecycle routes disabled until YAFA_INTERNAL_SERVICE_TOKEN is set")

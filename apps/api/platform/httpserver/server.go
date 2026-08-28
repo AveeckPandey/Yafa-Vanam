@@ -25,38 +25,40 @@ import (
 )
 
 type Config struct {
-	AllowedOrigins          []string
-	Logger                  *slog.Logger
-	DependencyHealth        func(context.Context) map[string]string
-	RateLimitStore          redis.UniversalClient
-	PanicReporter           func(*http.Request, any, []byte)
-	Auth                    *auth.Handler
-	Yafa                    *yafa.Service
-	RazorpayKeyID           string
-	RazorpayKeySecret       string
-	RazorpayWebhookSecret   string
-	RazorpayCheckoutEnabled bool
-	InternalServiceToken    string
+	AllowedOrigins             []string
+	Logger                     *slog.Logger
+	DependencyHealth           func(context.Context) map[string]string
+	RateLimitStore             redis.UniversalClient
+	PanicReporter              func(*http.Request, any, []byte)
+	Auth                       *auth.Handler
+	Yafa                       *yafa.Service
+	RazorpayKeyID              string
+	RazorpayKeySecret          string
+	RazorpayWebhookSecret      string
+	RazorpayCheckoutEnabled    bool
+	InternalServiceToken       string
+	OrderConfirmationPublisher OrderConfirmationPublisher
 }
 
 type Server struct {
-	catalog                 *commerce.Catalog
-	store                   commerce.CommerceStore
-	logger                  *slog.Logger
-	allowedOrigins          map[string]struct{}
-	startedAt               time.Time
-	dependencyHealth        func(context.Context) map[string]string
-	rateLimitStore          redis.UniversalClient
-	panicReporter           func(*http.Request, any, []byte)
-	razorpayKeyID           string
-	razorpayKeySecret       string
-	razorpayWebhookSecret   string
-	razorpayCheckoutEnabled bool
-	razorpayMu              sync.Mutex
-	internalServiceToken    string
-	yafa                    *yafa.Service
-	rateMu                  sync.Mutex
-	clientRates             map[string]*clientRate
+	catalog                    *commerce.Catalog
+	store                      commerce.CommerceStore
+	logger                     *slog.Logger
+	allowedOrigins             map[string]struct{}
+	startedAt                  time.Time
+	dependencyHealth           func(context.Context) map[string]string
+	rateLimitStore             redis.UniversalClient
+	panicReporter              func(*http.Request, any, []byte)
+	razorpayKeyID              string
+	razorpayKeySecret          string
+	razorpayWebhookSecret      string
+	razorpayCheckoutEnabled    bool
+	razorpayMu                 sync.Mutex
+	internalServiceToken       string
+	orderConfirmationPublisher OrderConfirmationPublisher
+	yafa                       *yafa.Service
+	rateMu                     sync.Mutex
+	clientRates                map[string]*clientRate
 }
 
 type clientRate struct {
@@ -80,17 +82,18 @@ func New(catalog *commerce.Catalog, store commerce.CommerceStore, config Config)
 	}
 	server := &Server{
 		catalog: catalog, store: store, logger: logger, startedAt: time.Now().UTC(),
-		allowedOrigins:          make(map[string]struct{}),
-		razorpayKeyID:           config.RazorpayKeyID,
-		razorpayKeySecret:       config.RazorpayKeySecret,
-		razorpayWebhookSecret:   config.RazorpayWebhookSecret,
-		razorpayCheckoutEnabled: config.RazorpayCheckoutEnabled,
-		internalServiceToken:    config.InternalServiceToken,
-		yafa:                    config.Yafa,
-		clientRates:             make(map[string]*clientRate),
-		dependencyHealth:        config.DependencyHealth,
-		rateLimitStore:          config.RateLimitStore,
-		panicReporter:           config.PanicReporter,
+		allowedOrigins:             make(map[string]struct{}),
+		razorpayKeyID:              config.RazorpayKeyID,
+		razorpayKeySecret:          config.RazorpayKeySecret,
+		razorpayWebhookSecret:      config.RazorpayWebhookSecret,
+		razorpayCheckoutEnabled:    config.RazorpayCheckoutEnabled,
+		internalServiceToken:       config.InternalServiceToken,
+		orderConfirmationPublisher: config.OrderConfirmationPublisher,
+		yafa:                       config.Yafa,
+		clientRates:                make(map[string]*clientRate),
+		dependencyHealth:           config.DependencyHealth,
+		rateLimitStore:             config.RateLimitStore,
+		panicReporter:              config.PanicReporter,
 	}
 	for _, origin := range config.AllowedOrigins {
 		origin = strings.TrimSpace(origin)
