@@ -1,8 +1,8 @@
-import { createHash } from "node:crypto";
 import { NextResponse, type NextRequest } from "next/server";
 import { z } from "zod";
 import { getOrCreateCart } from "@/lib/cart-server";
 import { commerceApi, CommerceApiError } from "@/lib/commerce-api";
+import { paymentOrderIdempotencyKey } from "@/lib/payment-order-idempotency";
 
 const requestSchema = z.object({
   shippingMethod: z.enum(["standard", "express"]),
@@ -19,7 +19,23 @@ export async function POST(request: NextRequest) {
     const { cart } = await getOrCreateCart(request);
     if (!cart.items.length) return NextResponse.json({ error: "Your bag is empty." }, { status: 400 });
     const { customer, shippingMethod, discountCode } = parsed.data;
-    const idempotencyKey = createHash("sha256").update(JSON.stringify({ cart: cart.id, email: customer.email, address: customer.address, pin: customer.pin, shippingMethod, discountCode })).digest("hex");
+    const idempotencyKey = paymentOrderIdempotencyKey({
+      cart: {
+        id: cart.id,
+        currency: cart.currency,
+        subtotal: cart.subtotal,
+        items: cart.items.map((item) => ({
+          key: item.key,
+          productId: item.product_id,
+          variantId: item.variant_id,
+          unitPrice: item.unit_price,
+          quantity: item.quantity,
+        })),
+      },
+      customer,
+      shippingMethod,
+      discountCode,
+    });
     const order = await commerceApi.createRazorpayOrder({
       cart_id: cart.id, customer_email: customer.email, shipping_method: shippingMethod, discount_code: discountCode,
       shipping_address: { recipient_name: `${customer.firstName} ${customer.lastName}`.trim(), phone: customer.phone, line1: customer.address, line2: customer.apartment || undefined, city: customer.city, state_region: customer.state, postal_code: customer.pin, country_code: "IN" },
