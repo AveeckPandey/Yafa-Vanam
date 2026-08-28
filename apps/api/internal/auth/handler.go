@@ -185,8 +185,8 @@ func (h *Handler) cognitoExchange(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	var in struct {
-		IDToken  string
-		Remember bool `json:"remember"`
+		IDToken  string `json:"id_token"`
+		Remember bool   `json:"remember"`
 	}
 	if !decode(r, &in) || strings.TrimSpace(in.IDToken) == "" {
 		fail(w, 400, "Invalid sign in details.")

@@ -219,4 +219,15 @@ func TestCognitoExchangeEndpointGuards(t *testing.T) {
 	if badRecorder.Code != http.StatusBadRequest {
 		t.Fatalf("malformed body status = %d, want 400", badRecorder.Code)
 	}
+
+	// The Next.js bridge sends snake_case JSON. Ensure id_token is decoded and
+	// reaches verification instead of being mistaken for an empty credential.
+	validShape := httptest.NewRequest(http.MethodPost, "/auth/cognito/exchange", strings.NewReader(`{"id_token":"not-a-jwt","remember":true}`))
+	validShape.AddCookie(&http.Cookie{Name: csrfCookie, Value: "token-value"})
+	validShape.Header.Set("X-CSRF-Token", "token-value")
+	shapeRecorder := httptest.NewRecorder()
+	gated.cognitoExchange(shapeRecorder, validShape)
+	if shapeRecorder.Code != http.StatusUnauthorized {
+		t.Fatalf("snake_case id_token status = %d, want 401 after verifier rejection", shapeRecorder.Code)
+	}
 }
