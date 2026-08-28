@@ -35,6 +35,7 @@ docker run -d --name yafa-advisor --restart unless-stopped --network host \
   "$REGISTRY/yafa-advisor:production"
 docker run -d --name yafa-api --restart unless-stopped --network host \
   -e APP_ENV=production -e ENVIRONMENT=production -e API_PORT=4000 \
+  -e AWS_REGION="$REGION" -e AWS_DEFAULT_REGION="$REGION" \
   -e APP_URL=https://yafavanam.buildwithaveeck.com \
   -e CORS_ALLOWED_ORIGINS=https://yafavanam.buildwithaveeck.com \
   -e DATABASE_URL="postgresql://${DB_USER}:${DB_PASSWORD_ENCODED}@${DB_HOST}:5432/yafa_vanam?sslmode=require" \

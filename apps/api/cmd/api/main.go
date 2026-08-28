@@ -152,7 +152,11 @@ func main() {
 	}
 	var orderConfirmationPublisher httpserver.OrderConfirmationPublisher
 	if queueURL := strings.TrimSpace(os.Getenv("ORDER_CONFIRMATION_QUEUE_URL")); queueURL != "" {
-		awsConfig, awsErr := awsconfig.LoadDefaultConfig(context.Background())
+		loadOptions := []func(*awsconfig.LoadOptions) error{}
+		if region := orderConfirmationAWSRegion(); region != "" {
+			loadOptions = append(loadOptions, awsconfig.WithRegion(region))
+		}
+		awsConfig, awsErr := awsconfig.LoadDefaultConfig(context.Background(), loadOptions...)
 		if awsErr != nil {
 			logger.Error("order confirmation queue disabled", "error", awsErr)
 		} else {
@@ -207,6 +211,15 @@ func main() {
 		os.Exit(1)
 	}
 	logger.Info("YAFA VANAM Commerce API stopped")
+}
+
+func orderConfirmationAWSRegion() string {
+	for _, name := range []string{"AWS_REGION", "AWS_DEFAULT_REGION", "YAFA_STORAGE_REGION"} {
+		if region := strings.TrimSpace(os.Getenv(name)); region != "" {
+			return region
+		}
+	}
+	return ""
 }
 
 // redisRateLimitStore avoids storing a typed-nil *redis.Client inside the
