@@ -23,10 +23,24 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Enter the verification code from your email." }, { status: 400 });
   }
   try {
-    await confirmSignUp(config, email, code);
+    let tokens: Awaited<ReturnType<typeof signIn>> | undefined;
+    try {
+      await confirmSignUp(config, email, code);
+    } catch (confirmationFailure) {
+      // A synchronous Post Confirmation trigger can fail after Cognito has
+      // already marked the account CONFIRMED. If the password proves this is
+      // the same customer, recover by signing in instead of trapping them on
+      // a verification screen that can no longer issue another code.
+      try {
+        tokens = await signIn(config, email, body.password);
+        console.warn("cognito confirmation recovered an already-confirmed account");
+      } catch {
+        throw confirmationFailure;
+      }
+    }
     // Re-signing in after confirmation proves the password still pairs with
     // the account instead of trusting whatever the browser forwarded.
-    const tokens = await signIn(config, email, body.password);
+    tokens ??= await signIn(config, email, body.password);
     const headers = new Headers();
     const { user } = await finishCognitoSignIn(request, headers, config, tokens, body.remember === true);
     return jsonWithCookies({ user }, headers);

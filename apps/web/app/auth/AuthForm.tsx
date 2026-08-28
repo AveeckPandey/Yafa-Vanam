@@ -82,7 +82,7 @@ export default function AuthForm({ mode }: { mode: "sign-in" | "sign-up" | "rese
   const resend = async () => {
     if (resendIn > 0 || busy) return;
     setBusy(true); setError(""); setNotice("");
-    try { setNotice(await resendConfirmationCode(confirming ? pendingEmail : pendingEmail)); setResendIn(60); }
+    try { await resendConfirmationCode(pendingEmail); setNotice("If no new code arrives, your email may already be verified. Return to sign in."); setResendIn(60); }
     catch (reason) { setError(reason instanceof Error ? reason.message : "We could not send a new code."); } finally { setBusy(false); }
   };
 

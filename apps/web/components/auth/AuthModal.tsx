@@ -110,7 +110,7 @@ export default function AuthModal({ open, onClose, returnTo }: Props) {
   const resend = async () => {
     if (resendIn > 0) return;
     setBusy(true); setError(""); setNotice("");
-    try { setNotice(await resendConfirmationCode(step === "confirm" ? pendingEmail : pendingEmail)); setResendIn(60); }
+    try { await resendConfirmationCode(pendingEmail); setNotice("If no new code arrives, your email may already be verified. Return to sign in."); setResendIn(60); }
     catch (reason) { setError(reason instanceof Error ? reason.message : "We could not send a new code."); }
     finally { setBusy(false); }
   };
