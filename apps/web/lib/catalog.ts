@@ -344,9 +344,10 @@ function getShadeReference(productId: string, variantId: string, shade: NonNulla
 
 function mapProduct(product: SourceProduct): CatalogProduct {
   const authoritativeProduct = authoritativeProductsById.get(product.id);
-  const variantSource = product.id === "yv-lip-006"
-    ? product
-    : authoritativeProduct ?? product;
+  // Cart requests are validated by the Go commerce API against Product.json.
+  // Use that same source for storefront variants so a visible shade is always
+  // a purchasable variant; external display metadata must never invent one.
+  const variantSource = product;
   const storefrontVariantIds = storefrontVariantIdsByProductId[product.id];
   const activeVariants = variantSource.variants.filter((variant) =>
     variant.is_active && (!storefrontVariantIds || storefrontVariantIds.includes(variant.id)),
