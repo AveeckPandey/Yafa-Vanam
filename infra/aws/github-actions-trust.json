@@ -9,10 +9,8 @@
       "Action": "sts:AssumeRoleWithWebIdentity",
       "Condition": {
         "StringEquals": {
-          "token.actions.githubusercontent.com:aud": "sts.amazonaws.com"
-        },
-        "StringLike": {
-          "token.actions.githubusercontent.com:sub": "repo:AveeckPandey/YAFA_VANAM:*"
+          "token.actions.githubusercontent.com:aud": "sts.amazonaws.com",
+          "token.actions.githubusercontent.com:sub": "repo:AveeckPandey@177404548/YAFA_VANAM@1345193776:ref:refs/heads/main"
         }
       }
     }
