@@ -1,8 +1,9 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
-  // Produces a minimal self-contained Node server for the ECS web task.
-  output: "standalone",
+  // AWS Docker images need a self-contained Node server. Vercel supplies its
+  // own runtime and post-build file tracing, which conflicts with standalone.
+  ...(process.env.VERCEL ? {} : { output: "standalone" as const }),
   reactStrictMode: true,
   async headers() {
     return [
