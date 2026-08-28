@@ -71,7 +71,7 @@ function useAuthApi() {
   // drift from runtime configuration and would leave dead buttons.
   const resolveProvider = useCallback(async () => {
     if (provider) return provider;
-    const response = await fetch(`${API}/auth/capability`, { cache: "no-store" });
+    const response = await fetch(`${API}/auth/cognito/capability`, { cache: "no-store" });
     if (!response.ok) throw new Error("Secure sign-in is temporarily unavailable. Please try again shortly.");
     const payload = await response.json() as { provider?: Provider };
     if (payload.provider !== "cognito" && payload.provider !== "native") throw new Error("Secure sign-in is temporarily unavailable. Please try again shortly.");
