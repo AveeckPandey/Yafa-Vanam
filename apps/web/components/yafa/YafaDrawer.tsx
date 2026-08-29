@@ -15,7 +15,7 @@ const MIN_H = 420;
  * drawer (resize handle is display:none under the breakpoint).
  */
 export default function YafaDrawer() {
-  const { isOpen, closeDrawer, toggleDrawer, pageContext } = useYafa();
+  const { isOpen, closeDrawer, toggleDrawer, resetConversation, pageContext } = useYafa();
   const [size, setSize] = useState<{ width: number; height: number } | null>(null);
   const resizeRef = useRef<{
     startX: number;
@@ -65,6 +65,8 @@ export default function YafaDrawer() {
   // Escape closes; focus returns to the launcher so nobody is trapped.
   useEffect(() => {
     if (!isOpen) return;
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
     const onKeyDown = (event: KeyboardEvent) => {
       if (event.key === "Escape") {
         event.preventDefault();
@@ -72,7 +74,10 @@ export default function YafaDrawer() {
       }
     };
     window.addEventListener("keydown", onKeyDown);
-    return () => window.removeEventListener("keydown", onKeyDown);
+    return () => {
+      window.removeEventListener("keydown", onKeyDown);
+      document.body.style.overflow = previousOverflow;
+    };
   }, [isOpen, close]);
 
   const contextLabel = pageContext?.type === "product"
@@ -101,25 +106,51 @@ export default function YafaDrawer() {
         <span aria-hidden="true">✦</span> Ask YAFA
       </button>
 
+      {isOpen ? (
+        <button
+          type="button"
+          className="yafa-drawer__backdrop"
+          onClick={close}
+          aria-label="Close Yafa chat"
+        />
+      ) : null}
+
       <div
         id="yafa-drawer"
         ref={drawerRef}
         className={`yafa-drawer ${isOpen ? "is-open" : ""}`}
         role="dialog"
-        aria-modal="false"
+        aria-modal="true"
         aria-label="Yafa beauty assistant"
         hidden={!isOpen}
         style={inlineSize}
       >
         <header className="yafa-drawer__header">
-          <div>
-            <h2>YAFA</h2>
+          <div className="yafa-drawer__title">
+            <h2>Ask Yafa</h2>
             <p>Your personal beauty companion</p>
             {contextLabel ? <span className="yafa-drawer__context">{contextLabel}</span> : null}
           </div>
-          <button type="button" className="yafa-drawer__close" onClick={close} aria-label="Close Yafa chat">
-            ×
-          </button>
+          <div className="yafa-drawer__actions">
+            <button
+              type="button"
+              className="yafa-drawer__action"
+              onClick={resetConversation}
+              aria-label="Start a new Yafa conversation"
+              title="Start a new conversation"
+            >
+              <span aria-hidden="true">↻</span>
+            </button>
+            <button
+              type="button"
+              className="yafa-drawer__action yafa-drawer__close"
+              onClick={close}
+              aria-label="Close Yafa chat"
+              title="Close"
+            >
+              <span aria-hidden="true">×</span>
+            </button>
+          </div>
         </header>
 
         <YafaChat />

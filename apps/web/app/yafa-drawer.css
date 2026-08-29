@@ -16,18 +16,30 @@
 
 .yafa-fab:hover { background: #000; }
 
+.yafa-drawer__backdrop {
+  position: fixed;
+  inset: 0;
+  /* Keep the backdrop above the sticky store header. */
+  z-index: 599;
+  border: 0;
+  background: rgb(15 12 13 / 34%);
+  cursor: default;
+}
+
 .yafa-drawer {
   position: fixed;
   top: 0;
   right: 0;
   height: 100dvh;
   width: min(26rem, 100vw);
-  z-index: 80;
+  /* The store header is z-index 100 and the cart drawer uses 500. */
+  z-index: 600;
   background: var(--paper, #faf8f5);
   color: var(--ink, #1c1c1c);
   display: flex;
   flex-direction: column;
   box-shadow: -12px 0 40px rgb(0 0 0 / 18%);
+  overflow: hidden;
   transform: translateX(105%);
   transition: transform 0.28s ease;
 }
@@ -36,23 +48,46 @@
 
 .yafa-drawer__header {
   display: flex;
-  flex-direction: column;
-  padding: 1.1rem 1.25rem 0.9rem;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.8rem;
+  min-height: 4.1rem;
+  padding: 0.7rem 1rem;
   border-bottom: 1px solid rgb(0 0 0 / 10%);
-  position: relative;
+  background: #fff;
+  position: sticky;
+  top: 0;
+  z-index: 2;
 }
-.yafa-drawer__header h2 { margin: 0; letter-spacing: 0.12em; }
+.yafa-drawer__title { min-width: 0; }
+.yafa-drawer__header h2 { margin: 0; font-size: 1rem; letter-spacing: 0; }
 .yafa-drawer__header p { margin: 0.2rem 0 0; font-size: 0.85rem; opacity: 0.75; }
 .yafa-drawer__context { display: inline-flex; margin-top: 0.65rem; color: #6f3948; font-size: 0.72rem; font-weight: 600; letter-spacing: 0.04em; }
-.yafa-drawer__close {
-  position: absolute;
-  top: 0.9rem;
-  right: 1rem;
-  border: none;
-  background: none;
-  font-size: 1.6rem;
+.yafa-drawer__actions { display: flex; flex: 0 0 auto; align-items: center; gap: 0.15rem; }
+.yafa-drawer__action {
+  display: grid;
+  width: 2.75rem;
+  height: 2.75rem;
+  padding: 0;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  font-size: 1.55rem;
   line-height: 1;
   cursor: pointer;
+  place-items: center;
+}
+.yafa-drawer__action:hover { background: rgb(0 0 0 / 7%); }
+.yafa-drawer__action:focus-visible { outline: 2px solid #6f3948; outline-offset: 2px; }
+.yafa-drawer__close { font-size: 1.8rem; }
+.yafa-drawer__close span { transform: translateY(-0.05rem); }
+.yafa-drawer__action:active { transform: scale(0.96); }
+.yafa-drawer__messages,
+.yafa-drawer__empty {
+  min-height: 0;
 }
 
 .yafa-drawer__messages,

@@ -51,6 +51,7 @@ type YafaContextValue = {
   setPageContext: (context: YafaPageContext | null) => void;
   profile: YafaProfilePayload;
   mergeProfile: (patch: YafaProfilePayload) => void;
+  resetConversation: () => void;
   shadeResult: ShadeResultSummary | null;
   setShadeResult: (result: ShadeResultSummary | null) => void;
   send: (
@@ -96,6 +97,14 @@ export function YafaProvider({ children }: { children: ReactNode }) {
 
   const mergeProfile = useCallback((patch: YafaProfilePayload) => {
     setProfile((current) => deepMerge(current, patch));
+  }, []);
+
+  const resetConversation = useCallback(() => {
+    conversationIdRef.current = null;
+    setMessages([]);
+    setError(null);
+    setProfile({});
+    setShadeResult(null);
   }, []);
 
   const pushMessage = useCallback((message: YafaMessage) => {
@@ -172,6 +181,7 @@ export function YafaProvider({ children }: { children: ReactNode }) {
       setPageContext,
       profile,
       mergeProfile,
+      resetConversation,
       shadeResult,
       setShadeResult,
       send,
@@ -188,6 +198,7 @@ export function YafaProvider({ children }: { children: ReactNode }) {
       pageContext,
       profile,
       mergeProfile,
+      resetConversation,
       shadeResult,
       send,
     ],
