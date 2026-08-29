@@ -1,0 +1,31 @@
+{
+  "CallerReference": "yafa-prod-assets-20260827",
+  "Comment": "YAFA VANAM storefront assets",
+  "Enabled": true,
+  "PriceClass": "PriceClass_200",
+  "Aliases": { "Quantity": 1, "Items": ["yafavanam.buildwithaveeck.com"] },
+  "DefaultRootObject": "index.html",
+  "Origins": {
+    "Quantity": 1,
+    "Items": [{
+      "Id": "yafa-assets-s3",
+      "DomainName": "yafa-prod-assets-758388043025-ap-south-1.s3.ap-south-1.amazonaws.com",
+      "OriginAccessControlId": "EPMEKO8CURM81",
+      "S3OriginConfig": { "OriginAccessIdentity": "" }
+    }]
+  },
+  "DefaultCacheBehavior": {
+    "TargetOriginId": "yafa-assets-s3",
+    "ViewerProtocolPolicy": "redirect-to-https",
+    "AllowedMethods": { "Quantity": 2, "Items": ["GET", "HEAD"], "CachedMethods": { "Quantity": 2, "Items": ["GET", "HEAD"] } },
+    "Compress": true,
+    "CachePolicyId": "658327ea-f89d-4fab-a63d-7e88639e58f6"
+  },
+  "ViewerCertificate": {
+    "ACMCertificateArn": "arn:aws:acm:us-east-1:758388043025:certificate/589a6e48-356d-49e5-975c-02b19b708590",
+    "SSLSupportMethod": "sni-only",
+    "MinimumProtocolVersion": "TLSv1.2_2021"
+  },
+  "HttpVersion": "http2and3",
+  "IsIPV6Enabled": true
+}

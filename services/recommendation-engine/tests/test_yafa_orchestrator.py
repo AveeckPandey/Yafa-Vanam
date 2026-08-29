@@ -161,12 +161,35 @@ async def test_page_context_binds_pronoun_to_current_product():
 
 
 async def test_greeting_never_triggers_rag_or_engines():
-    for message in ("hi", "hello", "thanks"):
+    for message in ("hi", "hello", "thanks", "how are you?"):
         response = await handle_chat(_request(message))
         assert response.intent == "greeting_or_small_talk"
         assert response.grounding == []
         assert response.recommendations == []
         assert "yafa" in response.message.lower()
+
+
+async def test_cruelty_free_policy_is_grounded_without_product_lookup():
+    response = await handle_chat(_request("Are your products cruelty-free and certified?"))
+    assert response.intent == "brand_values_policy"
+    assert "cruelty-free" in response.message.lower()
+    assert "not currently third-party certified" in response.message.lower()
+    assert response.grounding[0].product_id == "yv-brand-knowledge-001"
+
+
+async def test_vegan_policy_does_not_claim_every_product_is_vegan():
+    response = await handle_chat(_request("Is everything vegan?"))
+    assert response.intent == "brand_values_policy"
+    assert "only specified products" in response.message.lower()
+    assert "vegan*" in response.message.lower()
+
+
+async def test_charity_policy_explains_percentage_and_partner_model():
+    response = await handle_chat(_request("Do you donate to charity?"))
+    assert response.intent == "brand_values_policy"
+    assert "1%" in response.message
+    assert "nonprofit partners" in response.message.lower()
+    assert "annual impact statement" in response.message.lower()
 
 
 async def test_unclear_input_gets_capability_answer():

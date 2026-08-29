@@ -13,6 +13,7 @@ from typing import Any
 from app.advisor.catalogue import product_by_id
 from app.yafa import coordination as look_coordination
 from app.yafa import prompts
+from app.yafa.brand_knowledge import BRAND_KNOWLEDGE_ID, policy_answer, policy_content
 from app.yafa.context import (
     detect_fact_type,
     detect_live_data_domain,
@@ -139,6 +140,30 @@ async def handle_chat(request: YafaChatRequest) -> YafaChatResponse:
             conversation_id=conv.conversation_id,
             intent=intent.value,
             message=prompts.greeting_message(),
+        )
+        conv.record_turn("user", request.message)
+        conv.record_turn("yafa", response.message)
+        return response
+
+    # --- owner-approved brand values: non-product grounded knowledge ------
+    if intent is Intent.BRAND_VALUES_POLICY:
+        page_product = resolve_page_product(conv.page_context)
+        answer, section = policy_answer(
+            request.message,
+            product_name=(page_product or {}).get("name"),
+        )
+        response = YafaChatResponse(
+            conversation_id=conv.conversation_id,
+            intent=intent.value,
+            message=answer,
+            grounding=[GroundingChunk(
+                product_id=BRAND_KNOWLEDGE_ID,
+                chunk_type=section,
+                content=policy_content(section),
+                similarity=1.0,
+                trust_level="brand_authoritative",
+                requires_qualification=False,
+            )],
         )
         conv.record_turn("user", request.message)
         conv.record_turn("yafa", response.message)

@@ -12,11 +12,28 @@ export const YafaConfig = {
   voiceId: process.env.VOICE_ID || "tiffany",
   port: Number(process.env.PORT || 3008),
   host: process.env.HOST || "localhost",
+  recommendationServiceUrl: (process.env.YAFA_RECOMMENDATION_SERVICE_URL || "http://localhost:8000").replace(/\/$/, ""),
+  internalServiceToken: process.env.YAFA_INTERNAL_SERVICE_TOKEN || "",
+  knowledgeTimeoutMs: Math.max(500, Number(process.env.YAFA_KNOWLEDGE_TIMEOUT_MS || 5000)),
+  gatewaySigningSecret: process.env.YAFA_VOICE_GATEWAY_SIGNING_SECRET || "",
+  gatewayTokenAudience: process.env.YAFA_VOICE_GATEWAY_TOKEN_AUDIENCE || "yafa-voice",
+  authRequired: (process.env.YAFA_VOICE_AUTH_REQUIRED || (process.env.NODE_ENV === "production" ? "true" : "false")) === "true",
+  maxSessionMs: Math.max(60_000, Number(process.env.YAFA_VOICE_MAX_SESSION_MS || 600_000)),
+  maxAudioChunkBytes: Math.max(3_200, Number(process.env.YAFA_VOICE_MAX_AUDIO_CHUNK_BYTES || 65_536)),
+  maxTextChars: Math.max(1, Number(process.env.YAFA_VOICE_MAX_TEXT_CHARS || 1000)),
+  maxConnectionsPerMinute: Math.max(1, Number(process.env.YAFA_VOICE_MAX_CONNECTIONS_PER_MINUTE || 10)),
+  maxConcurrentConnectionsPerUser: Math.max(1, Number(process.env.YAFA_VOICE_MAX_CONNECTIONS_PER_USER || 2)),
+  maxTextEventsPerMinute: Math.max(1, Number(process.env.YAFA_VOICE_MAX_TEXT_EVENTS_PER_MINUTE || 20)),
+  maxAudioEventsPerMinute: Math.max(60, Number(process.env.YAFA_VOICE_MAX_AUDIO_EVENTS_PER_MINUTE || 720)),
   // Browser origins allowed to open a socket to this gateway.
   allowedOrigins: (process.env.ALLOWED_ORIGINS ||
     "http://localhost:3000,http://127.0.0.1:3000"
   ).split(",").map((origin) => origin.trim()),
 };
+
+if (YafaConfig.authRequired && YafaConfig.gatewaySigningSecret.length < 32) {
+  throw new Error("YAFA_VOICE_GATEWAY_SIGNING_SECRET must contain at least 32 characters when voice authentication is required");
+}
 
 export const DefaultInferenceConfiguration = {
   maxTokens: 1024,

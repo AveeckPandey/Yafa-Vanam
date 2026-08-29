@@ -6,6 +6,7 @@
   "type": "commonjs",
   "scripts": {
     "build": "tsc",
+    "test": "tsx --test src/*.test.ts src/tools/*.test.ts",
     "start": "node dist/server.js",
     "dev": "tsx watch --clear-screen=false src/server.ts"
   },

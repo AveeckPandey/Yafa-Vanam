@@ -150,6 +150,9 @@ def validate_startup_dimensions() -> dict[str, object]:
     provider = build_provider(settings)
     repo = RagRepository(settings.vector_database_url)
     try:
+        # A new isolated RAG database starts empty. Apply tracked migrations
+        # before reading vector metadata so first production boot is safe.
+        repo.ensure_schema(provider.dimension)
         stored_dimension = repo.stored_dimension()
         validate_dimensions(settings.embedding_dimension, provider.dimension, stored_dimension)
         metadata = repo.get_embedding_metadata()

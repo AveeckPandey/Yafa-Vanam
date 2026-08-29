@@ -12,6 +12,10 @@ def _default_catalogue_path() -> Path:
     return Path(__file__).resolve().parents[4] / "data" / "processed" / "Product.json"
 
 
+def _default_brand_knowledge_path() -> Path:
+    return Path(__file__).resolve().parents[4] / "data" / "processed" / "BrandKnowledge.json"
+
+
 def _env_flag(source: dict[str, str], key: str, default: bool = False) -> bool:
     raw = (source.get(key) or "").strip().lower()
     if not raw:
@@ -26,15 +30,19 @@ class RagSettings:
     embedding_model: str
     embedding_dimension: int | None
     catalogue_path: Path
+    brand_knowledge_path: Path | None
     internal_token: str | None
     openrouter_api_key: str
     openrouter_base_url: str
+    bedrock_region: str
     rerank_enabled: bool
 
     @classmethod
     def from_env(cls, env: dict[str, str] | None = None) -> "RagSettings":
         source = env if env is not None else os.environ
         raw_dimension = (source.get("EMBEDDING_DIMENSION") or "").strip()
+        explicit_catalogue = (source.get("YAFA_CATALOGUE_PATH") or "").strip()
+        explicit_brand_knowledge = (source.get("YAFA_BRAND_KNOWLEDGE_PATH") or "").strip()
         return cls(
             # Deliberately no DATABASE_URL fallback: the vector store (Supabase in
             # production) must never silently become the commerce database.
@@ -43,13 +51,22 @@ class RagSettings:
             embedding_model=(source.get("EMBEDDING_MODEL") or "").strip(),
             embedding_dimension=int(raw_dimension) if raw_dimension else None,
             catalogue_path=Path(
-                source.get("YAFA_CATALOGUE_PATH") or str(_default_catalogue_path())
+                explicit_catalogue or str(_default_catalogue_path())
+            ),
+            # Custom/fixture catalogues stay isolated unless their companion
+            # brand source is explicitly supplied. The canonical production
+            # catalogue automatically includes the approved brand knowledge.
+            brand_knowledge_path=(
+                Path(explicit_brand_knowledge)
+                if explicit_brand_knowledge
+                else (_default_brand_knowledge_path() if not explicit_catalogue else None)
             ),
             internal_token=(source.get("YAFA_INTERNAL_SERVICE_TOKEN") or "").strip() or None,
             openrouter_api_key=(source.get("OPENROUTER_API_KEY") or "").strip(),
             openrouter_base_url=(
                 source.get("OPENROUTER_BASE_URL") or "https://openrouter.ai/api/v1"
             ).strip(),
+            bedrock_region=(source.get("BEDROCK_REGION") or source.get("AWS_REGION") or "ap-south-1").strip(),
             rerank_enabled=_env_flag(source, "RAG_RERANK_ENABLED", default=False),
         )
 

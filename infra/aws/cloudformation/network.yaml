@@ -1,0 +1,103 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: YAFA VANAM production VPC - two AZ public, app, and database tiers.
+Parameters:
+  ProjectName:
+    Type: String
+    Default: yafa-prod
+  VpcCidr:
+    Type: String
+    Default: 10.40.0.0/16
+Resources:
+  Vpc:
+    Type: AWS::EC2::VPC
+    Properties:
+      CidrBlock: !Ref VpcCidr
+      EnableDnsHostnames: true
+      EnableDnsSupport: true
+      Tags: [{Key: Name, Value: !Sub '${ProjectName}-vpc'}]
+  InternetGateway:
+    Type: AWS::EC2::InternetGateway
+  GatewayAttachment:
+    Type: AWS::EC2::VPCGatewayAttachment
+    Properties: {VpcId: !Ref Vpc, InternetGatewayId: !Ref InternetGateway}
+  PublicRouteTable:
+    Type: AWS::EC2::RouteTable
+    Properties: {VpcId: !Ref Vpc}
+  PublicRoute:
+    Type: AWS::EC2::Route
+    DependsOn: GatewayAttachment
+    Properties: {RouteTableId: !Ref PublicRouteTable, DestinationCidrBlock: 0.0.0.0/0, GatewayId: !Ref InternetGateway}
+  PublicSubnetA:
+    Type: AWS::EC2::Subnet
+    Properties: {VpcId: !Ref Vpc, AvailabilityZone: !Select [0, !GetAZs ''], CidrBlock: 10.40.0.0/24, MapPublicIpOnLaunch: true, Tags: [{Key: Name, Value: !Sub '${ProjectName}-public-a'}]}
+  PublicSubnetB:
+    Type: AWS::EC2::Subnet
+    Properties: {VpcId: !Ref Vpc, AvailabilityZone: !Select [1, !GetAZs ''], CidrBlock: 10.40.1.0/24, MapPublicIpOnLaunch: true, Tags: [{Key: Name, Value: !Sub '${ProjectName}-public-b'}]}
+  PublicAssociationA:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties: {SubnetId: !Ref PublicSubnetA, RouteTableId: !Ref PublicRouteTable}
+  PublicAssociationB:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties: {SubnetId: !Ref PublicSubnetB, RouteTableId: !Ref PublicRouteTable}
+  NatEip:
+    Type: AWS::EC2::EIP
+    Properties: {Domain: vpc}
+  NatGateway:
+    Type: AWS::EC2::NatGateway
+    Properties: {AllocationId: !GetAtt NatEip.AllocationId, SubnetId: !Ref PublicSubnetA, Tags: [{Key: Name, Value: !Sub '${ProjectName}-nat'}]}
+  AppRouteTable:
+    Type: AWS::EC2::RouteTable
+    Properties: {VpcId: !Ref Vpc}
+  AppDefaultRoute:
+    Type: AWS::EC2::Route
+    Properties: {RouteTableId: !Ref AppRouteTable, DestinationCidrBlock: 0.0.0.0/0, NatGatewayId: !Ref NatGateway}
+  AppSubnetA:
+    Type: AWS::EC2::Subnet
+    Properties: {VpcId: !Ref Vpc, AvailabilityZone: !Select [0, !GetAZs ''], CidrBlock: 10.40.10.0/24, Tags: [{Key: Name, Value: !Sub '${ProjectName}-app-a'}]}
+  AppSubnetB:
+    Type: AWS::EC2::Subnet
+    Properties: {VpcId: !Ref Vpc, AvailabilityZone: !Select [1, !GetAZs ''], CidrBlock: 10.40.11.0/24, Tags: [{Key: Name, Value: !Sub '${ProjectName}-app-b'}]}
+  AppAssociationA:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties: {SubnetId: !Ref AppSubnetA, RouteTableId: !Ref AppRouteTable}
+  AppAssociationB:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties: {SubnetId: !Ref AppSubnetB, RouteTableId: !Ref AppRouteTable}
+  DbSubnetA:
+    Type: AWS::EC2::Subnet
+    Properties: {VpcId: !Ref Vpc, AvailabilityZone: !Select [0, !GetAZs ''], CidrBlock: 10.40.20.0/24, Tags: [{Key: Name, Value: !Sub '${ProjectName}-db-a'}]}
+  DbSubnetB:
+    Type: AWS::EC2::Subnet
+    Properties: {VpcId: !Ref Vpc, AvailabilityZone: !Select [1, !GetAZs ''], CidrBlock: 10.40.21.0/24, Tags: [{Key: Name, Value: !Sub '${ProjectName}-db-b'}]}
+  LoadBalancerSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: Public HTTPS access to YAFA load balancer
+      VpcId: !Ref Vpc
+      SecurityGroupIngress:
+        - {IpProtocol: tcp, FromPort: 80, ToPort: 80, CidrIp: 0.0.0.0/0}
+        - {IpProtocol: tcp, FromPort: 443, ToPort: 443, CidrIp: 0.0.0.0/0}
+  AppSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: Private YAFA web and API tier
+      VpcId: !Ref Vpc
+      SecurityGroupIngress:
+        - {IpProtocol: tcp, FromPort: 3000, ToPort: 3000, SourceSecurityGroupId: !Ref LoadBalancerSecurityGroup}
+        - {IpProtocol: tcp, FromPort: 4000, ToPort: 4000, SourceSecurityGroupId: !Ref LoadBalancerSecurityGroup}
+  DatabaseSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: Private YAFA data tier
+      VpcId: !Ref Vpc
+      SecurityGroupIngress:
+        - {IpProtocol: tcp, FromPort: 5432, ToPort: 5432, SourceSecurityGroupId: !Ref AppSecurityGroup}
+        - {IpProtocol: tcp, FromPort: 6379, ToPort: 6379, SourceSecurityGroupId: !Ref AppSecurityGroup}
+Outputs:
+  VpcId: {Value: !Ref Vpc}
+  PublicSubnets: {Value: !Join [',', [!Ref PublicSubnetA, !Ref PublicSubnetB]]}
+  AppSubnets: {Value: !Join [',', [!Ref AppSubnetA, !Ref AppSubnetB]]}
+  DatabaseSubnets: {Value: !Join [',', [!Ref DbSubnetA, !Ref DbSubnetB]]}
+  LoadBalancerSecurityGroup: {Value: !Ref LoadBalancerSecurityGroup}
+  AppSecurityGroup: {Value: !Ref AppSecurityGroup}
+  DatabaseSecurityGroup: {Value: !Ref DatabaseSecurityGroup}

@@ -1,0 +1,66 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: YAFA VANAM private encrypted PostgreSQL and Redis data tier.
+Parameters:
+  ProjectName: {Type: String, Default: yafa-prod}
+  DatabaseSubnets: {Type: CommaDelimitedList}
+  DatabaseSecurityGroup: {Type: AWS::EC2::SecurityGroup::Id}
+Resources:
+  DatabaseSubnetGroup:
+    Type: AWS::RDS::DBSubnetGroup
+    Properties:
+      DBSubnetGroupDescription: YAFA private database subnets
+      SubnetIds: !Ref DatabaseSubnets
+  CommerceDatabase:
+    Type: AWS::RDS::DBInstance
+    DeletionPolicy: Snapshot
+    UpdateReplacePolicy: Snapshot
+    Properties:
+      DBInstanceIdentifier: !Sub '${ProjectName}-commerce'
+      Engine: postgres
+      EngineVersion: '16.15'
+      DBInstanceClass: db.t4g.micro
+      AllocatedStorage: 20
+      MaxAllocatedStorage: 100
+      StorageType: gp3
+      StorageEncrypted: true
+      # Low-cost first release: Free-plan RDS supports Single-AZ only.
+      MultiAZ: false
+      PubliclyAccessible: false
+      # The account's current free-tier plan permits one day. Raise this to 7
+      # after upgrading the account plan for the intended production policy.
+      BackupRetentionPeriod: 1
+      DeletionProtection: true
+      AutoMinorVersionUpgrade: true
+      EnablePerformanceInsights: true
+      DBName: yafa_vanam
+      MasterUsername: yafa_admin
+      ManageMasterUserPassword: true
+      DBSubnetGroupName: !Ref DatabaseSubnetGroup
+      VPCSecurityGroups: [!Ref DatabaseSecurityGroup]
+  RedisSubnetGroup:
+    Type: AWS::ElastiCache::SubnetGroup
+    Properties:
+      Description: YAFA private Redis subnets
+      SubnetIds: !Ref DatabaseSubnets
+  Redis:
+    Type: AWS::ElastiCache::ReplicationGroup
+    Properties:
+      ReplicationGroupId: !Sub '${ProjectName}-redis'
+      ReplicationGroupDescription: YAFA sessions and rate limiting
+      Engine: redis
+      CacheNodeType: cache.t4g.micro
+      # Low-cost first release: one node. Upgrade to two nodes with failover
+      # when the account moves to the paid production plan.
+      NumCacheClusters: 1
+      AutomaticFailoverEnabled: false
+      MultiAZEnabled: false
+      AtRestEncryptionEnabled: true
+      TransitEncryptionEnabled: true
+      CacheSubnetGroupName: !Ref RedisSubnetGroup
+      SecurityGroupIds: [!Ref DatabaseSecurityGroup]
+Outputs:
+  DatabaseEndpoint: {Value: !GetAtt CommerceDatabase.Endpoint.Address}
+  DatabasePort: {Value: !GetAtt CommerceDatabase.Endpoint.Port}
+  DatabaseMasterSecretArn: {Value: !GetAtt CommerceDatabase.MasterUserSecret.SecretArn}
+  RedisPrimaryEndpoint: {Value: !GetAtt Redis.PrimaryEndPoint.Address}
+  RedisPort: {Value: !GetAtt Redis.PrimaryEndPoint.Port}

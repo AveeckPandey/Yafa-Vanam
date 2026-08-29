@@ -123,7 +123,7 @@ class RagRepository:
         """Apply tracked SQL migrations, then verify the vector column dimension.
 
         Schema lives in services/recommendation-engine/migrations/*.sql (001
-        base tables, 002 VECTOR(2048) + metadata). The configured dimension
+        base tables, 002 legacy vector column, 003 Titan V2 VECTOR(1024)). The configured dimension
         must match what the migrations created — a different embedding model
         needs a new migration plus an embeddings rebuild, never silent reuse.
         """

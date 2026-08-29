@@ -31,7 +31,12 @@ DB_PASSWORD_ENCODED=$(python3 -c 'import sys, urllib.parse; print(urllib.parse.q
 aws ecr get-login-password --region "$REGION" | docker login --username AWS --password-stdin "$REGISTRY"
 
 docker run -d --name yafa-advisor --restart unless-stopped --network host \
+  -e AWS_REGION="$REGION" -e AWS_DEFAULT_REGION="$REGION" \
   -e YAFA_INTERNAL_SERVICE_TOKEN="$TOKEN" \
+  -e VECTOR_DATABASE_URL="postgresql://${DB_USER}:${DB_PASSWORD_ENCODED}@${DB_HOST}:5432/yafa_rag?sslmode=require" \
+  -e EMBEDDING_PROVIDER=bedrock -e EMBEDDING_MODEL=amazon.titan-embed-text-v2:0 \
+  -e EMBEDDING_DIMENSION=1024 -e BEDROCK_REGION="$REGION" \
+  -e RAG_RERANK_ENABLED=false \
   "$REGISTRY/yafa-advisor:production"
 docker run -d --name yafa-api --restart unless-stopped --network host \
   -e APP_ENV=production -e ENVIRONMENT=production -e API_PORT=4000 \

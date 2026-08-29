@@ -32,7 +32,7 @@ def _settings() -> RagSettings:
     return RagSettings.from_env({
         "VECTOR_DATABASE_URL": DSN,
         "EMBEDDING_PROVIDER": "hashing",
-        "EMBEDDING_DIMENSION": "2048",
+        "EMBEDDING_DIMENSION": "1024",
         "YAFA_CATALOGUE_PATH": str(CATALOGUE),
     })
 
@@ -41,7 +41,7 @@ def _settings() -> RagSettings:
 def ingested():
     settings = _settings()
     repo = RagRepository(settings.vector_database_url)
-    provider = HashingEmbeddingProvider(dimension=2048)
+    provider = HashingEmbeddingProvider(dimension=1024)
     stats = asyncio.run(ingest_catalogue(repo, provider, settings))
     yield repo, provider, settings, stats
     repo.close()
@@ -55,9 +55,9 @@ async def test_ingestion_is_idempotent_against_real_pgvector(ingested):
     assert second.chunks_skipped_unchanged == first.chunks_seen
 
 
-def test_migrations_tracked_and_dimension_is_2048(ingested):
+def test_migrations_tracked_and_dimension_is_1024(ingested):
     """Update spec §3/§8: schema comes from tracked SQL migrations with a
-    VECTOR(2048) column, applied once and checksum-recorded."""
+    VECTOR(1024) column, applied once and checksum-recorded."""
     repo, _, _, _ = ingested
     conn = repo.connection()
     with conn.cursor() as cursor:
@@ -72,8 +72,8 @@ def test_migrations_tracked_and_dimension_is_2048(ingested):
         cursor.execute("SELECT embedding_dimension FROM rag_embedding_metadata")
         dimension = int(cursor.fetchone()["embedding_dimension"])
     assert "001_rag_base.sql" in filenames and "002_rag_embeddings.sql" in filenames
-    assert dimension == 2048
-    assert repo.stored_dimension() == 2048
+    assert dimension == 1024
+    assert repo.stored_dimension() == 1024
 
 
 def test_embedding_metadata_matches_provider(ingested):
@@ -85,14 +85,14 @@ def test_embedding_metadata_matches_provider(ingested):
     assert metadata == {
         "embedding_provider": provider.provider_name,
         "embedding_model": provider.model_name,
-        "embedding_dimension": 2048,
+        "embedding_dimension": 1024,
     }
     # A different model would be refused without an explicit rebuild.
     switched = RagSettings.from_env({
         "VECTOR_DATABASE_URL": DSN,
         "EMBEDDING_PROVIDER": "openrouter",
         "EMBEDDING_MODEL": "nvidia/nemotron-3-embed-1b:free",
-        "EMBEDDING_DIMENSION": "2048",
+        "EMBEDDING_DIMENSION": "1024",
         "OPENROUTER_API_KEY": "sk-or-test",
         "YAFA_CATALOGUE_PATH": str(CATALOGUE),
     })

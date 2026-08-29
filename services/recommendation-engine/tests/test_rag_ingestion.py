@@ -10,10 +10,11 @@ import pytest
 
 from app.rag.config import RagSettings
 from app.rag.providers import HashingEmbeddingProvider
-from app.rag.ingestion import CatalogueValidationError, chunk_identity, ingest_catalogue, load_catalogue
+from app.rag.ingestion import CatalogueValidationError, chunk_identity, ingest_catalogue, load_brand_knowledge, load_catalogue
 from app.rag.repository import ChunkUpsert
 
 CATALOGUE = Path(__file__).resolve().parents[3] / "data" / "processed" / "Product.json"
+BRAND_KNOWLEDGE = Path(__file__).resolve().parents[3] / "data" / "processed" / "BrandKnowledge.json"
 
 
 class CountingEmbedder(HashingEmbeddingProvider):
@@ -252,6 +253,35 @@ def test_load_catalogue_validation_errors(tmp_path):
     empty.write_text("[]", encoding="utf-8")
     with pytest.raises(CatalogueValidationError):
         load_catalogue(empty)
+
+
+def test_owner_approved_brand_knowledge_converts_to_retrievable_document():
+    document = load_brand_knowledge(BRAND_KNOWLEDGE)
+    assert document["id"] == "yv-brand-knowledge-001"
+    assert document["_rag_source_file"] == "BrandKnowledge.json"
+    questions = document["rag"]["customer_questions"]
+    assert any("cruelty-free" in row["question"].lower() for row in questions)
+    assert any("vegan" in row["question"].lower() for row in questions)
+    assert any("charity" in row["question"].lower() for row in questions)
+
+
+@pytest.mark.asyncio
+async def test_default_ingestion_includes_brand_knowledge(tmp_path):
+    catalogue_copy = tmp_path / "Product.json"
+    catalogue_copy.write_text(json.dumps([BASE_PRODUCT]), encoding="utf-8")
+    settings = RagSettings.from_env({
+        "EMBEDDING_PROVIDER": "hashing",
+        "YAFA_CATALOGUE_PATH": str(catalogue_copy),
+        "YAFA_BRAND_KNOWLEDGE_PATH": str(BRAND_KNOWLEDGE),
+    })
+    repo, embedder = FakeRepo(), CountingEmbedder()
+    stats = await ingest_catalogue(repo, embedder, settings)
+    assert stats.products_seen == 2
+    assert "yv-brand-knowledge-001" in repo.documents
+    assert any(
+        chunk.canonical_product_id == "yv-brand-knowledge-001"
+        for chunk in repo.chunks.values()
+    )
 
 
 def test_chunk_identity_is_spec_shaped():

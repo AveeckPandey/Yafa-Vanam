@@ -1,0 +1,5 @@
+[
+  { "Name": "given_name", "AttributeDataType": "String", "Required": true, "Mutable": true },
+  { "Name": "gender", "AttributeDataType": "String", "Required": true, "Mutable": true },
+  { "Name": "birthdate", "AttributeDataType": "String", "Required": true, "Mutable": true }
+]

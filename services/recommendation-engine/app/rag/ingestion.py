@@ -28,6 +28,76 @@ class CatalogueValidationError(ValueError):
     """The catalogue file does not meet the minimal ingestion contract."""
 
 
+def load_brand_knowledge(path: Path) -> dict[str, Any]:
+    """Convert the owner-approved brand source into the common RAG contract."""
+    try:
+        source = json.loads(path.read_text(encoding="utf-8"))
+    except FileNotFoundError as error:
+        raise CatalogueValidationError(f"brand knowledge file not found: {path}") from error
+    except json.JSONDecodeError as error:
+        raise CatalogueValidationError(f"brand knowledge is not valid JSON: {path}: {error}") from error
+    if not isinstance(source, dict) or not source.get("document_id") or not source.get("policy_title"):
+        raise CatalogueValidationError("brand knowledge must contain document_id and policy_title")
+
+    policies = source.get("public_policy") or {}
+    policy_questions = {
+        "cruelty_free": "Are YAFA VANAM products cruelty-free and certified?",
+        "vegan": "Are all YAFA VANAM products vegan?",
+        "charitable_giving": "Does YAFA VANAM donate sales revenue to charity?",
+    }
+    customer_questions: list[dict[str, str]] = []
+    for key, question in policy_questions.items():
+        item = policies.get(key) or {}
+        answer = " ".join(
+            value.strip()
+            for value in (str(item.get("approved_answer") or ""), str(item.get("star_note") or ""))
+            if value.strip()
+        )
+        if answer:
+            customer_questions.append({"question": question, "answer": answer})
+    for entry in source.get("conversational_inputs") or []:
+        if not isinstance(entry, dict):
+            continue
+        examples = [str(value).strip() for value in entry.get("example_inputs") or [] if str(value).strip()]
+        guidance = str(entry.get("response_guidance") or "").strip()
+        if examples and guidance:
+            customer_questions.append({
+                "question": " / ".join(examples[:4]),
+                "answer": guidance,
+            })
+
+    aliases = [
+        "YAFA VANAM policy", "YAFA VANAM values", "cruelty-free", "vegan policy",
+        "charity policy", "animal testing", "one percent giving",
+    ]
+    return {
+        "id": str(source["document_id"]),
+        "name": str(source["policy_title"]),
+        "brand": str(source.get("brand") or "YAFA VANAM"),
+        "category": "Brand Knowledge",
+        "subcategory": "Policies and Conversation",
+        "product_type": "Brand Knowledge Source",
+        "status": str(source.get("status") or "approved"),
+        "description": {
+            "full": "Owner-approved YAFA VANAM brand values, claim definitions, conversational guidance, and safety boundaries."
+        },
+        "metadata": {"data_version": str(source.get("version") or "unknown")},
+        "rag": {
+            "enabled": True,
+            "source_version": str(source.get("version") or "unknown"),
+            "search_aliases": aliases,
+            "topics": aliases,
+            "customer_questions": customer_questions,
+            "answer_policy": source.get("assistant_answer_rules") or {},
+            "medical_escalation_topics": [
+                "severe reaction", "persistent irritation", "eye injury",
+                "suspected allergy", "pregnancy-related ingredient question",
+            ],
+        },
+        "_rag_source_file": path.name,
+    }
+
+
 @dataclass
 class IngestionStats:
     products_seen: int = 0
@@ -141,6 +211,8 @@ async def ingest_catalogue(
     catalogue_path = settings.catalogue_path
     source_file = catalogue_path.name
     products = load_catalogue(catalogue_path, product_ids)
+    if product_ids is None and settings.brand_knowledge_path is not None:
+        products.append(load_brand_knowledge(settings.brand_knowledge_path))
 
     repo.ensure_schema(provider.dimension)
 
@@ -165,7 +237,7 @@ async def ingest_catalogue(
         stopped = False
         for product in products:
             stats.products_seen += 1
-            document = build_document(product, source_file)
+            document = build_document(product, str(product.get("_rag_source_file") or source_file))
             version = document["source_version"]
             rag_enabled = bool((product.get("rag") or {}).get("enabled", True))
             chunks = build_chunks(product) if rag_enabled else []

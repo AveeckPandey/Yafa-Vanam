@@ -1,0 +1,7 @@
+{
+  "Name": "yafa-prod-assets-oac",
+  "Description": "YAFA VANAM CloudFront access to private assets",
+  "SigningProtocol": "sigv4",
+  "SigningBehavior": "always",
+  "OriginAccessControlOriginType": "s3"
+}

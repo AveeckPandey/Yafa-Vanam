@@ -17,6 +17,7 @@ from enum import Enum
 
 class Intent(str, Enum):
     GREETING_OR_SMALL_TALK = "greeting_or_small_talk"
+    BRAND_VALUES_POLICY = "brand_values_policy"
 
     PRODUCT_INFORMATION = "product_information"
     PRODUCT_PAGE_QUESTION = "product_page_question"  # info scoped to current page product
@@ -75,7 +76,14 @@ CATEGORY_INTENTS: dict[str, Intent] = {
 # Word-boundary greetings: "hi" must never substring-match inside other words.
 _GREETING = re.compile(
     r"(^|\s)(hi|hiya|hey|hello|yo|good\s(morning|afternoon|evening)|"
-    r"thanks|thank\syou|thankyou|bye|goodbye)(\s|[!.?,]|$)",
+    r"how\sare\syou|thanks|thank\syou|thankyou|bye|goodbye)(\s|[!.?,]|$)",
+    re.IGNORECASE,
+)
+
+_BRAND_VALUES = re.compile(
+    r"\b(cruelty[- ]?free|animal test(?:ing|ed)?|tested on animals|vegan|"
+    r"animal[- ]derived|charit(?:y|able)|donat(?:e|es|ed|ing|ion|ions)|"
+    r"give back|giving policy|non[- ]?profit|one percent|1%)\b",
     re.IGNORECASE,
 )
 
@@ -161,6 +169,11 @@ def classify(message: str) -> Intent:
     # 2. Capability questions get the orientation answer, not tools.
     if _CAPABILITY.search(text):
         return Intent.ADVISOR_START
+
+    # Brand values are non-product knowledge and must never fail because a
+    # catalogue product could not be resolved.
+    if _BRAND_VALUES.search(text):
+        return Intent.BRAND_VALUES_POLICY
 
     # 3. Explicit whole-look requests outrank outfit matching phrasing.
     if re.search(

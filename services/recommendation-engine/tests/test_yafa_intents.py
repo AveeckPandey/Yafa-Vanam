@@ -13,6 +13,7 @@ from app.yafa.intents import Intent, categories_for_intent, classify
         ("hello", Intent.GREETING_OR_SMALL_TALK),
         ("hey there!", Intent.GREETING_OR_SMALL_TALK),
         ("thank you", Intent.GREETING_OR_SMALL_TALK),
+        ("how are you?", Intent.GREETING_OR_SMALL_TALK),
         ("can you help me?", Intent.ADVISOR_START),
         ("what can you do?", Intent.ADVISOR_START),
         ("I need makeup help", Intent.ADVISOR_START),
@@ -47,6 +48,9 @@ from app.yafa.intents import Intent, categories_for_intent, classify
             Intent.OUTFIT_MATCHING,
         ),
         ("hello, what does this smell like?", Intent.GREETING_OR_SMALL_TALK),
+        ("Are your products cruelty-free?", Intent.BRAND_VALUES_POLICY),
+        ("Is everything vegan?", Intent.BRAND_VALUES_POLICY),
+        ("Do you donate money to charity?", Intent.BRAND_VALUES_POLICY),
     ],
 )
 def test_classification(message: str, expected: Intent):

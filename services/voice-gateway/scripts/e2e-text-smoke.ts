@@ -13,11 +13,15 @@
 import { io } from "socket.io-client";
 
 const GATEWAY = process.env.GATEWAY_URL || "http://localhost:3008";
+const GATEWAY_TOKEN = process.env.GATEWAY_TOKEN || "";
 const SAMPLE_RATE = 16000;
 const CHUNK_MS = 100;
 const CHUNK_BYTES = (SAMPLE_RATE / 1000) * CHUNK_MS * 2; // mono, s16le
 
-const socket = io(GATEWAY, { transports: ["websocket"] });
+const socket = io(GATEWAY, {
+    transports: ["websocket"],
+    auth: GATEWAY_TOKEN ? { token: GATEWAY_TOKEN } : undefined,
+});
 let assistantText = "";
 let done = false;
 let silencePump: ReturnType<typeof setInterval> | null = null;
@@ -50,7 +54,7 @@ function startSilencePump() {
 socket.on("connect", () => {
     console.log(`[smoke] connected as ${socket.id}`);
 
-    socket.emit("initializeConnection", { region: process.env.AWS_REGION || "us-east-1" }, async (res: any) => {
+    socket.emit("initializeConnection", {}, async (res: any) => {
         if (!res?.success) {
             console.error("[smoke] initialize failed:", res);
             finish(1);

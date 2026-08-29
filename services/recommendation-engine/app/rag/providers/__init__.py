@@ -1,4 +1,4 @@
-"""Embedding providers: interface, offline hashing fallback, OpenRouter client."""
+"""Embedding providers: offline hashing, OpenRouter, and Amazon Bedrock."""
 
 from __future__ import annotations
 
@@ -12,6 +12,7 @@ from app.rag.providers.base import (
     validate_vectors,
 )
 from app.rag.providers.openrouter import DEFAULT_BASE_URL, OpenRouterEmbeddingProvider
+from app.rag.providers.bedrock import DEFAULT_BEDROCK_MODEL, BedrockEmbeddingProvider
 
 # Locked Phase 1 provider/model (update spec §2).
 DEFAULT_OPENROUTER_MODEL = "nvidia/nemotron-3-embed-1b:free"
@@ -25,6 +26,7 @@ __all__ = [
     "EmbeddingRateLimitError",
     "HashingEmbeddingProvider",
     "OpenRouterEmbeddingProvider",
+    "BedrockEmbeddingProvider",
     "build_provider",
     "provider_identity",
     "validate_vectors",
@@ -53,6 +55,12 @@ def provider_identity(settings: RagSettings) -> tuple[str, str, int] | None:
             settings.embedding_model or DEFAULT_OPENROUTER_MODEL,
             settings.embedding_dimension,
         )
+    if kind == "bedrock":
+        return (
+            "bedrock",
+            settings.embedding_model or DEFAULT_BEDROCK_MODEL,
+            settings.embedding_dimension or 1024,
+        )
     return None
 
 
@@ -75,6 +83,12 @@ def build_provider(settings: RagSettings) -> EmbeddingProvider:
             api_key=settings.openrouter_api_key,
             dimension=settings.embedding_dimension,
             base_url=settings.openrouter_base_url,
+        )
+    elif provider_kind == "bedrock":
+        provider = BedrockEmbeddingProvider(
+            model=settings.embedding_model or DEFAULT_BEDROCK_MODEL,
+            dimension=settings.embedding_dimension or 1024,
+            region=settings.bedrock_region,
         )
     else:
         raise RuntimeError(f"unsupported EMBEDDING_PROVIDER {provider_kind!r}")

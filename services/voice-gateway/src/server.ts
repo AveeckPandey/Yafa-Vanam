@@ -19,6 +19,12 @@ import { NovaSonicBidirectionalStreamClient, StreamSession } from './client';
 import { Buffer } from 'node:buffer';
 import { YafaConfig } from './consts';
 import { YAFA_SYSTEM_PROMPT } from './yafa-prompt';
+import {
+    FixedWindowRateLimiter,
+    clientAddress,
+    validateCustomerText,
+    verifyGatewayToken,
+} from './security';
 
 dotenv.config();
 
@@ -67,6 +73,53 @@ enum SessionState {
 
 const sessionStates = new Map<string, SessionState>();
 const cleanupInProgress = new Map<string, boolean>();
+const sessionTimers = new Map<string, ReturnType<typeof setTimeout>>();
+const connectionsPerSubject = new Map<string, number>();
+const connectionLimiter = new FixedWindowRateLimiter(YafaConfig.maxConnectionsPerMinute, 60_000);
+const textLimiter = new FixedWindowRateLimiter(YafaConfig.maxTextEventsPerMinute, 60_000);
+const audioLimiter = new FixedWindowRateLimiter(YafaConfig.maxAudioEventsPerMinute, 60_000);
+
+function authSubject(socket: any): string {
+    return String(socket.data?.authSubject || 'unauthenticated');
+}
+
+function clearSessionTimer(socketId: string): void {
+    const timer = sessionTimers.get(socketId);
+    if (timer) clearTimeout(timer);
+    sessionTimers.delete(socketId);
+}
+
+function emitSafeError(socket: any, message: string): void {
+    socket.emit('error', { message });
+}
+
+// Authentication happens before any Bedrock session can be created. Tokens
+// are short-lived and signed by the storefront; CORS is only an extra browser
+// control and is deliberately not treated as authentication.
+io.use((socket, next) => {
+    try {
+        const address = clientAddress(socket.handshake.address, socket.handshake.headers['x-forwarded-for']);
+        let subject = `development:${address}`;
+        if (YafaConfig.authRequired) {
+            subject = verifyGatewayToken(
+                socket.handshake.auth?.token,
+                YafaConfig.gatewaySigningSecret,
+                YafaConfig.gatewayTokenAudience,
+            ).sub;
+        }
+        if (!connectionLimiter.allow(`ip:${address}`) || !connectionLimiter.allow(`sub:${subject}`)) {
+            return next(new Error('rate_limited'));
+        }
+        if ((connectionsPerSubject.get(subject) || 0) >= YafaConfig.maxConcurrentConnectionsPerUser) {
+            return next(new Error('too_many_connections'));
+        }
+        socket.data.authSubject = subject;
+        socket.data.clientAddress = address;
+        next();
+    } catch {
+        next(new Error('unauthorized'));
+    }
+});
 
 // Close sessions idle for more than 5 minutes (audio billing stops at close).
 setInterval(() => {
@@ -87,42 +140,32 @@ setInterval(() => {
     });
 }, 60000);
 
-async function createNewSession(socket: any, config: any = {}): Promise<StreamSession> {
+async function createNewSession(socket: any): Promise<StreamSession> {
     const sessionId = socket.id;
-    const region = config.region || YafaConfig.defaultRegion;
+    // Region, model, inference settings and enabled tools are server-owned.
+    // Browser-provided overrides could otherwise expand cost or capabilities.
+    const region = YafaConfig.defaultRegion;
     const client = getClientForRegion(region);
 
     try {
         console.log(`Creating new session for client: ${sessionId} in region: ${region}`);
         sessionStates.set(sessionId, SessionState.INITIALIZING);
 
-        const sessionConfig: any = {};
-
-        if (config.inferenceConfig) {
-            sessionConfig.inferenceConfig = {
-                maxTokens: config.inferenceConfig.maxTokens || 2048,
-                topP: config.inferenceConfig.topP || 0.9,
-                temperature: config.inferenceConfig.temperature || 1,
-            };
-        }
-
-        if (config.turnDetectionConfig?.endpointingSensitivity) {
-            sessionConfig.turnDetectionConfig = {
-                endpointingSensitivity: config.turnDetectionConfig.endpointingSensitivity,
-            };
-        }
-
-        if (config.enabledTools && Array.isArray(config.enabledTools)) {
-            sessionConfig.enabledTools = config.enabledTools;
-        }
-
-        const session = client.createStreamSession(sessionId, Object.keys(sessionConfig).length > 0 ? sessionConfig : undefined);
+        const session = client.createStreamSession(sessionId);
         setupSessionEventHandlers(session, socket);
 
         socketSessions.set(sessionId, session);
         socketClients.set(sessionId, client);
-        socketConfigs.set(sessionId, config);
+        socketConfigs.set(sessionId, {});
         sessionStates.set(sessionId, SessionState.READY);
+
+        clearSessionTimer(sessionId);
+        sessionTimers.set(sessionId, setTimeout(() => {
+            console.log(`Closing session ${sessionId}: hard duration limit reached`);
+            try { client.forceCloseSession(sessionId); } catch { /* already closed */ }
+            emitSafeError(socket, 'This voice session has reached its time limit. Start a new session to continue.');
+            socket.disconnect(true);
+        }, YafaConfig.maxSessionMs));
 
         console.log(`Session ${sessionId} created and ready`);
         return session;
@@ -189,6 +232,8 @@ function setupSessionEventHandlers(session: StreamSession, socket: any) {
 
 io.on('connection', (socket) => {
     console.log('New client connected:', socket.id);
+    const subject = authSubject(socket);
+    connectionsPerSubject.set(subject, (connectionsPerSubject.get(subject) || 0) + 1);
     sessionStates.set(socket.id, SessionState.CLOSED);
 
     // --- session initialization -------------------------------------------------
@@ -210,7 +255,9 @@ io.on('connection', (socket) => {
                 return;
             }
 
-            await createNewSession(socket, config);
+            // Client configuration is intentionally ignored; security and
+            // inference settings are controlled by the gateway deployment.
+            await createNewSession(socket);
             sessionStates.set(socket.id, SessionState.READY);
             if (cb) cb({ success: true });
         } catch (error) {
@@ -218,14 +265,11 @@ io.on('connection', (socket) => {
             sessionStates.set(socket.id, SessionState.CLOSED);
             const cb = typeof data === 'function' ? data : callback;
             if (cb) cb({ success: false, error: error instanceof Error ? error.message : String(error) });
-            socket.emit('error', {
-                message: 'Failed to initialize session',
-                details: error instanceof Error ? error.message : String(error),
-            });
+            emitSafeError(socket, 'Failed to initialize voice session.');
         }
     });
 
-    socket.on('startNewChat', async (config: any = {}) => {
+    socket.on('startNewChat', async () => {
         try {
             const existingSession = socketSessions.get(socket.id);
             const client = socketClients.get(socket.id) || defaultClient;
@@ -243,13 +287,10 @@ io.on('connection', (socket) => {
                 socketSessions.delete(socket.id);
             }
 
-            await createNewSession(socket, config);
+            await createNewSession(socket);
         } catch (error) {
             console.error('Error starting new chat:', error);
-            socket.emit('error', {
-                message: 'Failed to start new chat',
-                details: error instanceof Error ? error.message : String(error),
-            });
+            emitSafeError(socket, 'Failed to start a new voice session.');
         }
     });
 
@@ -260,10 +301,20 @@ io.on('connection', (socket) => {
             const currentState = sessionStates.get(socket.id);
 
             if (!session || currentState !== SessionState.ACTIVE) {
-                socket.emit('error', {
-                    message: 'No active session for audio input',
-                    details: `Session exists: ${!!session}, Session state: ${currentState}.`,
-                });
+                emitSafeError(socket, 'No active voice session.');
+                return;
+            }
+
+            if (!audioLimiter.allow(authSubject(socket))) {
+                emitSafeError(socket, 'Voice input rate limit reached. Please pause and try again.');
+                return;
+            }
+
+            if (
+                (typeof audioData === 'string' && audioData.length > Math.ceil(YafaConfig.maxAudioChunkBytes * 4 / 3) + 4) ||
+                (typeof audioData !== 'string' && Buffer.byteLength(audioData || []) > YafaConfig.maxAudioChunkBytes)
+            ) {
+                emitSafeError(socket, 'Voice input chunk is too large.');
                 return;
             }
 
@@ -271,13 +322,15 @@ io.on('connection', (socket) => {
                 ? Buffer.from(audioData, 'base64')
                 : Buffer.from(audioData);
 
+            if (audioBuffer.byteLength > YafaConfig.maxAudioChunkBytes) {
+                emitSafeError(socket, 'Voice input chunk is too large.');
+                return;
+            }
+
             await session.streamAudio(audioBuffer);
         } catch (error) {
             console.error('Error processing audio:', error);
-            socket.emit('error', {
-                message: 'Error processing audio',
-                details: error instanceof Error ? error.message : String(error),
-            });
+            emitSafeError(socket, 'Voice input could not be processed.');
         }
     });
 
@@ -289,20 +342,17 @@ io.on('connection', (socket) => {
                 socket.emit('error', { message: 'No active session for prompt start' });
                 return;
             }
-            const voiceId = data?.voiceId || YafaConfig.voiceId;
-            const outputSampleRate = data?.outputSampleRate || 24000;
+            const voiceId = YafaConfig.voiceId;
+            const outputSampleRate = 24000;
             await session.setupSessionAndPromptStart(voiceId, outputSampleRate);
             console.log(`Prompt start completed for ${socket.id} with sample rate ${outputSampleRate}`);
         } catch (error) {
             console.error('Error processing prompt start:', error);
-            socket.emit('error', {
-                message: 'Error processing prompt start',
-                details: error instanceof Error ? error.message : String(error),
-            });
+            emitSafeError(socket, 'Voice prompt could not be started.');
         }
     });
 
-    socket.on('systemPrompt', async (data: any) => {
+    socket.on('systemPrompt', async () => {
         try {
             const session = socketSessions.get(socket.id);
             if (!session) {
@@ -310,20 +360,12 @@ io.on('connection', (socket) => {
                 return;
             }
 
-            // The gateway owns Yafa's personality; a client MAY extend it with
-            // extra context appended after the base prompt.
-            const base = YAFA_SYSTEM_PROMPT;
-            const extra = typeof data?.extraContext === 'string' ? data.extraContext.trim() : '';
-            const content = extra ? `${base}\n\nSESSION CONTEXT:\n${extra}` : base;
-
-            await session.setupSystemPrompt(undefined, content);
+            // The client cannot append instructions to the system prompt.
+            await session.setupSystemPrompt(undefined, YAFA_SYSTEM_PROMPT);
             console.log(`System prompt completed for ${socket.id}`);
         } catch (error) {
             console.error('Error processing system prompt:', error);
-            socket.emit('error', {
-                message: 'Error processing system prompt',
-                details: error instanceof Error ? error.message : String(error),
-            });
+            emitSafeError(socket, 'Voice assistant instructions could not be loaded.');
         }
     });
 
@@ -347,10 +389,7 @@ io.on('connection', (socket) => {
         } catch (error) {
             console.error('Error processing audio start:', error);
             sessionStates.set(socket.id, SessionState.CLOSED);
-            socket.emit('error', {
-                message: 'Error processing audio start',
-                details: error instanceof Error ? error.message : String(error),
-            });
+            emitSafeError(socket, 'Voice stream could not be started.');
         }
     });
 
@@ -371,14 +410,22 @@ io.on('connection', (socket) => {
                 sessionStates.set(socket.id, SessionState.ACTIVE);
             }
 
-            const content = typeof data === 'string' ? data : data?.content;
+            if (!textLimiter.allow(authSubject(socket))) {
+                emitSafeError(socket, 'Message rate limit reached. Please wait before trying again.');
+                return;
+            }
+            const content = validateCustomerText(
+                typeof data === 'string' ? data : data?.content,
+                YafaConfig.maxTextChars,
+            );
+            if (!content) {
+                emitSafeError(socket, 'That message cannot be processed. Please ask a concise beauty or YAFA VANAM question.');
+                return;
+            }
             await session.sendTextInput(content);
         } catch (error) {
             console.error('Error processing text input:', error);
-            socket.emit('error', {
-                message: 'Error processing text input',
-                details: error instanceof Error ? error.message : String(error),
-            });
+            emitSafeError(socket, 'That message could not be processed.');
         }
     });
 
@@ -413,6 +460,7 @@ io.on('connection', (socket) => {
             socketClients.delete(socket.id);
             socketConfigs.delete(socket.id);
             cleanupInProgress.delete(socket.id);
+            clearSessionTimer(socket.id);
 
             socket.emit('sessionClosed');
         } catch (error) {
@@ -476,6 +524,10 @@ io.on('connection', (socket) => {
         socketConfigs.delete(socket.id);
         sessionStates.delete(socket.id);
         cleanupInProgress.delete(socket.id);
+        clearSessionTimer(socket.id);
+        const remaining = Math.max(0, (connectionsPerSubject.get(subject) || 1) - 1);
+        if (remaining === 0) connectionsPerSubject.delete(subject);
+        else connectionsPerSubject.set(subject, remaining);
     });
 });
 
