@@ -16,6 +16,7 @@ import YafaProductGuidance from "@/components/yafa/YafaProductGuidance";
 import { useAuth } from "@/components/auth/AuthProvider";
 import { getConfirmedYafaProfile, type ConfirmedYafaProfile } from "@/lib/yafa-profile";
 import { trackEvent } from "@/lib/analytics";
+import { useYafa } from "@/components/yafa/YafaProvider";
 
 function pretty(value: string) {
   return value.replaceAll("_", " ");
@@ -69,6 +70,7 @@ export default function ProductPageClient({
   layerMatch: CatalogProduct | null;
 }) {
   const { user } = useAuth();
+  const { setPageContext } = useYafa();
   const [quantity, setQuantity] = useState(1);
   const [variantId, setVariantId] = useState(product.defaultVariantId);
   const [yafaProfile, setYafaProfile] = useState<ConfirmedYafaProfile | null>(null);
@@ -111,6 +113,16 @@ export default function ProductPageClient({
     }).catch(() => setYafaProfile(null));
   }, [product.variants, user]);
   const yafaVariantMatch = Boolean(yafaProfile?.shade_code && selected?.shade?.code === yafaProfile.shade_code);
+
+  useEffect(() => {
+    setPageContext({
+      type: "product",
+      product_id: product.id,
+      variant_id: variantId,
+      shade_id: selectedShadeCode,
+    });
+    return () => setPageContext(null);
+  }, [product.id, selectedShadeCode, setPageContext, variantId]);
 
   return (
     <main id="main-content" className="product-page">

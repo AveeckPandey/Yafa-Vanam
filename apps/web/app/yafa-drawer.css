@@ -43,6 +43,7 @@
 }
 .yafa-drawer__header h2 { margin: 0; letter-spacing: 0.12em; }
 .yafa-drawer__header p { margin: 0.2rem 0 0; font-size: 0.85rem; opacity: 0.75; }
+.yafa-drawer__context { display: inline-flex; margin-top: 0.65rem; color: #6f3948; font-size: 0.72rem; font-weight: 600; letter-spacing: 0.04em; }
 .yafa-drawer__close {
   position: absolute;
   top: 0.9rem;
@@ -68,6 +69,12 @@
   border-top: 1px solid rgb(0 0 0 / 10%);
   padding: 0.8rem 1.25rem 1rem;
 }
+.yafa-drawer__journeys { display: grid; grid-template-columns: 1fr 1fr; gap: 0.45rem; }
+.yafa-drawer__journeys > :first-child { grid-column: 1 / -1; }
+.yafa-drawer__journeys a,
+.yafa-drawer__journeys button { min-height: 2.45rem; padding: 0.55rem 0.7rem; border: 1px solid rgb(0 0 0 / 18%); border-radius: 0.6rem; background: #fff; color: inherit; font: inherit; font-size: 0.8rem; text-align: left; text-decoration: none; cursor: pointer; }
+.yafa-drawer__journeys a { background: #1c1c1c; color: #fff; border-color: #1c1c1c; }
+.yafa-drawer__journeys button:disabled { opacity: 0.5; cursor: default; }
 
 .yafa-message { display: flex; flex-direction: column; gap: 0.3rem; }
 .yafa-message--user { align-items: flex-end; }
@@ -127,13 +134,22 @@
 .yafa-card__match--strong-match { background: #e4f2e9; color: #1d7a44; }
 .yafa-card__why { margin-top: 0.45rem; font-size: 0.8rem; }
 .yafa-card__why ul { margin: 0.3rem 0 0 1rem; padding: 0; }
-.yafa-card__view {
-  display: inline-block;
-  margin-top: 0.5rem;
+.yafa-card__actions { display: flex; gap: 0.5rem; margin-top: 0.6rem; }
+.yafa-card__view,
+.yafa-card__add {
+  display: inline-flex;
+  min-height: 2rem;
+  align-items: center;
+  justify-content: center;
+  padding: 0.35rem 0.55rem;
   font-size: 0.8rem;
   color: inherit;
-  text-decoration: underline;
+  text-decoration: none;
 }
+.yafa-card__view { border: 1px solid rgb(0 0 0 / 20%); border-radius: 999px; }
+.yafa-card__add { margin-left: auto; border: 1px solid #1c1c1c; border-radius: 999px; background: #1c1c1c; color: #fff; cursor: pointer; }
+.yafa-card__add:disabled { opacity: 0.5; cursor: default; }
+.yafa-card__notice { margin: 0.45rem 0 0; font-size: 0.74rem; color: #1d7a44; }
 
 .yafa-grounding__toggle {
   margin-top: 0.5rem;

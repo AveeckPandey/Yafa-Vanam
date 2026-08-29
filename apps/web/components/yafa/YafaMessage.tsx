@@ -39,8 +39,7 @@ export default function YafaMessage({ message }: { message: YafaMessageType }) {
 
         {message.requires ? (
           <p className="yafa-message__requires" data-testid="yafa-live-data">
-            This needs {LIVE_DOMAIN_LABELS[message.requires.domain] ?? message.requires.domain.replace("_", " ")} —
-            check the shop page for the live answer.
+            <strong>Live store check:</strong> I&apos;ll use the current {LIVE_DOMAIN_LABELS[message.requires.domain] ?? message.requires.domain.replace("_", " ")} before you decide.
           </p>
         ) : null}
 
@@ -63,15 +62,14 @@ export default function YafaMessage({ message }: { message: YafaMessageType }) {
               aria-expanded={showGrounding}
               onClick={() => setShowGrounding((open) => !open)}
             >
-              {showGrounding ? "Hide sources" : "Where this comes from"}
+              {showGrounding ? "Hide verification details" : "Why Yafa recommends this"}
             </button>
             {showGrounding ? (
               <ul>
                 {message.grounding.map((chunk, index) => (
                   <li key={`${chunk.product_id}-${chunk.chunk_type}-${index}`}>
-                    <strong>{chunk.chunk_type.replace(/_/g, " ")}</strong> · trust:{" "}
-                    {chunk.trust_level.toLowerCase().replace(/_/g, " ")}
-                    {chunk.requires_qualification ? " · needs verification" : ""}
+                    <strong>{chunk.chunk_type.replace(/_/g, " ")}</strong>
+                    {chunk.requires_qualification ? " · confirm before purchase" : ""}
                     <br />
                     {chunk.content.length > 220 ? `${chunk.content.slice(0, 220)}…` : chunk.content}
                   </li>

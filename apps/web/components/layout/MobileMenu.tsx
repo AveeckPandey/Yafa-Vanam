@@ -160,9 +160,10 @@ export default function MobileMenu({ open, onClose, onOpenSearch }: MobileMenuPr
           </Link>
         </div>
 
-        <Link className="mobile-menu__advisor" href="/build-my-kit" onClick={onClose}>
-          Build My Kit
-        </Link>
+        <div style={{ display: "grid", gap: "9px", marginTop: "28px" }}>
+          <Link className="mobile-menu__advisor" href="/yafa" onClick={onClose} style={{ marginTop: 0 }}>Find Your Shade</Link>
+          <Link className="mobile-menu__advisor" href="/build-my-kit" onClick={onClose} style={{ marginTop: 0, color: "#171512", background: "transparent", border: "1px solid #171512" }}>Build My Kit</Link>
+        </div>
 
         <div className="mobile-menu__utility">
           <button type="button" onClick={(event) => onOpenSearch(event.currentTarget)}>Search</button>

@@ -15,7 +15,7 @@ const MIN_H = 420;
  * drawer (resize handle is display:none under the breakpoint).
  */
 export default function YafaDrawer() {
-  const { isOpen, closeDrawer, toggleDrawer } = useYafa();
+  const { isOpen, closeDrawer, toggleDrawer, pageContext } = useYafa();
   const [size, setSize] = useState<{ width: number; height: number } | null>(null);
   const resizeRef = useRef<{
     startX: number;
@@ -24,6 +24,12 @@ export default function YafaDrawer() {
     startH: number;
   } | null>(null);
   const drawerRef = useRef<HTMLDivElement | null>(null);
+  const launcherRef = useRef<HTMLButtonElement | null>(null);
+
+  const close = useCallback(() => {
+    closeDrawer();
+    window.requestAnimationFrame(() => launcherRef.current?.focus());
+  }, [closeDrawer]);
 
   const onResizeStart = useCallback(
     (event: React.PointerEvent<HTMLDivElement>) => {
@@ -60,11 +66,22 @@ export default function YafaDrawer() {
   useEffect(() => {
     if (!isOpen) return;
     const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key === "Escape") closeDrawer();
+      if (event.key === "Escape") {
+        event.preventDefault();
+        close();
+      }
     };
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
-  }, [isOpen, closeDrawer]);
+  }, [isOpen, close]);
+
+  const contextLabel = pageContext?.type === "product"
+    ? "Guidance for the product you’re viewing"
+    : pageContext?.type === "cart"
+      ? "Guidance for your bag"
+      : pageContext?.type === "category"
+        ? "Guidance for this collection"
+        : null;
 
   const inlineSize = size
     ? ({ width: `${size.width}px`, height: `${size.height}px` } as const)
@@ -75,6 +92,7 @@ export default function YafaDrawer() {
       <button
         type="button"
         className="yafa-fab"
+        ref={launcherRef}
         onClick={toggleDrawer}
         aria-expanded={isOpen}
         aria-controls="yafa-drawer"
@@ -94,9 +112,12 @@ export default function YafaDrawer() {
         style={inlineSize}
       >
         <header className="yafa-drawer__header">
-          <h2>YAFA</h2>
-          <p>Your personal beauty companion</p>
-          <button type="button" className="yafa-drawer__close" onClick={closeDrawer} aria-label="Close Yafa chat">
+          <div>
+            <h2>YAFA</h2>
+            <p>Your personal beauty companion</p>
+            {contextLabel ? <span className="yafa-drawer__context">{contextLabel}</span> : null}
+          </div>
+          <button type="button" className="yafa-drawer__close" onClick={close} aria-label="Close Yafa chat">
             ×
           </button>
         </header>

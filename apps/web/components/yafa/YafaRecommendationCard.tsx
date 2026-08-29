@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { fetchLiveProductCard, type LiveProductCardData } from "../../lib/yafa-chat";
 import type { YafaRecommendation } from "../../lib/yafa-chat";
+import { addCartItem } from "@/components/cart/cart-client";
 
 const REASON_PHRASES: Record<string, string> = {
   warm_undertone_match: "Warm undertone match",
@@ -34,6 +35,8 @@ export default function YafaRecommendationCard({
   recommendation: YafaRecommendation;
 }) {
   const [live, setLive] = useState<LiveProductCardData | null>(null);
+  const [isAdding, setIsAdding] = useState(false);
+  const [notice, setNotice] = useState("");
 
   useEffect(() => {
     let cancelled = false;
@@ -55,6 +58,21 @@ export default function YafaRecommendationCard({
       : recommendation.score >= 0.55
         ? "Good Match"
         : "Alternative";
+
+  const canAddToBag = Boolean(recommendation.variant_id && live?.live && live.in_stock);
+  const addToBag = async () => {
+    if (!recommendation.variant_id || isAdding) return;
+    setIsAdding(true);
+    setNotice("");
+    try {
+      await addCartItem(recommendation.product_id, recommendation.variant_id, 1);
+      setNotice("Added to your bag.");
+    } catch (error) {
+      setNotice(error instanceof Error ? error.message : "This item could not be added to your bag.");
+    } finally {
+      setIsAdding(false);
+    }
+  };
 
   return (
     <div className="yafa-card">
@@ -104,9 +122,17 @@ export default function YafaRecommendationCard({
         </details>
       ) : null}
 
-      <a className="yafa-card__view" href={`/products/${live?.slug ?? ""}`}>
-        View Product
-      </a>
+      <div className="yafa-card__actions">
+        <a className="yafa-card__view" href={`/products/${live?.slug ?? ""}`}>
+          View product
+        </a>
+        {recommendation.variant_id ? (
+          <button type="button" className="yafa-card__add" disabled={!canAddToBag || isAdding} onClick={() => void addToBag()}>
+            {isAdding ? "Adding…" : canAddToBag ? "Add to bag" : "Checking availability…"}
+          </button>
+        ) : null}
+      </div>
+      {notice ? <p className="yafa-card__notice" role="status">{notice}</p> : null}
     </div>
   );
 }

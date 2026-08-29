@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef } from "react";
+import Link from "next/link";
 import { useYafa } from "./YafaProvider";
 import YafaMessage from "./YafaMessage";
 import YafaSuggestedQuestions from "./YafaSuggestedQuestions";
@@ -10,7 +11,7 @@ import YafaSuggestedQuestions from "./YafaSuggestedQuestions";
  * from YafaProvider so navigation never resets the chat.
  */
 export default function YafaChat() {
-  const { messages, isThinking } = useYafa();
+  const { messages, isThinking, send } = useYafa();
   const bottomRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
@@ -24,6 +25,11 @@ export default function YafaChat() {
           Hi, I&apos;m Yafa. Ask me about any product, your shade, or the look
           you&apos;re planning — voice and photos work too.
         </p>
+        <div className="yafa-drawer__journeys" aria-label="Start with Yafa">
+          <Link href="/yafa">Find my shade</Link>
+          <button type="button" disabled={isThinking} onClick={() => void send("Help me build a simple beauty routine")}>Build a routine</button>
+          <button type="button" disabled={isThinking} onClick={() => void send("Can you match my makeup to an outfit?")}>Match an outfit</button>
+        </div>
         <YafaSuggestedQuestions />
       </div>
     );

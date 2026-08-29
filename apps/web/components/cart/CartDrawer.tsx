@@ -6,7 +6,6 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import type { CartResponse } from "@/lib/cart-types";
 import { formatCatalogPrice } from "@/lib/catalog-types";
 import { getCart, removeCartItem, updateCartItem } from "./cart-client";
-import { useRequireAuth } from "@/components/auth/AuthProvider";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/components/auth/AuthProvider";
 import { getConfirmedYafaProfile, type ConfirmedYafaProfile } from "@/lib/yafa-profile";
@@ -29,7 +28,7 @@ export default function CartDrawer() {
   const pendingKeys = useRef(new Set<string>());
 
   const close = useCallback(() => setOpen(false), []);
-  const checkout = useRequireAuth(() => { close(); router.push("/checkout"); });
+  const checkout = useCallback(() => { close(); router.push("/checkout"); }, [close, router]);
 
   useEffect(() => {
     const onOpen = (event: Event) => {

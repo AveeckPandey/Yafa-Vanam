@@ -1,3 +1,7 @@
+import CartPage from "@/components/cart/CartPage";
+
 export const metadata = { title: "Cart", robots: { index: false, follow: false } };
 
-export default function Page(){return <main className="route-page"><h1>Cart</h1><p>YAFA VANAM Cart.</p></main>}
+export default function Page() {
+  return <CartPage />;
+}
