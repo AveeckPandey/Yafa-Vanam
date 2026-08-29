@@ -1,7 +1,6 @@
 "use client";
 
 import Image from "next/image";
-import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import ProductCard from "@/components/product/ProductCard";
@@ -76,7 +75,7 @@ export default function MakeupCatalog({ products }: { products: CatalogProduct[]
           <div className="collection-toolbar__actions"><button type="button" onClick={() => setFilterOpen(true)}><span aria-hidden="true">☷</span> Filters{selectedTypes.length ? ` (${selectedTypes.length})` : ""}</button><p>{visibleProducts.length} {visibleProducts.length === 1 ? "product" : "products"}</p><label className="collection-sort"><span>Sort</span><select value={sortOrder} onChange={(event) => setSortOrder(event.target.value as SortOrder)}><option value="featured">Featured</option><option value="price-asc">Price: low to high</option><option value="price-desc">Price: high to low</option><option value="name">Name: A–Z</option></select></label></div>
         </div>
         <div className="commerce-grid makeup-product-grid">
-          {visibleProducts.map((product, index) => <div className="commerce-grid__item" key={product.id}>{category === "all" && selectedTypes.length === 0 && sortOrder === "featured" && index === 6 ? <article className="makeup-shade-tile"><p>Find your shade</p><h2>A more personal starting point for complexion.</h2><Link href="/build-my-kit">Find My Shade <span aria-hidden="true">↗</span></Link></article> : null}<ProductCard product={product} onQuickShop={setQuickProduct} eager={index < 4} showShadeCount /></div>)}
+          {visibleProducts.map((product, index) => <div className="commerce-grid__item" key={product.id}><ProductCard product={product} onQuickShop={setQuickProduct} eager={index < 4} showShadeCount /></div>)}
         </div>
       </section>
 

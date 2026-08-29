@@ -1,12 +1,11 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import type { CatalogProduct } from "@/lib/catalog-types";
 import { useAuth } from "@/components/auth/AuthProvider";
 import { getConfirmedYafaProfile, type ConfirmedYafaProfile } from "@/lib/yafa-profile";
 import { trackEvent } from "@/lib/analytics";
-import { transcribeAudio } from "@/lib/yafa-chat";
 import { advisorApi } from "@/lib/advisor/client";
 import type { Recommendation } from "@/lib/advisor/types";
 
@@ -17,8 +16,6 @@ const steps: Array<{ key: keyof Answer; label: string; question: string; options
   { key: "focus", label: "Your edit", question: "Where should we begin?", options: [{ label: "Complexion", value: "face" }, { label: "Eyes and lips", value: "colour" }, { label: "Skin care", value: "care" }] },
   { key: "budget", label: "Your budget", question: "How would you like to build your kit?", options: [{ label: "A considered essential", value: "essential" }, { label: "A complete ritual", value: "complete" }, { label: "Show me both", value: "both" }] },
 ];
-
-type MicState = "idle" | "recording" | "working" | "error";
 
 /** Deterministic keyword parse of a spoken/written brief into quiz answers. */
 export function parseBrief(text: string): Partial<Answer> {
@@ -55,12 +52,8 @@ export default function BuildMyKit({ products }: { products: CatalogProduct[] })
   const [engineError, setEngineError] = useState<string | null>(null);
   const [seeking, setSeeking] = useState(false);
 
-  // Voice brief state (Go -> Whisper transcription; no third-party voice SDKs).
-  const [micState, setMicState] = useState<MicState>("idle");
   const [briefText, setBriefText] = useState("");
-  const [micError, setMicError] = useState<string | null>(null);
-  const recorderRef = useRef<MediaRecorder | null>(null);
-  const chunksRef = useRef<Blob[]>([]);
+  const [briefError, setBriefError] = useState<string | null>(null);
 
   const current = steps[step];
   const complete = step === steps.length;
@@ -85,62 +78,8 @@ export default function BuildMyKit({ products }: { products: CatalogProduct[] })
     const parsed = parseBrief(text);
     if (!Object.keys(parsed).length) return false;
     setAnswers((currentAnswers) => ({ ...currentAnswers, ...parsed }));
-    trackEvent("quiz_answered", { source: "voice_brief", fields: Object.keys(parsed).join(",") });
+    trackEvent("quiz_answered", { source: "typed_brief", fields: Object.keys(parsed).join(",") });
     return true;
-  };
-
-  // --- voice brief ----------------------------------------------------------
-  const startMic = async () => {
-    setMicError(null);
-    if (!navigator.mediaDevices?.getUserMedia || typeof MediaRecorder === "undefined") {
-      setMicError("This browser doesn't support voice input — type your brief instead.");
-      setMicState("error");
-      return;
-    }
-    try {
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      chunksRef.current = [];
-      const recorder = new MediaRecorder(stream);
-      recorder.ondataavailable = (event) => {
-        if (event.data.size > 0) chunksRef.current.push(event.data);
-      };
-      recorder.onstop = async () => {
-        stream.getTracks().forEach((track) => track.stop());
-        const blob = new Blob(chunksRef.current, { type: recorder.mimeType });
-        chunksRef.current = [];
-        if (blob.size === 0) {
-          setMicState("idle");
-          return;
-        }
-        setMicState("working");
-        try {
-          const result = await transcribeAudio(blob);
-          if (result.text?.trim()) {
-            setBriefText(result.text.trim());
-            applyBriefToQuiz(result.text);
-            setMicState("idle");
-          } else {
-            setMicError("I couldn't hear anything — try recording again.");
-            setMicState("error");
-          }
-        } catch {
-          setMicError("Transcription is unavailable right now. Retry, or fill the quiz manually.");
-          setMicState("error");
-        }
-      };
-      recorderRef.current = recorder;
-      recorder.start();
-      setMicState("recording");
-      trackEvent("quiz_answered", { source: "voice_brief_started" });
-    } catch {
-      setMicError("Microphone access was blocked. Allow it in your browser settings, then retry.");
-      setMicState("error");
-    }
-  };
-
-  const stopMic = () => {
-    const recorder = recorderRef.current;
-    if (recorder && recorder.state !== "inactive") recorder.stop();
   };
 
   // --- results: live engine first, static fallback ---------------------------
@@ -181,25 +120,12 @@ export default function BuildMyKit({ products }: { products: CatalogProduct[] })
   const advance = () => setStep((currentStep) => Math.min(steps.length, currentStep + 1));
 
   return <main id="main-content" className="kit-flow">
-    <section className="kit-flow__intro"><p>YAFA VANAM / Personal ritual</p><h1>Build My Kit</h1><span>A small guided edit, shaped around how you want to feel.</span>{yafaProfile && useYafaMatch ? <aside className="kit-flow__yafa">We’ve pre-selected your Yafa shade — {yafaProfile.shade_name}. <button type="button" onClick={() => setUseYafaMatch(false)}>Undo</button></aside> : !yafaProfile ? <Link className="kit-flow__yafa" href="/yafa">Complete your Yafa profile to get your shade pre-selected.</Link> : null}</section>
+    <section className="kit-flow__intro"><p>YAFA VANAM / Personal ritual</p><h1>Build My Kit</h1><span>A small guided edit, shaped around how you want to feel.</span>{yafaProfile && useYafaMatch ? <aside className="kit-flow__yafa">We’ve pre-selected your Yafa shade — {yafaProfile.shade_name}. <button type="button" onClick={() => setUseYafaMatch(false)}>Undo</button></aside> : !yafaProfile ? <aside className="kit-flow__yafa">Answer a few questions to shape your edit.</aside> : null}</section>
 
-    {/* Voice brief — speak it and the quiz fills itself in */}
+    {/* Optional typed brief — fills the quiz from the customer's words. */}
     {!complete ? (
       <section className="kit-flow__step kit-flow__brief" aria-labelledby="kit-brief-title">
-        <h2 id="kit-brief-title">Or just tell Yafa what you need</h2>
-        <div className="kit-brief__controls">
-          {micState === "recording" ? (
-            <>
-              <button type="button" className="kit-brief__stop" onClick={stopMic}>⏹ Stop</button>
-              <span className="kit-brief__status" role="status">Recording…</span>
-            </>
-          ) : (
-            <button type="button" className="kit-brief__mic" onClick={startMic} disabled={micState === "working"} aria-label="Describe your kit with your voice">
-              🎤 Speak your brief
-            </button>
-          )}
-          {micState === "working" ? <span className="kit-brief__status" role="status">Listening back…</span> : null}
-        </div>
+        <h2 id="kit-brief-title">Tell Yafa what you need</h2>
         <label className="visually-hidden" htmlFor="kit-brief-text">Your beauty brief</label>
         <textarea
           id="kit-brief-text"
@@ -207,30 +133,26 @@ export default function BuildMyKit({ products }: { products: CatalogProduct[] })
           maxLength={500}
           placeholder='e.g. “I need an everyday natural kit for office weeks.”'
           value={briefText}
-          onChange={(event) => setBriefText(event.target.value)}
+          onChange={(event) => {
+            setBriefText(event.target.value);
+            setBriefError(null);
+          }}
         />
         <div className="kit-brief__actions">
           <button
             type="button"
             onClick={() => {
               if (!applyBriefToQuiz(briefText)) {
-                setMicError("Tell me a little more — mention a goal, finish, focus or budget.");
-                setMicState("error");
+                setBriefError("Mention a goal, finish, focus, or budget so Yafa can use your brief.");
                 return;
               }
-              setMicState("idle");
-              setMicError(null);
+              setBriefError(null);
             }}
             disabled={!briefText.trim()}
           >
             Fill the quiz from this
           </button>
-          {micState === "error" && micError ? (
-            <>
-              <span className="kit-brief__error" role="alert">{micError}</span>
-              <button type="button" className="kit-brief__retry" onClick={startMic}>Retry</button>
-            </>
-          ) : null}
+          {briefError ? <span className="kit-brief__error" role="alert">{briefError}</span> : null}
         </div>
       </section>
     ) : null}

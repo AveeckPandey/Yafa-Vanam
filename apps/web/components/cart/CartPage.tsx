@@ -69,8 +69,8 @@ export default function CartPage() {
       {status === "ready" && cart.items.length === 0 ? (
         <section className={styles.empty}>
           <h2>Your bag is waiting for something beautiful.</h2>
-          <p>Explore the collection or let YAFA help you find a shade, ritual, or full look.</p>
-          <div><Link className="button-primary" href="/shop">Explore the collection <span aria-hidden="true">→</span></Link><Link href="/yafa">Find your shade</Link></div>
+          <p>Explore the collection or let YAFA help you build a ritual or full look.</p>
+          <div><Link className="button-primary" href="/shop">Explore the collection <span aria-hidden="true">→</span></Link></div>
         </section>
       ) : null}
 

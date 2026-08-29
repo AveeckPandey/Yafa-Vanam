@@ -274,9 +274,6 @@ export default function Navbar() {
           <Link className="primary-nav__kit" href="/build-my-kit">
             Build My Kit
           </Link>
-          <Link className="primary-nav__kit primary-nav__shade" href="/yafa">
-            Find Your Shade
-          </Link>
         </div>
 
         <div className="primary-nav__mobile-actions">

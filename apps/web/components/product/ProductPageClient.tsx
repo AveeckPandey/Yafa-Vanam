@@ -214,7 +214,7 @@ export default function ProductPageClient({
                 <AddToBag className="pdp-add" productId={product.id} variantId={variantId} quantity={quantity} />
               </div>
             </div>
-            {yafaProfile ? <aside className="pdp-yafa-match"><span style={{ backgroundColor: yafaProfile.hex }} aria-hidden="true" /><div><strong>{yafaVariantMatch ? "Recommended for you by Yafa" : `Your Yafa match: ${yafaProfile.shade_name}`}</strong><p>{yafaVariantMatch ? `${yafaProfile.shade_name} is selected for this product.` : "This product does not currently offer your exact Yafa shade."} <Link href="/yafa">Change shade</Link></p></div></aside> : hasShadeOptions ? <Link className="pdp-yafa-cta" href="/yafa">Find Your Shade with Yafa</Link> : null}
+            {yafaProfile ? <aside className="pdp-yafa-match"><span style={{ backgroundColor: yafaProfile.hex }} aria-hidden="true" /><div><strong>{yafaVariantMatch ? "Recommended for you by Yafa" : `Your Yafa match: ${yafaProfile.shade_name}`}</strong><p>{yafaVariantMatch ? `${yafaProfile.shade_name} is selected for this product.` : "This product does not currently offer your exact Yafa shade."}</p></div></aside> : null}
           </section>
 
           {product.ragQuestions.length > 0 ? (

@@ -1,8 +1,7 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useState } from "react";
 import { useYafa, type YafaAttachment } from "./YafaProvider";
-import YafaMicrophone from "./YafaMicrophone";
 import YafaImageUpload from "./YafaImageUpload";
 import { analyseOutfitImage, type OutfitAttributes } from "../../lib/yafa-chat";
 
@@ -25,7 +24,6 @@ export default function YafaInput() {
   const [pendingImage, setPendingImage] = useState<{ file: File; previewUrl: string } | null>(null);
   const [imageError, setImageError] = useState("");
   const [isPreparingImage, setIsPreparingImage] = useState(false);
-  const textareaRef = useRef<HTMLTextAreaElement | null>(null);
 
   const removePendingImage = () => {
     if (pendingImage) URL.revokeObjectURL(pendingImage.previewUrl);
@@ -84,12 +82,11 @@ export default function YafaInput() {
       ) : null}
       <textarea
         id="yafa-input-field"
-        ref={textareaRef}
         className="yafa-input__field"
         value={value}
         rows={2}
         maxLength={MAX_LENGTH}
-        placeholder="Ask about products, shades, or the look you're planning…"
+        placeholder="Ask about products or the look you're planning…"
         onChange={(event) => setValue(event.target.value)}
         onKeyDown={(event) => {
           if (event.key === "Enter" && !event.shiftKey) {
@@ -99,14 +96,6 @@ export default function YafaInput() {
         }}
       />
       <div className="yafa-input__tools">
-        <YafaMicrophone
-          disabled={isThinking || isPreparingImage}
-          onTranscript={(text) => {
-            // Transcript is EDITABLE before sending (spec section 26).
-            setValue((current) => (current ? `${current} ${text}` : text).slice(0, MAX_LENGTH));
-            textareaRef.current?.focus();
-          }}
-        />
         <YafaImageUpload
           onError={setImageError}
           disabled={isThinking || isPreparingImage}
