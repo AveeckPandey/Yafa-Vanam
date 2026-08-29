@@ -7,6 +7,7 @@ import eyeShadeData from "../../../services/recommendation-engine/data/eyes.json
 import type { BodyCareGroup, CatalogIncludedShade, CatalogProduct, MakeupGroup, SkincareGroup } from "./catalog-types";
 import type { SearchIndexProduct } from "./product-search";
 import { makeupProductImageManifest } from "./makeup-assets";
+import { getLipstickShade } from "./lipstick-shades";
 
 type SourceProduct = {
   id: string;
@@ -128,18 +129,6 @@ for (const source of authoritativeSourceChunks as ShadeReferenceChunk[]) {
     }
   }
 }
-
-const storefrontVariantIdsByProductId: Record<string, string[]> = {
-  // The active Petal Velvet assortment is the six distinct shades specified for storefront sale.
-  "yv-lip-001": [
-    "yv-lip-001-petal-nude",
-    "yv-lip-001-rose-mist",
-    "yv-lip-001-mauve-wood",
-    "yv-lip-001-clay-rose",
-    "yv-lip-001-berry-soft",
-    "yv-lip-001-terracotta-dream",
-  ],
-};
 
 // These references are product-specific visual fallbacks for source records
 // whose authoritative status explicitly has no sampled HEX yet. They never
@@ -348,10 +337,7 @@ function mapProduct(product: SourceProduct): CatalogProduct {
   // Use that same source for storefront variants so a visible shade is always
   // a purchasable variant; external display metadata must never invent one.
   const variantSource = product;
-  const storefrontVariantIds = storefrontVariantIdsByProductId[product.id];
-  const activeVariants = variantSource.variants.filter((variant) =>
-    variant.is_active && (!storefrontVariantIds || storefrontVariantIds.includes(variant.id)),
-  );
+  const activeVariants = variantSource.variants.filter((variant) => variant.is_active);
   const includedShades: CatalogIncludedShade[] = (authoritativeProduct?.palette_colors ?? []).map((shade, index) => ({
     id: shade.code ?? `${product.id}-included-${index + 1}`,
     name: shade.name,
@@ -392,12 +378,13 @@ function mapProduct(product: SourceProduct): CatalogProduct {
       shade: (() => {
         if (!variant.shade) return null;
         const reference = getShadeReference(product.id, variant.id, variant.shade);
+        const lipstickShade = getLipstickShade(product.id, variant.id);
         return {
-          name: reference?.name ?? shadeLabel(variant.shade),
-          code: variant.shade.code ?? null,
+          name: lipstickShade?.name ?? reference?.name ?? shadeLabel(variant.shade),
+          code: lipstickShade?.key ?? variant.shade.code ?? null,
           undertone: variant.shade.undertone ?? reference?.undertone ?? null,
           depthFamily: variant.shade.depth_family ?? null,
-          hex: shadePreviewHex(variant.shade, reference?.hex),
+          hex: lipstickShade?.hex ?? shadePreviewHex(variant.shade, reference?.hex),
         };
       })(),
       price: variant.price,

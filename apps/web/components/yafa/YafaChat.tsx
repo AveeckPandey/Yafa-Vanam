@@ -11,7 +11,7 @@ import YafaSuggestedQuestions from "./YafaSuggestedQuestions";
  * from YafaProvider so navigation never resets the chat.
  */
 export default function YafaChat() {
-  const { messages, isThinking, send } = useYafa();
+  const { messages, isThinking, send, quickQuestions } = useYafa();
   const bottomRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
@@ -30,7 +30,7 @@ export default function YafaChat() {
           <button type="button" disabled={isThinking} onClick={() => void send("Help me build a simple beauty routine")}>Build a routine</button>
           <button type="button" disabled={isThinking} onClick={() => void send("Can you match my makeup to an outfit?")}>Match an outfit</button>
         </div>
-        <YafaSuggestedQuestions />
+        <YafaSuggestedQuestions questions={quickQuestions} />
       </div>
     );
   }

@@ -2,7 +2,7 @@
 
 import Image from "next/image";
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import type { CatalogProduct, CatalogVariant } from "@/lib/catalog-types";
 import { formatCatalogPrice } from "@/lib/catalog-types";
 import { getMakeupVariantImage, getVerifiedShadeImage } from "@/lib/makeup-variant-images";
@@ -17,6 +17,7 @@ import { useAuth } from "@/components/auth/AuthProvider";
 import { getConfirmedYafaProfile, type ConfirmedYafaProfile } from "@/lib/yafa-profile";
 import { trackEvent } from "@/lib/analytics";
 import { useYafa } from "@/components/yafa/YafaProvider";
+import { getYafaProductQuestions } from "@/lib/yafa-product-questions";
 
 function pretty(value: string) {
   return value.replaceAll("_", " ");
@@ -70,7 +71,7 @@ export default function ProductPageClient({
   layerMatch: CatalogProduct | null;
 }) {
   const { user } = useAuth();
-  const { setPageContext } = useYafa();
+  const { setPageContext, setQuickQuestions } = useYafa();
   const [quantity, setQuantity] = useState(1);
   const [variantId, setVariantId] = useState(product.defaultVariantId);
   const [yafaProfile, setYafaProfile] = useState<ConfirmedYafaProfile | null>(null);
@@ -97,6 +98,10 @@ export default function ProductPageClient({
     : variantImage && selected?.shade
       ? `${product.imageAlt} in shade ${shadeName(selected.shade)}`
       : product.imageAlt;
+  const yafaQuestions = useMemo(
+    () => getYafaProductQuestions(product, selected?.shade ?? null),
+    [product, selected?.shade],
+  );
 
   useEffect(() => {
     trackEvent("product_viewed", { product_id: product.id, product_slug: product.slug, category: product.category });
@@ -121,8 +126,12 @@ export default function ProductPageClient({
       variant_id: variantId,
       shade_id: selectedShadeCode,
     });
-    return () => setPageContext(null);
-  }, [product.id, selectedShadeCode, setPageContext, variantId]);
+    setQuickQuestions(yafaQuestions);
+    return () => {
+      setPageContext(null);
+      setQuickQuestions([]);
+    };
+  }, [product.id, selectedShadeCode, setPageContext, setQuickQuestions, variantId, yafaQuestions]);
 
   return (
     <main id="main-content" className="product-page">
@@ -213,6 +222,7 @@ export default function ProductPageClient({
               productId={product.id}
               variantId={variantId}
               shadeId={selected?.shade?.code ?? null}
+              questions={yafaQuestions}
             />
           ) : null}
 

@@ -1,11 +1,27 @@
 import type { CartResponse } from "@/lib/cart-types";
 import { csrfToken } from "@/lib/csrf-client";
 import { trackEvent } from "@/lib/analytics";
+import { getMakeupVariantImage } from "@/lib/makeup-variant-images";
+import { getLipstickShadeByVariantId } from "@/lib/lipstick-shades";
+
+function normalizeCart(cart: CartResponse): CartResponse {
+  return {
+    ...cart,
+    items: cart.items.map((item) => {
+      const lipstickShade = getLipstickShadeByVariantId(item.variantId);
+      return {
+        ...item,
+        image: getMakeupVariantImage(item.variantId) ?? item.image,
+        shade: lipstickShade?.name ?? item.shade,
+      };
+    }),
+  };
+}
 
 export async function getCart() {
   const response = await fetch("/api/cart", { credentials: "include", cache: "no-store" });
   if (!response.ok) throw new Error("Unable to load the bag.");
-  return response.json() as Promise<CartResponse>;
+  return normalizeCart(await response.json() as CartResponse);
 }
 
 export async function addCartItem(productId: string, variantId: string, quantity: number) {
@@ -20,7 +36,7 @@ export async function addCartItem(productId: string, variantId: string, quantity
     const payload = await response.json().catch(() => null) as { error?: string } | null;
     throw new Error(payload?.error || "This item could not be added to your bag.");
   }
-  const cart = await response.json() as CartResponse;
+  const cart = normalizeCart(await response.json() as CartResponse);
   window.dispatchEvent(new CustomEvent("yafa-cart-updated", { detail: cart }));
   window.dispatchEvent(new CustomEvent("yafa-cart-open", { detail: cart }));
   return cart;
@@ -38,7 +54,7 @@ export async function updateCartItem(key: string, quantity: number) {
     const payload = await response.json().catch(() => null) as { error?: string } | null;
     throw new Error(payload?.error || "The quantity could not be updated.");
   }
-  const cart = await response.json() as CartResponse;
+  const cart = normalizeCart(await response.json() as CartResponse);
   window.dispatchEvent(new CustomEvent("yafa-cart-updated", { detail: cart }));
   return cart;
 }
@@ -50,7 +66,7 @@ export async function removeCartItem(key: string) {
     const payload = await response.json().catch(() => null) as { error?: string } | null;
     throw new Error(payload?.error || "The item could not be removed.");
   }
-  const cart = await response.json() as CartResponse;
+  const cart = normalizeCart(await response.json() as CartResponse);
   trackEvent("product_removed_from_cart", { line_item: key });
   window.dispatchEvent(new CustomEvent("yafa-cart-updated", { detail: cart }));
   return cart;

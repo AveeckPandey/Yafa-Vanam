@@ -1,25 +1,22 @@
 "use client";
 
-import { useRef, useState } from "react";
-import { analyseOutfitImage, type OutfitAttributes } from "../../lib/yafa-chat";
+import { useRef } from "react";
 
 /**
- * Image upload for the Yafa drawer (Phase 3 sections 18-20, 35):
- * outfit photos -> structured colour attributes fed into the profile.
- * The local preview URL is handed to the caller so the image can be shown
- * inside the chat thread; the file itself is never persisted.
+ * Selects an outfit image for the chat composer. Analysis is deliberately
+ * deferred until send so the shopper can inspect or remove the preview first.
  */
 export default function YafaImageUpload({
-  onOutfitAttributes,
+  onImageSelected,
   onError,
+  disabled = false,
 }: {
-  onOutfitAttributes: (attributes: OutfitAttributes, previewUrl: string) => void;
+  onImageSelected: (file: File, previewUrl: string) => void;
   onError: (message: string) => void;
+  disabled?: boolean;
 }) {
   const inputRef = useRef<HTMLInputElement | null>(null);
-  const [busy, setBusy] = useState(false);
-
-  const handleFile = async (file: File) => {
+  const handleFile = (file: File) => {
     if (!file.type.startsWith("image/")) {
       onError("Please choose an image file.");
       return;
@@ -28,19 +25,9 @@ export default function YafaImageUpload({
       onError("That image is too large — please keep it under 8 MB.");
       return;
     }
-    setBusy(true);
-    // Local preview for the chat bubble; revoked implicitly on page unload.
     const previewUrl = URL.createObjectURL(file);
-    try {
-      const attributes = await analyseOutfitImage(file);
-      onOutfitAttributes(attributes, previewUrl);
-    } catch {
-      URL.revokeObjectURL(previewUrl);
-      onError("I couldn't read that outfit photo. Try another one?");
-    } finally {
-      setBusy(false);
-      if (inputRef.current) inputRef.current.value = "";
-    }
+    onImageSelected(file, previewUrl);
+    if (inputRef.current) inputRef.current.value = "";
   };
 
   return (
@@ -49,11 +36,11 @@ export default function YafaImageUpload({
         type="button"
         className="yafa-image-upload__button"
         onClick={() => inputRef.current?.click()}
-        disabled={busy}
-        aria-label="Upload an outfit photo so Yafa can match colours"
-        title="Upload an outfit photo"
+        disabled={disabled}
+        aria-label="Add an outfit photo"
+        title="Add an outfit photo"
       >
-        {busy ? "…" : "👗"}
+        Add image
       </button>
       <input
         ref={inputRef}

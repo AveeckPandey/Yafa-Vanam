@@ -45,6 +45,8 @@ type YafaContextValue = {
   messages: YafaMessage[];
   isThinking: boolean;
   error: string | null;
+  quickQuestions: string[];
+  setQuickQuestions: (questions: string[]) => void;
   pageContext: YafaPageContext | null;
   setPageContext: (context: YafaPageContext | null) => void;
   profile: YafaProfilePayload;
@@ -79,6 +81,7 @@ export function YafaProvider({ children }: { children: ReactNode }) {
   const [messages, setMessages] = useState<YafaMessage[]>([]);
   const [isThinking, setIsThinking] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [quickQuestions, setQuickQuestions] = useState<string[]>([]);
   const [pageContext, setPageContext] = useState<YafaPageContext | null>(null);
   const [profile, setProfile] = useState<YafaProfilePayload>({});
   const [shadeResult, setShadeResult] = useState<ShadeResultSummary | null>(null);
@@ -163,6 +166,8 @@ export function YafaProvider({ children }: { children: ReactNode }) {
       messages,
       isThinking,
       error,
+      quickQuestions,
+      setQuickQuestions,
       pageContext,
       setPageContext,
       profile,
@@ -179,6 +184,7 @@ export function YafaProvider({ children }: { children: ReactNode }) {
       messages,
       isThinking,
       error,
+      quickQuestions,
       pageContext,
       profile,
       mergeProfile,

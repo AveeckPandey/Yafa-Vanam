@@ -2,6 +2,8 @@
  * Verified local product/variant asset relationships. A missing entry returns
  * null so the UI never substitutes a different shade's image.
  */
+import { getLipstickVariantImage } from "./lipstick-shades";
+
 const exactVariantImages: Record<string, string> = {
   "yv-cheek-001-dawn-petal": "/images/yafavanam/cheeks/Airbloom/Airbloom-Dawn-Petal.png",
   "yv-cheek-001-mauve-air": "/images/yafavanam/cheeks/Airbloom/Airbloom-Mauve-Air.png",
@@ -201,7 +203,7 @@ const exactVariantImages: Record<string, string> = {
 export function getMakeupVariantImage(variantId: string) {
   // Only a verified, explicitly mapped asset can be treated as variant-specific.
   // Missing mappings deliberately fall back to the product's shared image.
-  return exactVariantImages[variantId] ?? null;
+  return getLipstickVariantImage(variantId) ?? exactVariantImages[variantId] ?? null;
 }
 
 type ShadeProductImage = {

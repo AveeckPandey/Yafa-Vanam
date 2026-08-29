@@ -12,10 +12,12 @@ export default function YafaProductGuidance({
   productId,
   variantId,
   shadeId,
+  questions,
 }: {
   productId: string;
   variantId?: string | null;
   shadeId?: string | null;
+  questions: string[];
 }) {
   const { openDrawer, setPageContext, send, isThinking } = useYafa();
   const [question, setQuestion] = useState("");
@@ -39,11 +41,7 @@ export default function YafaProductGuidance({
     <section className="ask-yafa" aria-labelledby="ask-yafa-title">
       <h2 id="ask-yafa-title">Ask YAFA</h2>
       <div className="ask-yafa__questions">
-        {[
-          "What does this smell like?",
-          "Where does this fit in a routine?",
-          "Would this work for an evening event?",
-        ].map((suggestion) => (
+        {questions.map((suggestion) => (
           <button key={suggestion} type="button" onClick={() => ask(suggestion)}>
             {suggestion}
           </button>
