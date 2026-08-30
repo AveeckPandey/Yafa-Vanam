@@ -1,0 +1,410 @@
+/* YAFA VANAM 60–30–10 system: warm paper, ink, and a restrained copper accent. */
+:root {
+  --palette-background: #F9F6F0;
+  --palette-ink: #262220;
+  --palette-accent: #B87355;
+  --palette-border: color-mix(in srgb, var(--palette-ink) 18%, transparent);
+  --palette-accent-soft: color-mix(in srgb, var(--palette-accent) 12%, var(--palette-background));
+}
+
+html,
+body {
+  background: var(--palette-background);
+  color: var(--palette-ink);
+}
+
+body,
+button,
+input,
+textarea,
+select {
+  color: var(--palette-ink);
+}
+
+::selection {
+  color: var(--palette-background);
+  background: var(--palette-accent);
+}
+
+:focus-visible {
+  outline-color: var(--palette-accent);
+}
+
+.site-header,
+.utility-nav,
+.primary-nav,
+.mega-menu,
+.mobile-menu,
+.header-search,
+.header-search-layer,
+.collection-drawer__panel,
+.filter-sheet,
+.cart-drawer__body,
+.site-cart-drawer__panel,
+.site-cart-drawer__body {
+  background: var(--palette-background);
+  color: var(--palette-ink);
+  border-color: var(--palette-border);
+}
+
+.utility-nav,
+.primary-nav,
+.site-header,
+.mega-menu,
+.mobile-menu__header,
+.header-search__field-row,
+.collection-drawer__panel,
+.site-cart-drawer__panel {
+  border-color: var(--palette-border);
+}
+
+.wordmark,
+.mobile-menu__wordmark,
+.checkout-wordmark,
+.primary-nav__brand,
+.primary-nav__link,
+.primary-nav__trigger,
+.utility-nav__actions,
+.utility-nav__contact,
+.site-footer__brand,
+.site-footer__bottom,
+.site-footer nav a {
+  color: var(--palette-ink);
+}
+
+.primary-nav__link:hover,
+.primary-nav__trigger:hover,
+.utility-nav__contact:hover,
+.site-footer nav a:hover,
+.header-search__result:hover,
+.collection-tabs button:hover,
+.collection-sort button:hover,
+.collection-toolbar button:hover {
+  color: var(--palette-accent);
+}
+
+.button-primary,
+.auth-modal__submit,
+.checkout-submit,
+.site-cart-drawer__checkout,
+.cart-drawer__checkout,
+.quick-shop__add,
+.sticky-buy-bar__button,
+.welcome-promo__cta,
+.yafa-input__send,
+.yafa-fab,
+.shade-results__confirm,
+.pdp-add {
+  border-color: var(--palette-accent);
+  background: var(--palette-accent);
+  color: var(--palette-ink);
+}
+
+.button-primary:hover,
+.auth-modal__submit:hover,
+.checkout-submit:hover:not(:disabled),
+.site-cart-drawer__checkout:hover,
+.cart-drawer__checkout:hover,
+.quick-shop__add:hover,
+.sticky-buy-bar__button:hover,
+.welcome-promo__cta:hover,
+.yafa-input__send:hover,
+.yafa-fab:hover,
+.shade-results__confirm:hover,
+.pdp-add:hover {
+  border-color: var(--palette-ink);
+  background: var(--palette-ink);
+  color: var(--palette-background);
+}
+
+.collection-tabs button.is-active,
+.collection-sort button.is-active,
+.makeup-category-nav button.is-active,
+.pdp-shade-selector button.is-selected,
+.pdp-shade-selector--lip-color button.is-selected,
+.checkout-option.is-selected {
+  border-color: var(--palette-accent);
+  background: var(--palette-accent-soft);
+  color: var(--palette-ink);
+}
+
+.catalog-product-card,
+.product-card,
+.featured-set,
+.featured-sets__card,
+.collection-kit-tile,
+.collection-editorial-tile,
+.yafa-product-card,
+.account-page__card,
+.checkout-payment-card,
+.reviews-empty,
+.empty,
+.status,
+.error {
+  border-color: var(--palette-border);
+  background: var(--palette-background);
+  color: var(--palette-ink);
+}
+
+.catalog-product-card__image-frame,
+.product-card__image,
+.quick-shop__image,
+.yafa-product-card__image,
+.cart-line__image,
+.site-cart-line__image,
+.checkout-line__image,
+.featured-sets__image {
+  background: var(--palette-accent-soft);
+}
+
+.collection-intro,
+.collection-shop,
+.shop-page,
+.shop-page__catalogue,
+.shop-page__departments,
+.search-results-page,
+.info-page,
+.account-page,
+.contact-page,
+.utility-page,
+.route-page,
+.product-page,
+.pdp-hero,
+.checkout-page {
+  background: var(--palette-background);
+  color: var(--palette-ink);
+}
+
+.collection-intro__eyebrow,
+.eyebrow,
+.info-page__eyebrow,
+.pdp-info__type,
+.pdp-info__family,
+.site-footer h3,
+.yafa-drawer__eyebrow,
+.yafa-drawer__context,
+.yafa-product-cards__label,
+.yafa-message__who,
+.welcome-promo__eyebrow,
+.checkout-info,
+.catalog-product-card__shade-count {
+  color: var(--palette-accent);
+}
+
+.collection-intro,
+.info-page__hero,
+.info-page__body,
+.shop-page__intro,
+.shop-page__toolbar,
+.collection-toolbar,
+.checkout-section,
+.checkout-summary,
+.site-footer__bottom,
+.yafa-drawer__header,
+.yafa-drawer__input,
+.yafa-drawer__notice,
+.yafa-message__body,
+.yafa-product-card,
+.yafa-suggested button,
+.pdp-details,
+.pdp-story,
+.product-accordion {
+  border-color: var(--palette-border);
+}
+
+.auth-modal,
+.welcome-promo,
+.cookie-banner,
+.yafa-drawer,
+.yafa-drawer__header,
+.yafa-drawer__input,
+.yafa-message__body,
+.yafa-product-card,
+.yafa-suggested button,
+.yafa-thinking,
+.yafa-input__field,
+.auth-modal input,
+.checkout-main input:not([type="checkbox"]):not([type="radio"]),
+.checkout-main select,
+.checkout-main textarea,
+.checkout-discount input {
+  background: var(--palette-background);
+  color: var(--palette-ink);
+  border-color: var(--palette-border);
+}
+
+.yafa-message--user .yafa-message__body {
+  border-color: var(--palette-accent);
+  background: var(--palette-accent);
+  color: var(--palette-ink);
+}
+
+.yafa-message__requires,
+.yafa-drawer__notice,
+.checkout-notice,
+.checkout-discount--applied,
+.auth-modal__notice,
+.site-cart-yafa-upsell,
+.pdp-yafa-match,
+.kit-flow__yafa {
+  border-color: color-mix(in srgb, var(--palette-accent) 48%, transparent);
+  background: var(--palette-accent-soft);
+  color: var(--palette-ink);
+}
+
+.yafa-input__field:focus,
+.auth-modal input:focus,
+.checkout-main input:focus,
+.checkout-main select:focus,
+.checkout-main textarea:focus,
+.checkout-discount input:focus {
+  border-color: var(--palette-accent);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--palette-accent) 20%, transparent);
+}
+
+.yafa-drawer__close,
+.yafa-drawer__action,
+.yafa-product-card__action,
+.yafa-input__disclaimer,
+.yafa-input__tools,
+.pdp-yafa-cta,
+.site-cart-yafa-match,
+.checkout-sign-in,
+.checkout-footer a,
+.checkout-section a,
+.header-search__view-all {
+  color: var(--palette-accent);
+}
+
+.site-footer {
+  background: var(--palette-background);
+  color: var(--palette-ink);
+  border-top-color: var(--palette-border);
+}
+
+.site-footer__brand p,
+.site-footer__brand h2,
+.site-footer__newsletter p,
+.site-footer__newsletter label,
+.site-footer__bottom,
+.site-footer__bottom a {
+  color: var(--palette-ink);
+}
+
+.site-footer__newsletter-field {
+  border-color: var(--palette-border);
+  background: var(--palette-background);
+}
+
+.site-footer__newsletter button {
+  border-color: var(--palette-accent);
+  background: var(--palette-accent);
+  color: var(--palette-ink);
+}
+
+.hero-logo-transition,
+.hero-logo-transition__anchor,
+.featured-sets,
+.editorial-grid,
+.featured-sets__header,
+.editorial-grid > header,
+.featured-sets__header h2,
+.editorial-grid h2,
+.featured-sets__card h3,
+.editorial-grid article h3 {
+  color: var(--palette-ink);
+}
+
+.featured-sets,
+.editorial-grid {
+  background: var(--palette-background);
+}
+
+.featured-sets__header,
+.editorial-grid > header {
+  border-color: var(--palette-border);
+}
+
+.featured-sets__header p,
+.featured-sets__card > div > span,
+.editorial-grid header > p,
+.editorial-grid article p,
+.lived-in-beauty .eyebrow {
+  color: var(--palette-accent);
+}
+
+.hero-campaign__veil {
+  background: linear-gradient(90deg, color-mix(in srgb, var(--palette-background) 94%, transparent) 0%, color-mix(in srgb, var(--palette-background) 68%, transparent) 31%, color-mix(in srgb, var(--palette-background) 6%, transparent) 54%, transparent 68%);
+}
+
+.real-skin {
+  background: var(--palette-ink);
+}
+
+.real-skin p {
+  color: var(--palette-accent);
+}
+
+.real-skin h2,
+.real-skin span,
+.real-skin a {
+  color: var(--palette-background);
+}
+
+.real-skin a {
+  border-color: var(--palette-accent);
+}
+
+/* Preserve the accent when legacy component rules use a more specific selector. */
+.hero-campaign .button-primary,
+.auth-modal .auth-modal__submit,
+.checkout-page .checkout-submit,
+.site-cart-drawer__checkout,
+.cart-drawer__checkout,
+.quick-shop__add,
+.sticky-buy-bar__button,
+.welcome-promo .welcome-promo__cta,
+.yafa-input__send,
+.yafa-fab,
+.shade-results__confirm,
+.pdp-add,
+.cookie-banner__primary {
+  border-color: var(--palette-accent) !important;
+  background: var(--palette-accent) !important;
+  color: var(--palette-ink) !important;
+}
+
+.hero-campaign .button-primary:hover,
+.auth-modal .auth-modal__submit:hover,
+.checkout-page .checkout-submit:hover:not(:disabled),
+.site-cart-drawer__checkout:hover,
+.cart-drawer__checkout:hover,
+.quick-shop__add:hover,
+.sticky-buy-bar__button:hover,
+.welcome-promo .welcome-promo__cta:hover,
+.yafa-input__send:hover,
+.yafa-fab:hover,
+.shade-results__confirm:hover,
+.pdp-add:hover,
+.cookie-banner__primary:hover {
+  border-color: var(--palette-ink) !important;
+  background: var(--palette-ink) !important;
+  color: var(--palette-background) !important;
+}
+
+.cookie-banner,
+.welcome-promo,
+.auth-modal,
+.site-cart-drawer__panel,
+.yafa-drawer {
+  box-shadow: 0 20px 60px color-mix(in srgb, var(--palette-ink) 18%, transparent);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    transition-duration: 0.01ms !important;
+    animation-duration: 0.01ms !important;
+  }
+}

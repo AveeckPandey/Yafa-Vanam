@@ -62,11 +62,19 @@ export default function MakeupCatalog({ products }: { products: CatalogProduct[]
 
   return (
     <main id="main-content" className="makeup-collection-page">
-      <section className="makeup-collection-intro" aria-labelledby="makeup-title">
+      <section className="makeup-collection-intro makeup-collection-intro--image" aria-labelledby="makeup-title">
+        <Image className="makeup-collection-intro__image" src="/images/home/campaign/hero-makeup-earth.png" alt="" fill priority sizes="100vw" />
+        <div className="makeup-collection-intro__veil" aria-hidden="true" />
         <p>Home <span aria-hidden="true">/</span> Makeup</p>
         <div><span>The color ritual</span><h1 id="makeup-title">All Makeup</h1><strong>Color, complexion and definition — considered as one ritual.</strong></div>
-        <nav className="makeup-category-nav" aria-label="Makeup categories">{categories.map((item) => <button key={item.value} type="button" className={category === item.value ? "is-active" : ""} aria-pressed={category === item.value} onClick={() => selectCategory(item.value)}><span><Image src={item.image} alt={item.alt} fill sizes="(max-width: 760px) 38vw, 180px" /></span><b>{item.label}</b></button>)}</nav>
         <p className="collection-status" aria-live="polite">{requestedType && resolvedTypes.length ? `Showing ${requestedType.replaceAll("-", " ")}.` : requestedType ? `“${requestedType}” is not a recognised category. Showing all makeup.` : requestedCategory && !queryCategoryMap[requestedCategory] ? `“${requestedCategory}” is not a recognised collection. Showing all makeup.` : category === "all" ? "Showing all makeup" : `Showing ${tabs.find((tab) => tab.value === category)?.label.toLowerCase()} makeup`}</p>
+      </section>
+
+      <section className="makeup-quick-picks" aria-label="Makeup quick picks">
+        <div className="makeup-quick-picks__inner">
+          <p className="makeup-quick-picks__eyebrow">Quick picks</p>
+          <nav className="makeup-category-nav" aria-label="Makeup categories">{categories.map((item) => <button key={item.value} type="button" className={category === item.value ? "is-active" : ""} aria-pressed={category === item.value} onClick={() => selectCategory(item.value)}><span><Image src={item.image} alt={item.alt} fill sizes="(max-width: 760px) 38vw, 180px" /></span><b>{item.label}</b></button>)}</nav>
+        </div>
       </section>
 
       <section className="collection-shop makeup-collection-shop" aria-label="Makeup collection">

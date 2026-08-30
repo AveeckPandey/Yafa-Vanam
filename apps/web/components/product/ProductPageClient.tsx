@@ -13,8 +13,6 @@ import ProductGallery from "./ProductGallery";
 import QuantitySelector from "./QuantitySelector";
 import StickyBuyBar from "./StickyBuyBar";
 import YafaProductGuidance from "@/components/yafa/YafaProductGuidance";
-import { useAuth } from "@/components/auth/AuthProvider";
-import { getConfirmedYafaProfile, type ConfirmedYafaProfile } from "@/lib/yafa-profile";
 import { trackEvent } from "@/lib/analytics";
 import { useYafa } from "@/components/yafa/YafaProvider";
 import { getYafaProductQuestions } from "@/lib/yafa-product-questions";
@@ -70,14 +68,13 @@ export default function ProductPageClient({
   related: CatalogProduct[];
   layerMatch: CatalogProduct | null;
 }) {
-  const { user } = useAuth();
   const { setPageContext, setQuickQuestions } = useYafa();
   const [quantity, setQuantity] = useState(1);
   const [variantId, setVariantId] = useState(product.defaultVariantId);
-  const [yafaProfile, setYafaProfile] = useState<ConfirmedYafaProfile | null>(null);
   const variantOptions = product.variants.filter((variant) => variant.size || variant.shade);
   const selected = product.variants.find((variant) => variant.id === variantId);
   const hasShadeOptions = variantOptions.some((variant) => variant.shade);
+  const isLipColor = product.id.startsWith("yv-lip-");
   const orderedVariantOptions = hasShadeOptions
     ? [...variantOptions].sort((left, right) => {
         const leftIndex = masterShadeOrder.indexOf(left.shade?.code ?? "");
@@ -106,19 +103,6 @@ export default function ProductPageClient({
   useEffect(() => {
     trackEvent("product_viewed", { product_id: product.id, product_slug: product.slug, category: product.category });
   }, [product.category, product.id, product.slug]);
-  useEffect(() => {
-    if (!user) {
-      setYafaProfile(null);
-      return;
-    }
-    getConfirmedYafaProfile().then((profile) => {
-      setYafaProfile(profile);
-      const match = profile?.shade_code ? product.variants.find((variant) => variant.shade?.code === profile.shade_code) : undefined;
-      if (match) setVariantId(match.id);
-    }).catch(() => setYafaProfile(null));
-  }, [product.variants, user]);
-  const yafaVariantMatch = Boolean(yafaProfile?.shade_code && selected?.shade?.code === yafaProfile.shade_code);
-
   useEffect(() => {
     setPageContext({
       type: "product",
@@ -163,7 +147,7 @@ export default function ProductPageClient({
 
             <div id="pdp-purchase" className="pdp-purchase">
               {variantOptions.length > 0 ? (
-                <fieldset className={`pdp-shade-selector${hasShadeOptions ? " pdp-shade-selector--shades" : ""}${product.id === "yv-lip-002" ? " pdp-shade-selector--satin" : ""}`}>
+                <fieldset className={`pdp-shade-selector${hasShadeOptions ? " pdp-shade-selector--shades" : ""}${isLipColor ? " pdp-shade-selector--lip-color" : ""}${product.id === "yv-lip-003" ? " pdp-shade-selector--riverrose" : ""}${product.id === "yv-lip-002" ? " pdp-shade-selector--satin" : ""}`}>
                   <legend>{hasShadeOptions ? "Choose shade" : "Choose option"}</legend>
                   <div className="pdp-shade-selector__palette">
                     {orderedVariantOptions.map((variant) => {
@@ -182,7 +166,8 @@ export default function ProductPageClient({
                             trackEvent("variant_selected", { product_id: product.id, variant_id: variant.id, shade_code: shade?.code || null });
                           }}
                         >
-                          {shade?.hex ? <i style={{ backgroundColor: shade.hex }} aria-hidden="true" /> : <span>{variant.size ?? shade?.name}</span>}
+                          {shade?.hex ? <i style={{ backgroundColor: shade.hex }} aria-hidden="true" /> : null}
+                          <span>{shade ? shadeName(shade) : variant.size ?? "Option"}</span>
                         </button>
                       );
                     })}
@@ -214,7 +199,6 @@ export default function ProductPageClient({
                 <AddToBag className="pdp-add" productId={product.id} variantId={variantId} quantity={quantity} />
               </div>
             </div>
-            {yafaProfile ? <aside className="pdp-yafa-match"><span style={{ backgroundColor: yafaProfile.hex }} aria-hidden="true" /><div><strong>{yafaVariantMatch ? "Recommended for you by Yafa" : `Your Yafa match: ${yafaProfile.shade_name}`}</strong><p>{yafaVariantMatch ? `${yafaProfile.shade_name} is selected for this product.` : "This product does not currently offer your exact Yafa shade."}</p></div></aside> : null}
           </section>
 
           {product.ragQuestions.length > 0 ? (

@@ -5,7 +5,7 @@ import { useState } from "react";
 const announcements = [
   "COMPLIMENTARY SHIPPING ON ORDERS OVER ₹1,999.",
   "EASY RETURNS WITHIN 14 DAYS.",
-  "FIND YOUR MATCH WITH THE MAKEUP ADVISOR.",
+  "NEW RITUALS, MADE FOR EVERYDAY.",
 ];
 
 export default function AnnouncementBar() {

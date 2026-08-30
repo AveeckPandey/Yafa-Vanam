@@ -1,5 +1,3 @@
-import ShadeResults from "./ShadeResults";
+import { notFound } from "next/navigation";
 
-export default function YafaResultsPage() {
-  return <ShadeResults />;
-}
+export default function Page() { notFound(); }

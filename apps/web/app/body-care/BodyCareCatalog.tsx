@@ -1,6 +1,6 @@
 "use client";
 
-import Link from "next/link";
+import Image from "next/image";
 import { useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import ProductCard from "@/components/product/ProductCard";
@@ -59,15 +59,15 @@ export default function BodyCareCatalog({ products }: { products: CatalogProduct
   }, [category, products, selectedGroups, selectedTypes, sortOrder]);
 
   const groupCount = (group: BodyCareGroup) => products.filter((product) => product.bodyCareGroup === group).length;
-  const showEditorialTile = category === "all" && selectedGroups.length === 0 && selectedTypes.length === 0 && sortOrder === "featured";
   const selectCategory = (next: BodyCareFilter) => { setCategory(next); setSelectedGroups([]); setSelectedTypes([]); };
 
   return (
     <main id="main-content" className="bodycare-collection-page">
-      <section className="collection-intro" aria-labelledby="bodycare-title">
+      <section className="collection-intro collection-intro--image collection-intro--bodycare" aria-labelledby="bodycare-title">
+        <Image className="collection-intro__image" src="/images/home/campaign/hero-body-care-winter.png" alt="" fill priority sizes="100vw" />
+        <div className="collection-intro__veil" aria-hidden="true" />
         <div className="collection-intro__eyebrow">The body ritual</div>
         <h1 id="bodycare-title">Care for the body, quietly.</h1>
-        <p>Thoughtful essentials for nourishing hands, feet and body — designed to turn everyday care into a quieter ritual.</p>
       </section>
 
       <section className="collection-shop" aria-label="Body Care collection">
@@ -85,7 +85,6 @@ export default function BodyCareCatalog({ products }: { products: CatalogProduct
 
         <div className="commerce-grid">
           {visibleProducts.map((product, index) => <div className="commerce-grid__item" key={product.id}><ProductCard product={product} onQuickShop={setQuickProduct} eager={index < 3} /></div>)}
-          {showEditorialTile ? <div className="commerce-grid__item"><article className="collection-kit-tile"><div className="collection-kit-tile__mark" aria-hidden="true">YV</div><div><p>The body ritual</p><h3>Three essentials, made intentional.</h3><span>Care for hands, feet and body with a simple, thoughtful ritual.</span></div><Link href="/build-my-kit">Build My Kit <span aria-hidden="true">↗</span></Link></article></div> : null}
         </div>
       </section>
 

@@ -1,6 +1,9 @@
 # RAG
 
-The product and brand knowledge database is now implemented for the recommendation service. See [Nova + RAG workflow](./NOVA_RAG_WORKFLOW.md) for the runtime flow, ingestion process, deployment checklist, responsibility boundaries, and improvement roadmap.
+The product and brand knowledge database is implemented as the private YAFA
+RAG service. See [Nova + RAG workflow](./NOVA_RAG_WORKFLOW.md) for the runtime
+flow, ingestion process, deployment checklist, responsibility boundaries, and
+improvement roadmap.
 
 RAG supports grounded product, ingredient, skincare, and customer-policy explanations. An internal Retool staff assistant remains a possible later use.
 

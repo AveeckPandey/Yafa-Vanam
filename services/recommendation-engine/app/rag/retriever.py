@@ -14,8 +14,11 @@ the Yafa orchestrator (later phase) can decide presentation.
 
 from __future__ import annotations
 
+import re
+
 from app.rag.config import RagSettings
-from app.rag.providers import EmbeddingProvider
+from app.rag.providers import EmbeddingProvider, EmbeddingProviderError
+from app.rag.filters import _STOPWORDS as _QUERY_STOPWORDS
 from app.rag.filters import detect_live_data_domains, is_pure_live_data_query
 from app.rag.models import LiveDataDomain, TrustLevel
 from app.rag.normalizer import normalize_alias
@@ -43,6 +46,19 @@ _LIVE_DOMAIN_REASONS = {
 
 # Vector-search candidate pool size before reranking/diversity capping.
 _POOL_MULTIPLIER = 4
+
+# A free embedding endpoint can briefly rate-limit. These intentionally small
+# expansions keep common fragrance language useful during that outage without
+# turning the fallback into an unbounded recommendation or live-data search.
+_KEYWORD_STOPWORDS = _QUERY_STOPWORDS | frozenset({
+    "product", "products", "yafa", "vanam", "fragrance", "fragrances",
+    "scent", "scents", "smell", "smells", "perfume", "perfumes",
+})
+_KEYWORD_EXPANSIONS: dict[str, tuple[str, ...]] = {
+    "aqua": ("aquatic", "watery", "marine"),
+    "aquatic": ("aqua", "watery", "marine"),
+}
+_KEYWORD_TOKEN = re.compile(r"[a-z0-9]+")
 
 
 def _scope_from_request(request: RagSearchRequest) -> tuple[str | None, str]:
@@ -89,21 +105,47 @@ class RagRetriever:
 
         results: list[RetrievedChunk] = []
         if not pure_live_question:
-            query_vector = await self._provider.embed_query(query)
-            hits = self._repo.search(
-                query_vector,
-                product_ids=[effective_scope] if effective_scope else None,
-                customer_factual_only=request.allowed_for_customer,
-                top_k=min(request.top_k * _POOL_MULTIPLIER, 40),
-                chunk_types=request.chunk_types,
-                trust_levels=[level.value for level in request.trust_levels] if request.trust_levels else None,
-            )
+            trust_levels = [level.value for level in request.trust_levels] if request.trust_levels else None
+            try:
+                query_vector = await self._provider.embed_query(query)
+            except EmbeddingProviderError:
+                # A provider outage must not make an already-resolved product
+                # fact disappear. Generic product-fact searches can also use
+                # a deterministic, bounded term match over the same verified
+                # fact type. It never exposes live data or recommendations.
+                if not request.chunk_types:
+                    raise
+                if effective_scope:
+                    hits = self._repo.fetch_verified_chunks(
+                        product_id=effective_scope,
+                        customer_factual_only=request.allowed_for_customer,
+                        top_k=min(request.top_k * _POOL_MULTIPLIER, 40),
+                        chunk_types=request.chunk_types,
+                        trust_levels=trust_levels,
+                    )
+                else:
+                    hits = self._keyword_fallback(
+                        query,
+                        request,
+                        trust_levels=trust_levels,
+                    )
+                    if not hits:
+                        raise
+            else:
+                hits = self._repo.search(
+                    query_vector,
+                    product_ids=[effective_scope] if effective_scope else None,
+                    customer_factual_only=request.allowed_for_customer,
+                    top_k=min(request.top_k * _POOL_MULTIPLIER, 40),
+                    chunk_types=request.chunk_types,
+                    trust_levels=trust_levels,
+                )
             pool = self._policy_filter(hits, request.allowed_for_customer)
             if self._settings.rerank_enabled:
                 results = [self._to_chunk(hit) for hit in rerank(pool, query, request.top_k)]
             else:
-                # Phase 1 default (update spec §13): raw similarity order only.
-                # The SQL pool is already ordered by cosine distance.
+                # Phase 1 default: vector similarity order, or the explicit
+                # known-product fallback order when embeddings are unavailable.
                 results = [self._to_chunk(hit) for hit in pool[: request.top_k]]
 
         document = self._repo.document_for_product(effective_scope) if effective_scope else None
@@ -140,16 +182,24 @@ class RagRetriever:
         matches = self._repo.resolve_aliases(normalized)
         if not matches:
             return None, 0, []
-        best_rank = max(match.match_rank for match in matches)
-        strongest = [match for match in matches if match.match_rank == best_rank]
+        # A full product name must beat a shorter collection alias at the
+        # same evidence level ("Forest Rain Body Mist" over "Forest Rain").
+        # Otherwise an exact customer question becomes needlessly ambiguous
+        # and cannot use either vector retrieval or the outage fallback.
+        best_evidence = max((match.match_rank, match.matched_alias_length) for match in matches)
+        strongest = [
+            match
+            for match in matches
+            if (match.match_rank, match.matched_alias_length) == best_evidence
+        ]
         product_ids = {match.canonical_product_id for match in strongest}
         if len(product_ids) == 1:
-            return next(iter(product_ids)), best_rank, []
+            return next(iter(product_ids)), best_evidence[0], []
         candidates = [
             {"product_id": match.canonical_product_id, "product_name": match.product_name}
             for match in strongest
         ]
-        return None, best_rank, candidates[:10]
+        return None, best_evidence[0], candidates[:10]
 
     @staticmethod
     def _policy_filter(hits: list[SearchHit], allowed_for_customer: bool) -> list[SearchHit]:
@@ -164,6 +214,59 @@ class RagRetriever:
             hit for hit in hits
             if hit.customer_factual_eligible and can_surface_as_customer_fact(hit.metadata)
         ]
+
+    def _keyword_fallback(
+        self,
+        query: str,
+        request: RagSearchRequest,
+        *,
+        trust_levels: list[str] | None,
+    ) -> list[SearchHit]:
+        """Rank a small verified fact pool when embeddings are temporarily down.
+
+        This is deliberately narrower than normal global retrieval: it is only
+        enabled for a caller-supplied factual chunk type, has to match a
+        meaningful query term, and de-duplicates products before returning.
+        """
+        weights = self._keyword_weights(query)
+        if not weights:
+            return []
+        candidates = self._repo.fetch_eligible_chunks(
+            customer_factual_only=request.allowed_for_customer,
+            top_k=min(request.top_k * _POOL_MULTIPLIER * 3, 120),
+            chunk_types=request.chunk_types,
+            trust_levels=trust_levels,
+        )
+        ranked: list[tuple[int, SearchHit]] = []
+        for hit in candidates:
+            haystack = f"{hit.product_name} {hit.content}".lower()
+            score = sum(weight for term, weight in weights.items() if term in haystack)
+            if score:
+                ranked.append((score, hit))
+        ranked.sort(key=lambda item: (-item[0], item[1].product_name, item[1].chunk_id))
+
+        results: list[SearchHit] = []
+        product_ids: set[str] = set()
+        for _, hit in ranked:
+            if hit.product_id in product_ids:
+                continue
+            product_ids.add(hit.product_id)
+            results.append(hit)
+            if len(results) == request.top_k:
+                break
+        return results
+
+    @staticmethod
+    def _keyword_weights(query: str) -> dict[str, int]:
+        """Meaningful lexical terms, plus cautious scent-language aliases."""
+        weights: dict[str, int] = {}
+        for term in _KEYWORD_TOKEN.findall(query.lower()):
+            if len(term) < 3 or term in _KEYWORD_STOPWORDS:
+                continue
+            weights[term] = max(weights.get(term, 0), 3)
+            for synonym in _KEYWORD_EXPANSIONS.get(term, ()):
+                weights[synonym] = max(weights.get(synonym, 0), 1)
+        return weights
 
     def _to_chunk(self, hit: SearchHit) -> RetrievedChunk:
         return RetrievedChunk(

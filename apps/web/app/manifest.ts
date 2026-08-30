@@ -7,8 +7,8 @@ export default function manifest(): MetadataRoute.Manifest {
     description: "Botanical beauty, made personal.",
     start_url: "/",
     display: "standalone",
-    background_color: "#fbf8f1",
-    theme_color: "#173b28",
+    background_color: "#F9F6F0",
+    theme_color: "#262220",
     icons: [{ src: "/icon.png", sizes: "32x32", type: "image/png" }],
   };
 }

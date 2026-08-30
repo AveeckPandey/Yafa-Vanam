@@ -10,9 +10,8 @@ The backend in `apps/api` now provides a runnable commerce slice for the storefr
 - Pending-payment order creation with shipping calculation and idempotency keys.
 - Private order lookup using an order access token.
 - Strict JSON decoding, structured errors, CORS, security headers, panic recovery, timeouts, JSON logs, and graceful shutdown.
-- OpenAPI contract at `apps/api/openapi/openapi.yaml` covering every route: catalogue,
-  carts, orders, Razorpay payments, session auth (`/auth/*`), and the YAFA beauty-profile
-  flow.
+- OpenAPI contract at `apps/api/openapi/openapi.yaml` covering the commerce,
+  payment, and session-auth (`/auth/*`) routes.
 - TypeScript types for the storefront are generated from that spec into
   `packages/frontend-types` (`@yafa/frontend-types`). After any contract change run
   `npm run generate:api-types` and commit the regenerated file.

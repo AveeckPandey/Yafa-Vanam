@@ -24,16 +24,10 @@ function duplicateValues(values) {
 }
 
 const processedProducts = readJson("data/processed/Product.json");
-const sourceChunks = [
-  readJson("services/recommendation-engine/data/skin.json"),
-  readJson("services/recommendation-engine/data/cheeks.json"),
-  readJson("services/recommendation-engine/data/lips.json"),
-  readJson("services/recommendation-engine/data/eyes.json"),
-];
-const authoritativeProducts = sourceChunks.flatMap((chunk) => chunk.products ?? []);
+const authoritativeProducts = processedProducts;
 const sourceById = new Map(authoritativeProducts.map((product) => [product.id, product]));
 
-for (const [label, products] of [["processed", processedProducts], ["authoritative", authoritativeProducts]]) {
+for (const [label, products] of [["canonical", authoritativeProducts]]) {
   for (const field of ["id", "slug"]) {
     const duplicates = [...new Set(duplicateValues(products.map((product) => product[field]).filter(Boolean)))];
     assert(duplicates.length === 0, `${label} catalogue has duplicate ${field}: ${duplicates.join(", ")}`);
@@ -49,18 +43,30 @@ for (const product of authoritativeProducts) {
 }
 
 const moonveil = sourceById.get("yv-eye-006");
-assert(moonveil?.variants?.filter((variant) => variant.is_active && variant.shade).length === 7, "Moonveil must have exactly 7 shades");
+const moonveilVariantIds = [
+  "yv-eye-006-aubergine-plum",
+  "yv-eye-006-bronze",
+  "yv-eye-006-deep-burgundy",
+  "yv-eye-006-rose-gold",
+  "yv-eye-006-smoky-charcoal",
+  "yv-eye-006-antique-gold",
+  "yv-eye-006-champagne-gold",
+];
+assert(moonveil?.variants?.length === moonveilVariantIds.length, "Moonveil must expose all seven canonical shades");
+assert(moonveilVariantIds.every((id) => moonveil?.variants?.some((variant) => variant.id === id && variant.shade?.name)), "Moonveil canonical shades must have named sellable variants");
 
 const petalVelvetIds = [
   "yv-lip-001-petal-nude",
-  "yv-lip-001-rose-mist",
-  "yv-lip-001-mauve-wood",
-  "yv-lip-001-clay-rose",
-  "yv-lip-001-berry-soft",
-  "yv-lip-001-terracotta-dream",
+  "yv-lip-001-clay-bloom",
+  "yv-lip-001-rose-bark",
+  "yv-lip-001-soft-fig",
+  "yv-lip-001-berry-veil",
+  "yv-lip-001-amber-rose",
+  "yv-lip-001-moss-nude",
+  "yv-lip-001-brick-petal",
 ];
 const petalVelvet = sourceById.get("yv-lip-001");
-assert(petalVelvetIds.length === 6 && new Set(petalVelvetIds).size === 6, "Petal Velvet storefront assortment must contain six distinct shades");
+assert(petalVelvetIds.length === 8 && new Set(petalVelvetIds).size === 8, "Petal Velvet storefront assortment must contain eight distinct shades");
 assert(petalVelvetIds.every((id) => petalVelvet?.variants?.some((variant) => variant.id === id)), "Petal Velvet storefront shades must belong to Petal Velvet's own source record");
 
 const velvetstem = processedProducts.find((product) => product.id === "yv-lip-006");
@@ -90,4 +96,4 @@ if (errors.length) {
   process.exit(1);
 }
 
-console.log(`Catalogue validation passed (${processedProducts.length} processed products; ${authoritativeProducts.length} authoritative records).`);
+console.log(`Catalogue validation passed (${authoritativeProducts.length} canonical products).`);

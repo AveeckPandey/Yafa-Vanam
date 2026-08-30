@@ -19,7 +19,6 @@ import (
 
 	"github.com/BuildWithAveeck/yafa-vanam/apps/api/internal/auth"
 	"github.com/BuildWithAveeck/yafa-vanam/apps/api/internal/commerce"
-	"github.com/BuildWithAveeck/yafa-vanam/apps/api/internal/yafa"
 	"github.com/redis/go-redis/v9"
 	"golang.org/x/time/rate"
 )
@@ -31,7 +30,6 @@ type Config struct {
 	RateLimitStore             redis.UniversalClient
 	PanicReporter              func(*http.Request, any, []byte)
 	Auth                       *auth.Handler
-	Yafa                       *yafa.Service
 	RazorpayKeyID              string
 	RazorpayKeySecret          string
 	RazorpayWebhookSecret      string
@@ -56,7 +54,6 @@ type Server struct {
 	razorpayMu                 sync.Mutex
 	internalServiceToken       string
 	orderConfirmationPublisher OrderConfirmationPublisher
-	yafa                       *yafa.Service
 	rateMu                     sync.Mutex
 	clientRates                map[string]*clientRate
 }
@@ -89,7 +86,6 @@ func New(catalog *commerce.Catalog, store commerce.CommerceStore, config Config)
 		razorpayCheckoutEnabled:    config.RazorpayCheckoutEnabled,
 		internalServiceToken:       config.InternalServiceToken,
 		orderConfirmationPublisher: config.OrderConfirmationPublisher,
-		yafa:                       config.Yafa,
 		clientRates:                make(map[string]*clientRate),
 		dependencyHealth:           config.DependencyHealth,
 		rateLimitStore:             config.RateLimitStore,
@@ -112,7 +108,6 @@ func New(catalog *commerce.Catalog, store commerce.CommerceStore, config Config)
 	mux.HandleFunc("GET /api/v1/categories", server.categories)
 	mux.HandleFunc("GET /api/v1/products", server.products)
 	mux.HandleFunc("GET /api/v1/products/{slug}", server.product)
-	mux.HandleFunc("POST /api/v1/yafa/transcribe", server.yafaTranscribe)
 	if config.Auth != nil {
 		mux.Handle("POST /api/v1/payments/razorpay/orders", config.Auth.Middleware(http.HandlerFunc(server.createRazorpayOrder)))
 		mux.Handle("POST /api/v1/payments/razorpay/verify", config.Auth.Middleware(http.HandlerFunc(server.verifyRazorpayPayment)))
@@ -130,22 +125,6 @@ func New(catalog *commerce.Catalog, store commerce.CommerceStore, config Config)
 	mux.Handle("POST /api/internal/coupons/recovery", server.internalGuard(http.HandlerFunc(server.issueRecoveryVoucher)))
 	mux.Handle("POST /api/internal/coupons/recovery/revoke", server.internalGuard(http.HandlerFunc(server.revokeRecoveryVoucher)))
 	mux.Handle("POST /api/internal/messages/record", server.internalGuard(http.HandlerFunc(server.recordLifecycleMessage)))
-	if config.Auth != nil {
-		mux.Handle("GET /api/v1/me/beauty-profile", config.Auth.Middleware(http.HandlerFunc(server.yafaBeautyProfile)))
-		mux.Handle("POST /api/v1/yafa/session/start", config.Auth.OptionalMiddleware(http.HandlerFunc(server.startYafaSession)))
-		mux.Handle("PATCH /api/v1/yafa/session/{sessionID}/answer", config.Auth.OptionalMiddleware(http.HandlerFunc(server.saveYafaAnswer)))
-		mux.Handle("POST /api/v1/yafa/session/{sessionID}/selfie", config.Auth.OptionalMiddleware(http.HandlerFunc(server.uploadYafaSelfie)))
-		mux.Handle("POST /api/v1/yafa/session/{sessionID}/analyze", config.Auth.OptionalMiddleware(http.HandlerFunc(server.analyzeYafaSession)))
-		mux.Handle("POST /api/v1/yafa/session/{sessionID}/confirm", config.Auth.OptionalMiddleware(http.HandlerFunc(server.confirmYafaShade)))
-		mux.Handle("POST /api/v1/yafa/confirm-shade", config.Auth.OptionalMiddleware(http.HandlerFunc(server.confirmYafaShade)))
-	} else {
-		mux.HandleFunc("POST /api/v1/yafa/session/start", server.startYafaSession)
-		mux.HandleFunc("PATCH /api/v1/yafa/session/{sessionID}/answer", server.saveYafaAnswer)
-		mux.HandleFunc("POST /api/v1/yafa/session/{sessionID}/selfie", server.uploadYafaSelfie)
-		mux.HandleFunc("POST /api/v1/yafa/session/{sessionID}/analyze", server.analyzeYafaSession)
-		mux.HandleFunc("POST /api/v1/yafa/session/{sessionID}/confirm", server.confirmYafaShade)
-		mux.HandleFunc("POST /api/v1/yafa/confirm-shade", server.confirmYafaShade)
-	}
 	if config.Auth != nil {
 		mux.Handle("POST /api/v1/carts", config.Auth.OptionalMiddleware(http.HandlerFunc(server.createCart)))
 		mux.Handle("GET /api/v1/carts/{cartID}", config.Auth.OptionalMiddleware(http.HandlerFunc(server.getCart)))
@@ -514,7 +493,7 @@ func (server *Server) cors(next http.Handler) http.Handler {
 			w.Header().Set("Access-Control-Allow-Origin", origin)
 			w.Header().Set("Vary", "Origin")
 			w.Header().Set("Access-Control-Allow-Credentials", "true")
-			w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Idempotency-Key, X-Order-Access-Token, X-CSRF-Token, X-Yafa-Session-Token")
+			w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Idempotency-Key, X-Order-Access-Token, X-CSRF-Token")
 			w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PATCH, DELETE, OPTIONS")
 		}
 		if request.Method == http.MethodOptions {

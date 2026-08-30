@@ -9,6 +9,7 @@ from fastapi.testclient import TestClient
 
 import app.api.rag_search as rag_api
 from app.rag.models import LiveDataDomain, TrustLevel
+from app.rag.providers.base import EmbeddingRateLimitError
 from app.rag.schemas import LiveRequirement, RagSearchRequest, RagSearchResponse, RetrievedChunk
 
 TOKEN = "x" * 40
@@ -92,6 +93,21 @@ def test_request_validation_rejects_bad_top_k(client):
         headers={"X-Yafa-Service-Token": TOKEN},
     )
     assert response.status_code == 422
+
+
+def test_embedding_rate_limit_returns_safe_service_unavailable(client, monkeypatch):
+    class RateLimitedRetriever:
+        async def search(self, request: RagSearchRequest) -> RagSearchResponse:
+            raise EmbeddingRateLimitError("provider response details must not leak")
+
+    monkeypatch.setattr(rag_api, "_retriever", RateLimitedRetriever())
+    response = client.post(
+        "/internal/rag/search",
+        json={"query": "What does this smell like?"},
+        headers={"X-Yafa-Service-Token": TOKEN},
+    )
+    assert response.status_code == 503
+    assert response.json()["detail"] == "RAG embedding service is temporarily unavailable. Please try again shortly."
 
 
 # -- health ------------------------------------------------------------------

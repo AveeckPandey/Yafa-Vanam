@@ -30,7 +30,7 @@ COGNITO_REFRESH_USERNAME_SOURCE=$(jq -r .refresh_username_source <<< "$COGNITO_J
 DB_PASSWORD_ENCODED=$(python3 -c 'import sys, urllib.parse; print(urllib.parse.quote(sys.stdin.read().strip(), safe=""))' <<< "$DB_PASSWORD")
 aws ecr get-login-password --region "$REGION" | docker login --username AWS --password-stdin "$REGISTRY"
 
-docker run -d --name yafa-advisor --restart unless-stopped --network host \
+docker run -d --name yafa-rag --restart unless-stopped --network host \
   -e AWS_REGION="$REGION" -e AWS_DEFAULT_REGION="$REGION" \
   -e YAFA_INTERNAL_SERVICE_TOKEN="$TOKEN" \
   -e VECTOR_DATABASE_URL="postgresql://${DB_USER}:${DB_PASSWORD_ENCODED}@${DB_HOST}:5432/yafa_rag?sslmode=require" \
@@ -55,7 +55,7 @@ docker run -d --name yafa-api --restart unless-stopped --network host \
   "$REGISTRY/yafa-api:production"
 docker run -d --name yafa-web --restart unless-stopped --network host \
   -e PORT=3000 -e COMMERCE_API_URL=http://127.0.0.1:4000 \
-  -e ADVISOR_URL=http://127.0.0.1:8000 -e YAFA_INTERNAL_SERVICE_TOKEN="$TOKEN" \
+  -e YAFA_RAG_URL=http://127.0.0.1:8000 -e YAFA_INTERNAL_SERVICE_TOKEN="$TOKEN" \
   -e COGNITO_REGION="$COGNITO_REGION" -e COGNITO_USER_POOL_ID="$COGNITO_USER_POOL_ID" \
   -e COGNITO_CLIENT_ID="$COGNITO_CLIENT_ID" -e COGNITO_CLIENT_SECRET="$COGNITO_CLIENT_SECRET" \
   -e COGNITO_REFRESH_USERNAME_SOURCE="$COGNITO_REFRESH_USERNAME_SOURCE" \

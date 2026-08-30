@@ -1,8 +1,8 @@
 "use client";
 
-import { useState } from "react";
+import Image from "next/image";
+import Link from "next/link";
 import type { YafaMessage as YafaMessageType } from "./YafaProvider";
-import YafaRecommendationCard from "./YafaRecommendationCard";
 
 const LIVE_DOMAIN_LABELS: Record<string, string> = {
   inventory: "live stock",
@@ -15,70 +15,52 @@ const LIVE_DOMAIN_LABELS: Record<string, string> = {
 };
 
 export default function YafaMessage({ message }: { message: YafaMessageType }) {
-  const [showGrounding, setShowGrounding] = useState(false);
   const isUser = message.role === "user";
+  const productCards = [...new Map(
+    (message.grounding ?? [])
+      .filter((chunk) => Boolean(chunk.product_card))
+      .map((chunk) => [chunk.product_id, chunk] as const),
+  ).values()].slice(0, 2);
 
   return (
     <article className={`yafa-message yafa-message--${message.role}`}>
       <span className="yafa-message__who">{isUser ? "You" : "Yafa"}</span>
       <div className="yafa-message__body">
-        {message.attachments?.length ? (
-          <div className="yafa-message__attachments">
-            {message.attachments.map((attachment) => (
-              // eslint-disable-next-line @next/next/no-img-element -- local object-URL preview
-              <img
-                key={attachment.previewUrl}
-                src={attachment.previewUrl}
-                alt={attachment.label ?? "Uploaded image"}
-                className="yafa-message__image"
-              />
-            ))}
-          </div>
-        ) : null}
         <p className="yafa-message__text">{message.text}</p>
 
         {message.requires ? (
           <p className="yafa-message__requires" data-testid="yafa-live-data">
-            <strong>Live store check:</strong> I&apos;ll use the current {LIVE_DOMAIN_LABELS[message.requires.domain] ?? message.requires.domain.replace("_", " ")} before you decide.
+            <strong>Live store check:</strong> Please check the current {LIVE_DOMAIN_LABELS[message.requires.domain] ?? message.requires.domain.replace("_", " ")} in the shop before you decide.
           </p>
         ) : null}
-
-        {message.recommendations?.length ? (
-          <div className="yafa-message__recommendations">
-            {message.recommendations.map((recommendation) => (
-              <YafaRecommendationCard
-                key={`${recommendation.product_id}-${recommendation.variant_id ?? "base"}`}
-                recommendation={recommendation}
-              />
-            ))}
-          </div>
-        ) : null}
-
-        {message.grounding?.length ? (
-          <div className="yafa-message__grounding">
-            <button
-              type="button"
-              className="yafa-grounding__toggle"
-              aria-expanded={showGrounding}
-              onClick={() => setShowGrounding((open) => !open)}
-            >
-              {showGrounding ? "Hide verification details" : "Why Yafa recommends this"}
-            </button>
-            {showGrounding ? (
-              <ul>
-                {message.grounding.map((chunk, index) => (
-                  <li key={`${chunk.product_id}-${chunk.chunk_type}-${index}`}>
-                    <strong>{chunk.chunk_type.replace(/_/g, " ")}</strong>
-                    {chunk.requires_qualification ? " · confirm before purchase" : ""}
-                    <br />
-                    {chunk.content.length > 220 ? `${chunk.content.slice(0, 220)}…` : chunk.content}
-                  </li>
-                ))}
-              </ul>
-            ) : null}
-          </div>
-        ) : null}
       </div>
+
+      {productCards.length ? (
+        <section className="yafa-product-cards" aria-label="Verified product links">
+          <p className="yafa-product-cards__label">Verified product details</p>
+          <div className="yafa-product-cards__grid">
+            {productCards.map((chunk) => {
+              const card = chunk.product_card!;
+              const summary = chunk.content.replace(/\s+/g, " ").trim();
+              return (
+                <Link className="yafa-product-card" href={card.href} key={chunk.product_id}>
+                  <span className="yafa-product-card__image">
+                    <Image src={card.image} alt={card.image_alt} fill sizes="(max-width: 720px) 42vw, 12rem" />
+                  </span>
+                  <span className="yafa-product-card__copy">
+                    <span className="yafa-product-card__type">{card.product_type}</span>
+                    <strong>{card.name}</strong>
+                    <span className="yafa-product-card__summary">
+                      {summary.length > 135 ? `${summary.slice(0, 135)}…` : summary}
+                    </span>
+                    <span className="yafa-product-card__action">View product</span>
+                  </span>
+                </Link>
+              );
+            })}
+          </div>
+        </section>
+      ) : null}
     </article>
   );
 }

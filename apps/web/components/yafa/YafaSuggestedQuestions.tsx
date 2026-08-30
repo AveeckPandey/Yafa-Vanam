@@ -3,10 +3,9 @@
 import { useYafa } from "./YafaProvider";
 
 const DEFAULT_QUESTIONS = [
-  "What does this smell like?",
-  "Where does this fit in a routine?",
-  "Would this work for an evening event?",
-  "Build me a full look for a wedding",
+  "What does Forest Rain Body Mist smell like?",
+  "How do I use Leafwell Hydra Balance Gel?",
+  "What warnings should I know before using Calmpath Soothing Serum?",
 ];
 
 /**
@@ -27,7 +26,6 @@ export default function YafaSuggestedQuestions({
         <button
           key={question}
           type="button"
-          role="listitem"
           disabled={isThinking}
           onClick={() => void send(question)}
         >

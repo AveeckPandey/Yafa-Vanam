@@ -2,7 +2,7 @@
 
 ## PostHog
 
-Primary product/user behavior analytics: product views, product clicks, shade selections, wishlist, add-to-cart, checkout funnel, recommendation engagement, funnels, cohorts, and session replay where configured safely.
+Primary product/user behavior analytics: product views, product clicks, shade selections, wishlist, add-to-cart, checkout funnel, funnels, cohorts, and session replay where configured safely.
 
 ## Google Analytics 4
 

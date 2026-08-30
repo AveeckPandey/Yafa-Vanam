@@ -3166,10 +3166,99 @@
     },
     "variants": [
       {
-        "id": "yv-eye-006-default",
+        "id": "yv-eye-006-aubergine-plum",
         "sku": null,
         "size": null,
-        "shade": null,
+        "shade": {
+          "name": "Aubergine Plum",
+          "code": null,
+          "hex": "#4A3044",
+          "undertone": null
+        },
+        "price": 3800,
+        "stock": null,
+        "is_active": true
+      },
+      {
+        "id": "yv-eye-006-bronze",
+        "sku": null,
+        "size": null,
+        "shade": {
+          "name": "Bronze",
+          "code": null,
+          "hex": "#8B5A36",
+          "undertone": null
+        },
+        "price": 3800,
+        "stock": null,
+        "is_active": true
+      },
+      {
+        "id": "yv-eye-006-deep-burgundy",
+        "sku": null,
+        "size": null,
+        "shade": {
+          "name": "Deep Burgundy",
+          "code": null,
+          "hex": "#6A3039",
+          "undertone": null
+        },
+        "price": 3800,
+        "stock": null,
+        "is_active": true
+      },
+      {
+        "id": "yv-eye-006-rose-gold",
+        "sku": null,
+        "size": null,
+        "shade": {
+          "name": "Rose Gold",
+          "code": null,
+          "hex": "#B77B73",
+          "undertone": null
+        },
+        "price": 3800,
+        "stock": null,
+        "is_active": true
+      },
+      {
+        "id": "yv-eye-006-smoky-charcoal",
+        "sku": null,
+        "size": null,
+        "shade": {
+          "name": "Smoky Charcoal",
+          "code": null,
+          "hex": "#4B494B",
+          "undertone": null
+        },
+        "price": 3800,
+        "stock": null,
+        "is_active": true
+      },
+      {
+        "id": "yv-eye-006-antique-gold",
+        "sku": null,
+        "size": null,
+        "shade": {
+          "name": "Antique Gold",
+          "code": null,
+          "hex": "#A98542",
+          "undertone": null
+        },
+        "price": 3800,
+        "stock": null,
+        "is_active": true
+      },
+      {
+        "id": "yv-eye-006-champagne-gold",
+        "sku": null,
+        "size": null,
+        "shade": {
+          "name": "Champagne Gold",
+          "code": null,
+          "hex": "#D1B17A",
+          "undertone": null
+        },
         "price": 3800,
         "stock": null,
         "is_active": true
@@ -3366,13 +3455,13 @@
       ]
     },
     "palette_colors": [],
-    "variant_note": "Master eye-colour palette exists, but the exact sellable shade allocation for this product is not yet confirmed.",
+    "variant_note": "Seven catalogue colour variants are available; final formula, colourant, and regulatory verification remain pending.",
     "data_status": {
       "catalogue_identity": "complete",
       "taxonomy": "complete",
       "descriptions": "draft_complete",
       "recommendation_profile": "draft_complete",
-      "variants": "needs_sellable_shade_allocation",
+      "variants": "catalogue_colour_only_needs_formula_and_regulatory_review",
       "images": "proposed_paths_need_file_mapping",
       "commerce": "provisional_luxury_price_added_needs_business_approval",
       "full_inci": "needs_manufacturer",
@@ -3567,7 +3656,7 @@
       "reviews_enabled": true,
       "show_rating_only_when_reviews_exist": true,
       "show_size_selector": false,
-      "show_shade_selector": false,
+      "show_shade_selector": true,
       "show_quantity_selector": true,
       "show_stock_message": false,
       "open_cart_drawer_after_add": true,
@@ -3583,7 +3672,7 @@
         "scent_story": false,
         "layer_this_scent": false,
         "makeup_profile": true,
-        "shade_information": false,
+        "shade_information": true,
         "compatibility": true,
         "warnings": true
       },

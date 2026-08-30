@@ -1,55 +1,216 @@
-# Design QA: Yafa assistant header
+# YAFA chat drawer — design QA
 
-## Source visual truth
+## Visual truth and review state
 
-- Source screenshot: `C:/Users/aveec/AppData/Local/Temp/codex-clipboard-1b047c38-92f7-4724-9cc0-5563638a9c4d.png`
-- Source state: open mobile AI chat panel showing a persistent top bar with a title, refresh/new-chat control, and close control.
-- Source pixels: 413 x 695 (single-density screenshot; browser chrome is included in the supplied reference).
+- Reference: the user-provided product-card chat example at `C:\Users\aveec\AppData\Local\Temp\codex-clipboard-ab82b1fa-65c9-4443-aeb8-e69bac28bb83.png`.
+- Product-specific source: YAFA VANAM's existing palette, typography, product imagery, and catalogue routes.
+- Rendered review: local production preview at `http://127.0.0.1:3101`, 390 × 675 mobile viewport, comparing the same aqua-scent chat result with the reference.
 
-## Rendered implementation evidence
+## Comparison outcome
 
-- Local route: `http://localhost:3000/`
-- Mobile capture: `audit-output/yafa-chat/02-chat-header-mobile.png` (412 x 844 CSS px, device scale 1).
-- Desktop capture: `audit-output/yafa-chat/03-chat-header-desktop.png` (1280 x 720 CSS px, device scale 1).
-- State: Yafa assistant open, clean conversation, backdrop visible, responsive mobile and desktop layouts.
-- Console check: no assistant-specific errors. The Next.js development server reports its existing React `eval()` development warning and unrelated image/LCP warnings; production build completes successfully.
+The YAFA drawer preserves the reference's useful response pattern—short factual lead-in followed by two product cards—while retaining YAFA VANAM's own brand, imagery, and visual language. The cards show an existing product image, type, verified scent excerpt, and a clear link to the matching product page. They are catalogue links for already-retrieved products, not personalised recommendations.
 
-## Comparison evidence
+## Functional and accessibility checks
 
-### Full view
+- A generic aqua-scent query returned verified Greenbrook and Soft Current product records through the storefront → RAG route; a generic woody query returned Forest Rain records.
+- The interim reply state is exposed as the accessible status “Yafa is checking verified product details” and uses an animated three-dot indicator that respects reduced-motion preferences.
+- Product cards are native links with product-specific accessible names and route to `/products/<slug>`.
+- The former “View verified source details” disclosure is absent from the rendered chat. The verified excerpts remain visible in the product cards instead.
+- No browser console errors were present during the reviewed aqua and woody journeys.
 
-The implementation keeps the assistant panel above the sticky storefront header, dims the page behind it, and anchors the input at the bottom. At 412 px wide the panel fills the viewport, matching the reference's focused chat experience; at desktop width it becomes a right-side drawer.
+## Final result
 
-### Focused header region
+**Passed for the reviewed mobile chat states.**
 
-The revised header visibly contains the assistant title, a refresh icon for starting a new conversation, and an always-reachable X close control. Both controls have accessible labels, keyboard focus styling, and tooltips. Escape and backdrop clicks also close the panel.
+---
 
-## Comparison history
+# Homepage campaign and collection refresh — design QA
 
-1. Initial implementation: the drawer used a lower stacking level than the sticky storefront header, so the header controls were visually covered at the top of the viewport (P1 usability issue).
-2. Fix: raised the backdrop to `z-index: 599` and the drawer to `z-index: 600`, while making the header a fixed-height flex row with visible action buttons.
-3. Post-fix evidence: the mobile and desktop captures above show the header and X control unobscured. Automated interaction check confirmed closing hides the drawer and restores body scrolling; reopening exposes the refresh action.
+## Visual truth and review state
 
-## Required fidelity surfaces
+- Source visuals: the four supplied YAFA VANAM campaign images for fragrance,
+  body care, makeup, and skincare; the supplied editorial-grid and Riverrose
+  shade-picker screenshots.
+- Intended implementation: homepage at the local production preview, collection
+  landing panels for `/skincare`, `/makeup`, `/body-care`, and `/fragrance`,
+  plus `/products/riverrose-lip-color`.
+- Viewport: desktop browser viewport, 1262 × 710 CSS pixels.
 
-- Fonts and typography: compact sans-serif UI text preserves the site's existing type tokens and readable hierarchy.
-- Spacing and layout rhythm: header actions have 44 px touch targets, consistent horizontal padding, and a stable 67 px header height.
-- Colors and tokens: white header, dark text, subtle divider, and translucent page scrim align with the reference's light chat shell.
-- Image quality and asset fidelity: no reference images or brand assets are replaced; this change is limited to controls and layout.
-- Copy and content: title and action labels are concise and self-describing; aria labels clarify refresh and close behavior.
+## Build and source checks
+
+- `npm.cmd run typecheck --workspace=@yafa/web` passed.
+- `npm.cmd run build:web` passed.
+- The production homepage server-rendered four carousel slides and referenced
+  `/images/home/campaign/hero-fragrance-lakeside.png` for the active slide.
+- The new campaign assets exist at their expected public paths.
 
 ## Findings
 
-- No actionable P0, P1, or P2 differences remain for the requested close/back interaction.
-- P3 polish: the production design could use a bespoke vector refresh/close icon set instead of text glyphs if the brand later standardizes iconography.
+- The normal Next production preview now serves the generated CSS and image
+  assets correctly. The homepage visual review shows the four supplied hero
+  images, centered campaign wordmark, and the updated editorial tiles.
+- The carousel next control changes the active slide, the measured logo reaches
+  the navbar after scrolling, and the floating wordmark is hidden at handoff.
+- The Riverrose product route renders the mapped shade names and no browser
+  console errors were reported across the reviewed routes.
 
 ## Implementation checklist
 
-- [x] Persistent visible header with title.
-- [x] Refresh/new-conversation action.
-- [x] Close action with X icon.
-- [x] Backdrop and Escape dismissal.
-- [x] Mobile and desktop responsive verification.
-- [x] Typecheck, tests, and production build.
+- [x] Four-slide campaign carousel with supplied fragrance, body-care, makeup,
+  and skincare photography.
+- [x] Matching collection-intro images with the existing collection copy kept.
+- [x] GSAP scroll-driven, measured hero-to-navbar wordmark transition; it is
+  hidden while navigation overlays are open.
+- [x] Riverrose buttons display real shade names and mapped shade colours.
+- [x] Visual comparison in the production preview.
+
+final result: passed
+
+---
+
+# Launch-readiness check — popup, email, and AWS
+
+## Scope and evidence
+
+- Local review: `http://localhost:3103` after a fresh production web build.
+- Captures: `audit-output/body-care-description-removed.png` and
+  `audit-output/startup-signup-popup.png`.
+- Automated checks: web TypeScript, 31 web authentication/checkout tests, Go
+  API tests, and Python syntax checks for both AWS email Lambdas.
+
+## Findings
+
+- [P1, unresolved] The Body Care collection banner no longer renders the
+  right-side explanatory paragraph. The live local page was checked after the
+  rebuild.
+- [P1, unresolved] The welcome popup is implemented as a global, accessible
+  signed-out experience with a six-second delay, but it cannot open in the
+  local preview while the same-origin `/api/auth/csrf` proxy returns HTTP 502.
+  The popup intentionally stays closed when auth is in its error state.
+- [P1, unresolved] The order receipt has a working API-to-SQS publisher and
+  an SQS-to-SES Lambda implementation, but the repository contains neither a
+  queue/Lambda/event-source deployment resource nor a verifiable active AWS
+  binding.
+- [P1, unresolved] The Cognito post-confirmation welcome-coupon Lambda is
+  compatible with the intended flow, but its dedicated role permissions,
+  Cognito trigger attachment, required environment values, and network path to
+  the coupon API are not declared as deployable infrastructure here.
+- [P1, unresolved] Deployment documentation says FIFO queue while the current
+  queue URL has no `.fifo` suffix and the API omits `MessageGroupId`; it must
+  be made consistently standard or consistently FIFO before production.
+- [P2, unresolved] The production user-data script references a
+  `razorpay-test` secret. Confirm production payment credentials before go-live.
+
+## AWS compatibility assessment
+
+- The chosen Bedrock model, `amazon.titan-embed-text-v2:0`, with 1024
+  dimensions in `ap-south-1`, is a compatible RAG target.
+- RDS/PostgreSQL, ElastiCache Redis, ECR, EC2, Cognito, S3, SQS, SES, and
+  Bedrock are a compatible AWS service set for this monorepo. The repository
+  is not yet fully deployment-ready because the email-event and Cognito
+  trigger resources are only represented by code, policies, and user-data.
+
+## Result
+
+The UI deletion and all local compile/test checks passed. Do not treat the
+signup popup or either transactional email as live-ready until the listed P1
+configuration gaps are provisioned and verified in the AWS account.
+
+---
+
+# Collection banner copy and dropdown assets — design QA
+
+## Visual truth and review state
+
+- Sources: the user-provided collection-banner captures at
+  `C:\Users\aveec\AppData\Local\Temp\codex-clipboard-d3d8e598-3c48-41f4-aff4-71d20cbe5f52.png`
+  and `C:\Users\aveec\AppData\Local\Temp\codex-clipboard-a235adcd-02f5-4d60-8d64-702a9d9b4cfd.png`,
+  plus the three dropdown captures supplied in the same request.
+- Rendered captures: `audit-output/skincare-description-removed.png`,
+  `audit-output/fragrance-description-removed.png`, and
+  `audit-output/dropdown-assets-fragrance.png`, captured from
+  `http://localhost:3103`.
+- Focused comparisons: `audit-output/skincare-banner-comparison.png` and
+  `audit-output/fragrance-banner-comparison.png` pair the annotated source
+  capture on the left with the revised local implementation on the right.
+- Viewports: 1533 × 536 CSS pixels for Skin Care and 1533 × 598 CSS pixels
+  for Fragrance, both at device scale factor 1. The implementation includes
+  the current global announcement strip, which is outside this narrow change.
+
+## Findings and fixes
+
+- [P1, resolved] The right-side explanatory text remained visible in the
+  Skin Care and Fragrance collection banners. Both elements are removed; the
+  eyebrow, heading, imagery, navigation, and collection controls remain.
+- [P1, resolved] The Skin Care, Make Up, Body Care, and Fragrance dropdowns
+  used unrelated product artwork in their feature cards. Each menu now uses
+  the matching supplied collection image: skincare garden, makeup earth,
+  body-care winter, and fragrance lakeside.
+
+## Verification
+
+- The reviewed routes contain no `.collection-intro > p` element on either
+  `/skincare` or `/fragrance`.
+- The four desktop navigation controls each open their own menu and resolve
+  to the matching category image. The reviewed Fragrance menu visibly shows
+  the lakeside fragrance collection, not lip colour artwork.
+- Fonts, spacing, palette tokens, image crop, and menu copy remain sourced
+  from the existing components; no layout, link, or catalogue changes were
+  introduced.
+- `npm.cmd run typecheck --workspace=@yafa/web` and the production web build
+  completed successfully.
+
+final result: passed
+
+---
+
+# Hero spacing, makeup quick picks, and lip swatches — design QA
+
+## Review state
+
+- Source visuals: the user-provided hero reference at
+  `C:\Users\aveec\AppData\Local\Temp\codex-clipboard-70a6a239-24d5-4708-be81-10f9275840c0.png`
+  and Moonveil product reference at
+  `C:\Users\aveec\AppData\Local\Temp\codex-clipboard-b4b21a29-7734-40ae-bdd1-28a59319b1d7.png`.
+- Implementation captures: `audit-output/hero-logo-transition.png` and
+  `audit-output/moonveil-shade-selector.png`, captured from the local
+  production preview at `http://localhost:3103`.
+- Desktop review viewport: 1280 × 720 CSS pixels.
+- Responsive review viewport: 390 × 844 CSS pixels.
+
+## Checks
+
+- Hero copy sits below the centered YAFA VANAM wordmark on all four carousel slides.
+- The scroll-driven wordmark hands off to the navbar and hides while a navigation menu is open.
+- The makeup landing image keeps its product composition visible, and quick-pick cards now sit in a separate accent-colour zone below the banner.
+- Lip colour products render compact 31px swatch boxes with accessible shade names; the compact rule is scoped only to lipstick/lip-colour selectors.
+- No horizontal overflow was found at the mobile breakpoint, and the browser console reported no errors.
+
+The source and implementation captures were reviewed at the same desktop
+viewport; the focused regions were the hero wordmark/copy alignment and the
+Moonveil shade selector. No additional crop normalization was required.
+
+final result: passed
+
+---
+
+# 60–30–10 palette refresh — design QA
+
+## Visual truth and review state
+
+- Reference: the user-provided 60–30–10 direction using `#F9F6F0`, `#262220`,
+  and `#B87355`.
+- Rendered review: local production preview across the homepage, collection
+  routes, cart, Riverrose product page, and YAFA assistant drawer.
+
+## Checks
+
+- Page surfaces resolve to `#F9F6F0` and primary text resolves to `#262220`.
+- Primary CTAs, active states, labels, focus outlines, and assistant accents use
+  `#B87355` with ink text for readable contrast.
+- Shared palette tokens are applied through `palette.css`; cart module styles
+  now consume the same semantic variables.
+- Typecheck and production build passed, and the reviewed preview reported no
+  browser console errors.
 
 final result: passed

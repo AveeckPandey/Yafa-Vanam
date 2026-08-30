@@ -151,7 +151,7 @@ class OpenRouterEmbeddingProvider(EmbeddingProvider):
         headers = {
             "Authorization": f"Bearer {self._api_key}",
             # OpenRouter app-attribution headers; static values, no secrets.
-            "X-Title": "YAFA VANAM recommendation-engine",
+            "X-Title": "YAFA VANAM RAG service",
         }
         if self._client is not None:
             return await self._client.post(f"{self._base_url}/embeddings", json=payload, headers=headers)

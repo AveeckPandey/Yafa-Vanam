@@ -135,44 +135,47 @@ class RagRepository:
     def apply_migrations(self) -> list[str]:
         """Apply pending *.sql migrations in filename order.
 
-        Each file runs once inside a transaction together with its tracking
-        row; editing an applied file is refused so drift cannot hide.
+        The full migration sequence is serialised with a PostgreSQL advisory
+        lock. This service can run multiple Uvicorn workers, all of which
+        execute startup validation; without the lock, two workers can both
+        observe a pending migration and race to write its ledger row.
+        Editing an applied file is still refused so drift cannot hide.
         """
         migrations_dir = Path(__file__).resolve().parents[2] / "migrations"
         if not migrations_dir.is_dir():
             raise RuntimeError(f"migrations directory not found: {migrations_dir}")
         conn = self.connection()
         applied: list[str] = []
-        with conn.cursor() as cursor:
-            cursor.execute(
-                """
-                CREATE TABLE IF NOT EXISTS rag_schema_migrations (
-                    filename TEXT PRIMARY KEY,
-                    checksum TEXT NOT NULL,
-                    applied_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
-                )
-                """
-            )
-            cursor.execute("SELECT filename, checksum FROM rag_schema_migrations")
-            known = {row["filename"]: row["checksum"] for row in cursor.fetchall()}
-        for path in sorted(migrations_dir.glob("*.sql")):
-            sql = path.read_text(encoding="utf-8")
-            checksum = hashlib.sha256(sql.encode("utf-8")).hexdigest()
-            record = known.get(path.name)
-            if record is not None:
-                if record != checksum:
-                    raise RuntimeError(
-                        f"migration {path.name} changed after being applied; add a new migration instead"
+        with conn.transaction():
+            with conn.cursor() as cursor:
+                cursor.execute(
+                    """
+                    CREATE TABLE IF NOT EXISTS rag_schema_migrations (
+                        filename TEXT PRIMARY KEY,
+                        checksum TEXT NOT NULL,
+                        applied_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
                     )
-                continue
-            with conn.transaction():
-                with conn.cursor() as cursor:
+                    """
+                )
+                cursor.execute("SELECT pg_advisory_xact_lock(hashtext('yafa_rag_schema_migrations'))")
+                cursor.execute("SELECT filename, checksum FROM rag_schema_migrations")
+                known = {row["filename"]: row["checksum"] for row in cursor.fetchall()}
+                for path in sorted(migrations_dir.glob("*.sql")):
+                    sql = path.read_text(encoding="utf-8")
+                    checksum = hashlib.sha256(sql.encode("utf-8")).hexdigest()
+                    record = known.get(path.name)
+                    if record is not None:
+                        if record != checksum:
+                            raise RuntimeError(
+                                f"migration {path.name} changed after being applied; add a new migration instead"
+                            )
+                        continue
                     cursor.execute(sql)
                     cursor.execute(
                         "INSERT INTO rag_schema_migrations (filename, checksum) VALUES (%s, %s)",
                         (path.name, checksum),
                     )
-            applied.append(path.name)
+                    applied.append(path.name)
         return applied
 
     def validate_stored_dimension(self, expected: int) -> None:
@@ -527,6 +530,127 @@ class RagRepository:
                 chunk_type=row["chunk_type"],
                 content=row["content"],
                 similarity=float(row["similarity"]),
+                trust_level=row["trust_level"],
+                customer_factual_eligible=row["customer_factual_eligible"],
+                requires_qualification=row["requires_qualification"],
+                metadata=row["metadata"] or {},
+            )
+            for row in rows
+        ]
+
+    def fetch_verified_chunks(
+        self,
+        *,
+        product_id: str,
+        customer_factual_only: bool = True,
+        chunk_types: list[str] | None = None,
+        trust_levels: list[str] | None = None,
+        top_k: int = 5,
+    ) -> list[SearchHit]:
+        """Fetch a known product's vetted facts without an embedding query.
+
+        This is intentionally narrow: it is only used as a short outage
+        fallback after alias resolution has pinned the request to one product
+        and the caller has supplied a fact-type filter. It cannot turn into a
+        catalogue-wide keyword search or surface live commerce data.
+        """
+        conn = self.connection()
+        with conn.cursor() as cursor:
+            cursor.execute(
+                """
+                SELECT c.id, c.canonical_product_id, d.product_name, d.category, d.subcategory,
+                       d.product_type, c.chunk_type, c.content, c.trust_level,
+                       c.customer_factual_eligible, c.requires_qualification, c.metadata
+                FROM rag_chunks c
+                JOIN rag_documents d ON d.id = c.document_id
+                WHERE c.canonical_product_id = %(product_id)s
+                  AND (%(types)s::text[] IS NULL OR c.chunk_type = ANY(%(types)s::text[]))
+                  AND (%(trusts)s::text[] IS NULL OR c.trust_level = ANY(%(trusts)s::text[]))
+                  AND (%(customer_only)s = FALSE OR c.customer_factual_eligible)
+                ORDER BY c.updated_at DESC, c.id
+                LIMIT %(top_k)s
+                """,
+                {
+                    "product_id": product_id,
+                    "types": chunk_types,
+                    "trusts": trust_levels,
+                    "customer_only": customer_factual_only,
+                    "top_k": top_k,
+                },
+            )
+            rows = cursor.fetchall()
+        return [
+            SearchHit(
+                chunk_id=row["id"],
+                product_id=row["canonical_product_id"],
+                product_name=row["product_name"],
+                category=row["category"],
+                subcategory=row["subcategory"],
+                product_type=row["product_type"],
+                chunk_type=row["chunk_type"],
+                content=row["content"],
+                # These are not vector-ranked. A neutral score keeps the
+                # response shape stable without implying semantic similarity.
+                similarity=0.0,
+                trust_level=row["trust_level"],
+                customer_factual_eligible=row["customer_factual_eligible"],
+                requires_qualification=row["requires_qualification"],
+                metadata=row["metadata"] or {},
+            )
+            for row in rows
+        ]
+
+    def fetch_eligible_chunks(
+        self,
+        *,
+        customer_factual_only: bool = True,
+        chunk_types: list[str] | None = None,
+        trust_levels: list[str] | None = None,
+        top_k: int = 120,
+    ) -> list[SearchHit]:
+        """Return a bounded, verified static-fact pool without vectors.
+
+        The retriever uses this only after an embedding-provider failure and
+        only when the caller has already constrained the requested fact type.
+        It contains no live-commerce fields and remains subject to the normal
+        customer-fact policy check in the retriever.
+        """
+        conn = self.connection()
+        with conn.cursor() as cursor:
+            cursor.execute(
+                """
+                SELECT c.id, c.canonical_product_id, d.product_name, d.category, d.subcategory,
+                       d.product_type, c.chunk_type, c.content, c.trust_level,
+                       c.customer_factual_eligible, c.requires_qualification, c.metadata
+                FROM rag_chunks c
+                JOIN rag_documents d ON d.id = c.document_id
+                WHERE (%(types)s::text[] IS NULL OR c.chunk_type = ANY(%(types)s::text[]))
+                  AND (%(trusts)s::text[] IS NULL OR c.trust_level = ANY(%(trusts)s::text[]))
+                  AND (%(customer_only)s = FALSE OR c.customer_factual_eligible)
+                ORDER BY d.product_name, c.chunk_type, c.id
+                LIMIT %(top_k)s
+                """,
+                {
+                    "types": chunk_types,
+                    "trusts": trust_levels,
+                    "customer_only": customer_factual_only,
+                    "top_k": top_k,
+                },
+            )
+            rows = cursor.fetchall()
+        return [
+            SearchHit(
+                chunk_id=row["id"],
+                product_id=row["canonical_product_id"],
+                product_name=row["product_name"],
+                category=row["category"],
+                subcategory=row["subcategory"],
+                product_type=row["product_type"],
+                chunk_type=row["chunk_type"],
+                content=row["content"],
+                # This pool is ranked deterministically by the retriever, not
+                # by vector distance. Do not imply an embedding similarity.
+                similarity=0.0,
                 trust_level=row["trust_level"],
                 customer_factual_eligible=row["customer_factual_eligible"],
                 requires_qualification=row["requires_qualification"],

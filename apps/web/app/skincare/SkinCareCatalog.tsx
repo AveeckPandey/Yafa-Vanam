@@ -1,7 +1,6 @@
 "use client";
 
 import Image from "next/image";
-import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import ProductCard from "@/components/product/ProductCard";
@@ -80,10 +79,11 @@ export default function SkinCareCatalog({ products }: { products: CatalogProduct
 
   return (
     <main id="main-content" className="skincare-collection-page">
-      <section className="collection-intro" aria-labelledby="skincare-title">
+      <section className="collection-intro collection-intro--image collection-intro--skincare" aria-labelledby="skincare-title">
+        <Image className="collection-intro__image" src="/images/home/campaign/hero-skincare-garden.png" alt="" fill priority sizes="100vw" />
+        <div className="collection-intro__veil" aria-hidden="true" />
         <div className="collection-intro__eyebrow">The daily skin ritual</div>
         <h1 id="skincare-title">Skin care, made into a ritual.</h1>
-        <p>Thoughtful essentials for cleansing, treating, hydrating and protecting the skin — designed around what your skin needs.</p>
       </section>
 
       <section className="collection-shop" aria-label="Skin Care collection">
@@ -108,9 +108,6 @@ export default function SkinCareCatalog({ products }: { products: CatalogProduct
             <div className="commerce-grid__item" key={product.id}>
               {category === "all" && selectedGroups.length === 0 && sortOrder === "featured" && index === 0 ? (
                 <article className="collection-editorial-tile"><Image src="/images/yafavanam/No%20Shades%20Items/face%20Care/Morningroot_Daily_Face_Cleanser.png" alt="Morningroot Daily Face Cleanser by YAFA VANAM" fill sizes="25vw" /><div className="collection-editorial-tile__shade" /><div className="collection-editorial-tile__content"><p>The daily ritual</p><h3>Care, at your own pace.</h3><span>Discover Skin Care</span></div></article>
-              ) : null}
-              {category === "all" && selectedGroups.length === 0 && sortOrder === "featured" && index === 7 ? (
-                <article className="collection-kit-tile"><div className="collection-kit-tile__mark" aria-hidden="true">YV</div><div><p>Your skin care ritual</p><h3>Build a routine around what your skin needs.</h3><span>Cleanse, treat, hydrate and protect — one thoughtful step at a time.</span></div><Link href="/build-my-kit">Build My Kit <span aria-hidden="true">↗</span></Link></article>
               ) : null}
               <ProductCard product={product} onQuickShop={setQuickProduct} eager={index < 3} />
             </div>

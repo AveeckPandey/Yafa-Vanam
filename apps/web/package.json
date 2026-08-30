@@ -6,7 +6,7 @@
     "build": "next build",
     "start": "next start",
     "typecheck": "tsc --noEmit",
-    "test": "node --experimental-transform-types --import ./tests/helpers/register.mjs --test tests/signup-validation.test.ts tests/cognito-server.test.ts tests/session-cookies.test.ts tests/payment-order-idempotency.test.ts tests/voice-gateway-token.test.ts",
+    "test": "node --experimental-transform-types --import ./tests/helpers/register.mjs --test tests/signup-validation.test.ts tests/cognito-server.test.ts tests/session-cookies.test.ts tests/payment-order-idempotency.test.ts",
     "test:e2e": "playwright test --config playwright.config.ts e2e/storefront.spec.ts",
     "test:a11y": "playwright test --config playwright.config.ts e2e/accessibility.spec.ts --project=chromium",
     "validate:catalog": "node scripts/validate-catalog.mjs"

@@ -141,6 +141,12 @@ export default function Navbar() {
   }, [pathname, dismissSearch]);
 
   useEffect(() => {
+    const hasOverlay = Boolean(activeMenu || mobileOpen || searchOpen);
+    document.documentElement.toggleAttribute("data-navigation-overlay", hasOverlay);
+    return () => document.documentElement.removeAttribute("data-navigation-overlay");
+  }, [activeMenu, mobileOpen, searchOpen]);
+
+  useEffect(() => {
     if (isLoading) return;
     const updateBagCount = (event?: Event) => {
       const detail = (event as CustomEvent<{ itemCount?: number }> | undefined)?.detail;
@@ -271,9 +277,6 @@ export default function Navbar() {
             </button>
           ))}
 
-          <Link className="primary-nav__kit" href="/build-my-kit">
-            Build My Kit
-          </Link>
         </div>
 
         <div className="primary-nav__mobile-actions">

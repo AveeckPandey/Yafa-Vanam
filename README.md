@@ -1,46 +1,57 @@
 # YAFA VANAM
 
-Monorepo scaffold for the YAFA VANAM beauty commerce platform.
+RAG-only beauty commerce platform for YAFA VANAM. The customer chat answers
+verified product and brand questions; it does not make personalised
+recommendations or process images, voice, or medical advice.
 
-## Architecture snapshot
+## Current architecture
 
 | Concern | Technology |
 | --- | --- |
 | Customer storefront | Next.js + TypeScript |
 | Main commerce backend | Go |
-| Database | PostgreSQL |
-| Go DB access | pgx + sqlc |
-| Recommendation / ML | Python + FastAPI |
-| Behavior analytics | PostHog |
-| Marketing analytics | Google Analytics 4 |
-| CRM | HubSpot Free (initial phase) |
-| Admin | Retool |
-| Payments | Razorpay |
-| Lifecycle messaging | WhatsApp Business |
-| Monitoring | Sentry |
-| Future knowledge assistant | RAG service |
-| Future beauty companion | Quiz + skin analysis + kit recommendation orchestration |
+| Commerce database | PostgreSQL |
+| Product knowledge service | Python + FastAPI grounded RAG |
+| RAG vector database | PostgreSQL with pgvector |
+| Caching | Redis |
+| Local runtime | Docker Compose |
+| Production infrastructure | AWS |
 
-## Main directories
+## Project structure
 
 ```text
-apps/web                     Next.js storefront
-apps/api                     Go commerce/business API
-services/recommendation-engine  Python/FastAPI ranking engine
-services/ai-companion        future conversational companion + system prompt
-services/rag-assistant       future grounded knowledge retrieval
-retool                       internal admin query/docs scaffold
-data                         catalogue import/normalization work
-docs                         architecture and feature notes
+apps/
+  web/                       Next.js storefront and YAFA chat interface
+  api/                       Go commerce API, database migrations, OpenAPI contract
+services/
+  recommendation-engine/     FastAPI RAG service, verified knowledge retrieval,
+                             embeddings, ingestion migrations, and RAG tests
+data/                         Product catalogue import and normalisation data
+packages/                     Shared workspace packages
+infra/
+  aws/                       AWS deployment infrastructure and Lambda functions
+lambda/                       Standalone Lambda source
+scripts/                      Repository automation and operational scripts
+docs/
+  rag/                       RAG setup, ingestion, and operational guidance
+  deployment/                Docker and AWS deployment guidance
+  ai/, analytics/, brand/, crm/, lifecycle-marketing/, merchandising/,
+  payments/, returns/        Supporting product and operational documentation
+docker-compose.yml            Local PostgreSQL, pgvector, Redis, Go API, and RAG stack
 ```
+
+For the complete active monorepo map, see `docs/PROJECT_STRUCTURE.md`.
 
 ## Local development
 
-### PostgreSQL
+### Full local stack
 
 ```bash
-docker compose up postgres
+docker compose up --build
 ```
+
+This starts PostgreSQL, pgvector, Redis, the Go API, and the RAG service. Run
+the Next.js storefront separately with `npm run dev:web`.
 
 ### Go API
 
@@ -64,7 +75,7 @@ npm run dev:web
 
 The JavaScript workspace now uses npm workspaces. Run `npm install` once to install dependencies and generate `package-lock.json`.
 
-### Recommendation engine
+### Product-knowledge RAG only
 
 ```bash
 cd services/recommendation-engine
@@ -76,8 +87,9 @@ uvicorn app.main:app --reload --port 8000
 ## Important boundaries
 
 - PostgreSQL + verified payment data is business truth.
-- PostHog/GA4 are analytics, not accounting databases.
-- Retool uses the Go Admin API for sensitive writes.
-- The recommendation engine ranks; Go validates sellability.
-- Future RAG explains knowledge; it does not decide stock, refunds, payments, or coupons.
-- WhatsApp marketing requires a separate explicit opt-in and lifecycle suppression rules.
+- RAG explains verified product and brand knowledge; it does not decide stock,
+  refunds, payments, coupons, or personalised product choices.
+- The RAG service returns grounded product information and product links only.
+  It does not use image, voice, shade-matching, or recommendation workflows.
+- See `docs/deployment/aws-production-architecture.md` for the AWS target
+  architecture and `docs/rag/README.md` for the active RAG workflow.

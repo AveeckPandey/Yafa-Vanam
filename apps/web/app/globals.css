@@ -1,28 +1,28 @@
 :root{/* YAFA VANAM light storefront theme. The --yv-* aliases expose the same
      palette under semantic names so newer components can use either set. */
   
-  --yv-background: #fcf9fa;
-  --yv-surface: #ffffff;
-  --yv-surface-raised: #f5e8ec;
-  --yv-pink: #c94c6b;
-  --yv-pink-soft: #f3e4e7;
-  --yv-white: #111111;
-  --yv-muted: #66615e;
-  --yv-border: rgba(23, 21, 18, 0.16);
+  --yv-background: #F9F6F0;
+  --yv-surface: #F9F6F0;
+  --yv-surface-raised: #F9F6F0;
+  --yv-pink: #B87355;
+  --yv-pink-soft: color-mix(in srgb, #B87355 14%, #F9F6F0);
+  --yv-white: #262220;
+  --yv-muted: color-mix(in srgb, #262220 62%, #F9F6F0);
+  --yv-border: color-mix(in srgb, #262220 16%, transparent);
   --yv-error: #b33c33;
   --yv-success: #1e6b47;
-  --ink: #111111;
-  --forest: #111111;
-  --fern: var(--yv-pink-soft);
-  --muted: #66615e;
-  --copper: #8d4b5c;
-  --border: #d9d9d9;
-  --muted-ink: #5f5a57;
-  --paper: #fcf9fa;
-  --warm-paper: #f5e8ec;
-  --peach: #f3e4e7;
-  --coral: #a85d70;
-  --line: rgba(23, 21, 18, 0.16);
+  --ink: #262220;
+  --forest: #262220;
+  --fern: color-mix(in srgb, #B87355 14%, #F9F6F0);
+  --muted: color-mix(in srgb, #262220 62%, #F9F6F0);
+  --copper: #B87355;
+  --border: color-mix(in srgb, #262220 16%, transparent);
+  --muted-ink: color-mix(in srgb, #262220 70%, #F9F6F0);
+  --paper: #F9F6F0;
+  --warm-paper: #F9F6F0;
+  --peach: color-mix(in srgb, #B87355 14%, #F9F6F0);
+  --coral: #B87355;
+  --line: color-mix(in srgb, #262220 16%, transparent);
   --shell: 1440px;
   --header-height: 111px;
   color: var(--ink);

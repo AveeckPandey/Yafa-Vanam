@@ -64,7 +64,7 @@ export default function YafaProductGuidance({
           maxLength={1000}
           value={question}
           onChange={(event) => setQuestion(event.target.value)}
-          placeholder="🎤 Ask Yafa about this product…"
+          placeholder="Ask Yafa about this product…"
         />
         <button type="submit" disabled={isThinking || !question.trim()}>
           Send

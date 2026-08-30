@@ -1,2 +1,3 @@
-// YAFA VANAM scaffold route. Replace this re-export when the page is implemented.
-export { default } from "@/components/layout/ScaffoldRoute";
+import { notFound } from "next/navigation";
+
+export default function Page() { notFound(); }

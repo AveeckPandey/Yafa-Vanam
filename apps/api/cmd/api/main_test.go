@@ -4,8 +4,7 @@ import "testing"
 
 func TestOrderConfirmationAWSRegion(t *testing.T) {
 	t.Setenv("AWS_REGION", "")
-	t.Setenv("AWS_DEFAULT_REGION", "")
-	t.Setenv("YAFA_STORAGE_REGION", "ap-south-1")
+	t.Setenv("AWS_DEFAULT_REGION", "ap-south-1")
 	if got := orderConfirmationAWSRegion(); got != "ap-south-1" {
 		t.Fatalf("orderConfirmationAWSRegion() = %q, want ap-south-1", got)
 	}

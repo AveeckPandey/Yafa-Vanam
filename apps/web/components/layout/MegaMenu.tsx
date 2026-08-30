@@ -31,7 +31,7 @@ const menuContent: Record<MegaMenuKey, MenuContent> = {
         ],
       },
     ],
-    feature: { image: "/images/hero/yafa-vanam-foundation-collection.png", imagePosition: "72% center", label: "Your skin, only more seamless", title: "Meet the Earth Skin complexion ritual", href: "/makeup?category=complexion" },
+    feature: { image: "/images/home/campaign/hero-skincare-garden.png", imagePosition: "72% center", label: "Your skin, only more seamless", title: "Meet the Earth Skin complexion ritual", href: "/makeup?category=complexion" },
   },
   makeup: {
     eyebrow: "Colour with intention", title: "Make Up", shopAllHref: "/makeup",
@@ -41,7 +41,7 @@ const menuContent: Record<MegaMenuKey, MenuContent> = {
       { title: "Lips", links: [{ label: "Lipstick", href: "/makeup?category=lips&type=lipstick" }, { label: "Lip Oil", href: "/makeup?category=lips&type=lip-oil" }, { label: "Lip Gloss", href: "/makeup?category=lips&type=lip-gloss" }, { label: "Lip Liner", href: "/makeup?category=lips&type=lip-liner" }, { label: "Lip Stain", href: "/makeup?category=lips&type=lip-stain" }, { label: "Lip Plumper", href: "/makeup?category=lips&type=lip-plumper" }] },
       { title: "Cheeks", links: [{ label: "Blush", href: "/makeup?category=cheeks&type=blush" }, { label: "Lip + Cheek", href: "/makeup?category=cheeks&type=lip-cheek" }] },
     ],
-    feature: { image: "/images/hero/yafa-vanam-cheek-collection.png", imagePosition: "80% center", label: "Petal-soft colour", title: "A fresh flush with a luminous finish", href: "/makeup?category=cheeks" },
+    feature: { image: "/images/home/campaign/hero-makeup-earth.png", imagePosition: "76% center", label: "Petal-soft colour", title: "A fresh flush with a luminous finish", href: "/makeup?category=cheeks" },
   },
   body: {
     eyebrow: "Care from head to toe", title: "Body Care", shopAllHref: "/body-care",
@@ -49,7 +49,7 @@ const menuContent: Record<MegaMenuKey, MenuContent> = {
       { title: "Body Moisturizers", links: [{ label: "Body Butter", href: "/body-care?type=body-butter" }] },
       { title: "Hand & Foot Care", links: [{ label: "Hand Cream", href: "/body-care?type=hand-cream" }, { label: "Foot Cream", href: "/body-care?type=foot-cream" }] },
     ],
-    feature: { image: "/images/hero/yafa-vanam-soft-colour.png", imagePosition: "88% center", label: "Daily rituals", title: "Care that feels as good as it performs", href: "/body-care" },
+    feature: { image: "/images/home/campaign/hero-body-care-winter.png", imagePosition: "72% center", label: "Daily rituals", title: "Care that feels as good as it performs", href: "/body-care" },
   },
   fragrance: {
     eyebrow: "A signature in every note", title: "Fragrance", shopAllHref: "/fragrance",
@@ -57,7 +57,7 @@ const menuContent: Record<MegaMenuKey, MenuContent> = {
       { title: "Body & Hair Mists", links: [{ label: "Body Mist", href: "/fragrance?category=body-mist" }, { label: "Hair & Body Mist", href: "/fragrance?category=hair-body-mist" }] },
       { title: "Perfume", links: [{ label: "Eau de Parfum", href: "/fragrance?category=eau-de-parfum" }, { label: "Solid Perfume", href: "/fragrance?category=solid-perfume" }, { label: "Warm Fragrance", href: "/fragrance?category=warm-fragrance" }] },
     ],
-    feature: { image: "/images/hero/yafa-vanam-lip-collection.png", imagePosition: "74% center", label: "Find your signature", title: "Fragrance for every mood and ritual", href: "/fragrance" },
+    feature: { image: "/images/home/campaign/hero-fragrance-lakeside.png", imagePosition: "72% center", label: "Find your signature", title: "Fragrance for every mood and ritual", href: "/fragrance" },
   },
 };
 

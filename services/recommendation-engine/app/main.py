@@ -1,8 +1,14 @@
+"""Private YAFA VANAM product-knowledge RAG service."""
+
+from __future__ import annotations
+
 import os
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
-from fastapi.middleware.cors import CORSMiddleware
+
+from app.api.rag_search import router as rag_search_router, validate_startup_dimensions
+from app.api.yafa_chat import router as yafa_chat_router
 
 try:
     import sentry_sdk
@@ -11,14 +17,6 @@ except ImportError:  # Keeps local development usable before optional monitoring
     sentry_sdk = None
     SentryAsgiMiddleware = None
 
-from app.api.advisor import router as advisor_router
-from app.api.rag_search import router as rag_search_router, validate_startup_dimensions
-from app.api.yafa_analysis import router as yafa_analysis_router
-from app.api.yafa_chat import router as yafa_chat_router
-from app.advisor.catalogue import load_catalogue
-from app.advisor.models import BeautyProfile
-from app.advisor.recommender import recommend
-from app.v1 import router as v1_router
 
 if sentry_sdk is not None and os.getenv("SENTRY_DSN"):
     sentry_sdk.init(
@@ -32,8 +30,7 @@ if sentry_sdk is not None and os.getenv("SENTRY_DSN"):
 
 @asynccontextmanager
 async def lifespan(_: FastAPI):
-    # Startup guard (spec §11): configured EMBEDDING_DIMENSION == provider
-    # output == stored pgvector column dimension. No-op without VECTOR_DATABASE_URL.
+    """Validate the vector store before serving any RAG traffic."""
     import asyncio
 
     status = await asyncio.to_thread(validate_startup_dimensions)
@@ -42,29 +39,16 @@ async def lifespan(_: FastAPI):
     yield
 
 
-app = FastAPI(title="YAFA VANAM Product Advisor", version="1.0.0", lifespan=lifespan)
+app = FastAPI(title="YAFA VANAM RAG Service", version="1.0.0", lifespan=lifespan)
 if sentry_sdk is not None and SentryAsgiMiddleware is not None and os.getenv("SENTRY_DSN"):
     app.add_middleware(SentryAsgiMiddleware)
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["http://localhost:3000"],
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
-app.include_router(advisor_router)
-app.include_router(yafa_analysis_router)
+
+# The browser reaches this private service only through the server-side Yafa
+# bridge, which supplies the internal service token.
 app.include_router(rag_search_router)
 app.include_router(yafa_chat_router)
-app.include_router(v1_router)
 
 
 @app.get("/health")
-def health() -> dict[str, str | int]:
-    return {"service": "product-advisor", "status": "ok", "catalogue_products": len(load_catalogue())}
-
-
-@app.post("/recommendations")
-def recommendations(profile: BeautyProfile) -> dict:
-    # Backward-compatible stateless endpoint. Commerce fields still require Go validation.
-    return {"profile": profile.model_dump(mode="json"), "recommendations": [r.model_dump(mode="json") for r in recommend(profile)]}
+def health() -> dict[str, str]:
+    return {"service": "yafa-rag", "status": "ok"}

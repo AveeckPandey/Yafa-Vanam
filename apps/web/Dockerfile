@@ -9,7 +9,6 @@ RUN npm ci
 COPY apps/web ./apps/web
 COPY packages/frontend-types ./packages/frontend-types
 COPY data/processed ./data/processed
-COPY services/recommendation-engine/data ./services/recommendation-engine/data
 WORKDIR /workspace/apps/web
 RUN npm run build
 

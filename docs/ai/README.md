@@ -1,5 +1,8 @@
 # AI companion — later phase
 
-The planned YAFA VANAM AI Companion combines the conversational quiz, optional cosmetic skin-tone/undertone analysis, the recommendation engine, and later RAG grounding.
+YAFA VANAM's AI capability is a private, grounded RAG service for verified
+product and brand knowledge. It does not provide ranking, shade matching,
+image analysis, or personalised recommendations.
 
-The source prompt lives at `services/ai-companion/prompts/yafa_vanam_system_prompt.md`. Internal profile/scoring information must not be exposed to the shopper. Photo analysis should remain cosmetic/personalization oriented rather than medical diagnosis.
+The service returns only grounded product and brand facts. It does not collect a
+shopper profile or accept photo, audio, or other media inputs.

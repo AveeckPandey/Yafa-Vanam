@@ -17,6 +17,8 @@ const MIN_H = 420;
 export default function YafaDrawer() {
   const { isOpen, closeDrawer, toggleDrawer, resetConversation, pageContext } = useYafa();
   const [size, setSize] = useState<{ width: number; height: number } | null>(null);
+  const [shouldRender, setShouldRender] = useState(isOpen);
+  const [isVisible, setIsVisible] = useState(false);
   const resizeRef = useRef<{
     startX: number;
     startY: number;
@@ -28,8 +30,32 @@ export default function YafaDrawer() {
 
   const close = useCallback(() => {
     closeDrawer();
-    window.requestAnimationFrame(() => launcherRef.current?.focus());
   }, [closeDrawer]);
+
+  // Keep the drawer mounted while it exits so closing has the same deliberate
+  // motion as opening, while returning focus only after the exit completes.
+  useEffect(() => {
+    let frame: number | undefined;
+    let timeout: number | undefined;
+
+    if (isOpen) {
+      setShouldRender(true);
+      frame = window.requestAnimationFrame(() => setIsVisible(true));
+    } else {
+      setIsVisible(false);
+      if (shouldRender) {
+        timeout = window.setTimeout(() => {
+          setShouldRender(false);
+          launcherRef.current?.focus();
+        }, 340);
+      }
+    }
+
+    return () => {
+      if (frame !== undefined) window.cancelAnimationFrame(frame);
+      if (timeout !== undefined) window.clearTimeout(timeout);
+    };
+  }, [isOpen, shouldRender]);
 
   const onResizeStart = useCallback(
     (event: React.PointerEvent<HTMLDivElement>) => {
@@ -103,73 +129,74 @@ export default function YafaDrawer() {
         aria-controls="yafa-drawer"
         aria-label="Open Yafa beauty assistant"
       >
-        <span aria-hidden="true">✦</span> Ask YAFA
+        Ask YAFA
       </button>
 
-      {isOpen ? (
+      {shouldRender ? (
         <button
           type="button"
-          className="yafa-drawer__backdrop"
+          className={`yafa-drawer__backdrop ${isVisible ? "is-visible" : ""}`}
           onClick={close}
           aria-label="Close Yafa chat"
+          tabIndex={isOpen ? 0 : -1}
         />
       ) : null}
 
-      <div
-        id="yafa-drawer"
-        ref={drawerRef}
-        className={`yafa-drawer ${isOpen ? "is-open" : ""}`}
-        role="dialog"
-        aria-modal="true"
-        aria-label="Yafa beauty assistant"
-        hidden={!isOpen}
-        style={inlineSize}
-      >
-        <header className="yafa-drawer__header">
-          <div className="yafa-drawer__title">
-            <h2>Ask Yafa</h2>
-            <p>Your personal beauty companion</p>
-            {contextLabel ? <span className="yafa-drawer__context">{contextLabel}</span> : null}
-          </div>
-          <div className="yafa-drawer__actions">
-            <button
-              type="button"
-              className="yafa-drawer__action"
-              onClick={resetConversation}
-              aria-label="Start a new Yafa conversation"
-              title="Start a new conversation"
-            >
-              <span aria-hidden="true">↻</span>
-            </button>
-            <button
-              type="button"
-              className="yafa-drawer__action yafa-drawer__close"
-              onClick={close}
-              aria-label="Close Yafa chat"
-              title="Close"
-            >
-              <span aria-hidden="true">×</span>
-            </button>
-          </div>
-        </header>
-
-        <YafaChat />
-
-        <div className="yafa-drawer__input">
-          <YafaInput />
-        </div>
-
-        {/* Desktop-only drag handle (bottom-left corner). */}
+      {shouldRender ? (
         <div
-          className="yafa-drawer__resize"
-          onPointerDown={onResizeStart}
-          onPointerMove={onResizeMove}
-          onPointerUp={onResizeEnd}
-          role="separator"
-          aria-orientation="vertical"
-          aria-label="Resize chat panel"
-        />
-      </div>
+          id="yafa-drawer"
+          ref={drawerRef}
+          className={`yafa-drawer ${isVisible ? "is-visible" : "is-exiting"}`}
+          role="dialog"
+          aria-modal={isOpen ? "true" : undefined}
+          aria-hidden={!isOpen}
+          aria-label="Yafa beauty assistant"
+          style={inlineSize}
+        >
+          <header className="yafa-drawer__header">
+            <div className="yafa-drawer__title">
+              <span className="yafa-drawer__eyebrow">YAFA VANAM</span>
+              <h2>Ask Yafa</h2>
+              <p>Verified product knowledge, beautifully simple.</p>
+              {contextLabel ? <span className="yafa-drawer__context">{contextLabel}</span> : null}
+            </div>
+            <div className="yafa-drawer__actions">
+              <button
+                type="button"
+                className="yafa-drawer__action"
+                onClick={resetConversation}
+                aria-label="Start a new Yafa conversation"
+              >
+                New chat
+              </button>
+              <button
+                type="button"
+                className="yafa-drawer__action yafa-drawer__close"
+                onClick={close}
+              >
+                Close
+              </button>
+            </div>
+          </header>
+
+          <YafaChat />
+
+          <div className="yafa-drawer__input">
+            <YafaInput />
+          </div>
+
+          {/* Desktop-only drag handle (bottom-left corner). */}
+          <div
+            className="yafa-drawer__resize"
+            onPointerDown={onResizeStart}
+            onPointerMove={onResizeMove}
+            onPointerUp={onResizeEnd}
+            role="separator"
+            aria-orientation="vertical"
+            aria-label="Resize chat panel"
+          />
+        </div>
+      ) : null}
     </>
   );
 }

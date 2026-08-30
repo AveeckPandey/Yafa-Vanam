@@ -1,9 +1,5 @@
 import "server-only";
 import productData from "../../../data/processed/Product.json";
-import skinShadeData from "../../../services/recommendation-engine/data/skin.json";
-import cheekShadeData from "../../../services/recommendation-engine/data/cheeks.json";
-import lipShadeData from "../../../services/recommendation-engine/data/lips.json";
-import eyeShadeData from "../../../services/recommendation-engine/data/eyes.json";
 import type { BodyCareGroup, CatalogIncludedShade, CatalogProduct, MakeupGroup, SkincareGroup } from "./catalog-types";
 import type { SearchIndexProduct } from "./product-search";
 import { makeupProductImageManifest } from "./makeup-assets";
@@ -94,45 +90,8 @@ type ShadeReference = {
   code?: string | null;
 };
 
-type ShadeReferenceProduct = {
-  variants?: Array<{ id?: string; shade?: ShadeReference | null }>;
-};
-
-type ShadeReferenceChunk = {
-  products?: ShadeReferenceProduct[];
-};
-
-type SourceProductChunk = {
-  products?: SourceProduct[];
-};
-
-type ShadeSystem = {
-  profiles?: Record<string, ShadeReference>;
-  shades?: ShadeReference[] | Record<string, ShadeReference>;
-};
-
-type ShadeSystemsChunk = {
-  shade_systems?: Record<string, ShadeSystem>;
-};
-
-const shadeReferenceByVariantId = new Map<string, ShadeReference>();
-const authoritativeSourceChunks = [skinShadeData, cheekShadeData, lipShadeData, eyeShadeData] as unknown as SourceProductChunk[];
-const authoritativeProductsById = new Map<string, SourceProduct>();
-for (const source of authoritativeSourceChunks) {
-  for (const product of source.products ?? []) authoritativeProductsById.set(product.id, product);
-}
-
-for (const source of authoritativeSourceChunks as ShadeReferenceChunk[]) {
-  for (const product of source.products ?? []) {
-    for (const variant of product.variants ?? []) {
-      if (variant.id && variant.shade?.hex) shadeReferenceByVariantId.set(variant.id, variant.shade);
-    }
-  }
-}
-
-// These references are product-specific visual fallbacks for source records
-// whose authoritative status explicitly has no sampled HEX yet. They never
-// fall through to the complexion/brown generic shade scale.
+// Product-specific visual fallbacks are used only where the canonical product
+// catalogue has no sampled HEX value.
 const productShadeVisualOverrides: Record<string, Record<string, ShadeReference>> = {
   "yv-complex-007": {
     "Peach Veil": { hex: "#E6A07E" },
@@ -152,23 +111,6 @@ const productShadeVisualOverrides: Record<string, Record<string, ShadeReference>
     "Clay Line": { hex: "#B86640" },
   },
 };
-
-const skinShadeSystems = (skinShadeData as unknown as ShadeSystemsChunk).shade_systems ?? {};
-const lipShadeSystems = (lipShadeData as unknown as ShadeSystemsChunk).shade_systems ?? {};
-const shadeSystemByProductId = new Map<string, ShadeSystem>();
-for (const [productId, shadeSystem] of Object.entries(lipShadeSystems)) {
-  if (productId.startsWith("yv-")) shadeSystemByProductId.set(productId, shadeSystem);
-}
-for (const [productId, shadeSystemId] of Object.entries({
-  "yv-complex-007": "tonepetal_corrector_5",
-  "yv-complex-008": "airveil_setting_powder_4",
-  "yv-complex-009": "sungrove_bronzer_5",
-  "yv-complex-010": "shadowroot_contour_4",
-  "yv-complex-011": "moonbeam_highlighter_4",
-})) {
-  const shadeSystem = skinShadeSystems[shadeSystemId];
-  if (shadeSystem) shadeSystemByProductId.set(productId, shadeSystem);
-}
 
 const earthSkinProductIds = new Set([
   "yv-complex-001",
@@ -314,31 +256,17 @@ function shadeLabel(shade: NonNullable<SourceProduct["variants"][number]["shade"
     .join(" ");
 }
 
-function getSystemShadeReference(productId: string, shade: NonNullable<SourceProduct["variants"][number]["shade"]>) {
-  const shadeSystem = shadeSystemByProductId.get(productId);
-  if (!shadeSystem) return null;
-  const systemShades = Array.isArray(shadeSystem.shades)
-    ? shadeSystem.shades
-    : Object.entries(shadeSystem.shades ?? {}).map(([name, value]) => ({ ...value, name }));
-  const candidates = [...Object.values(shadeSystem.profiles ?? {}), ...systemShades];
-  return candidates.find((candidate) => candidate.name === shade.name || candidate.code === shade.code) ?? null;
-}
-
 function getShadeReference(productId: string, variantId: string, shade: NonNullable<SourceProduct["variants"][number]["shade"]>) {
   if (earthSkinProductIds.has(productId) && shade.code) return earthSkinMasterShades.get(shade.code) ?? null;
-  return productShadeVisualOverrides[productId]?.[shade.name ?? ""]
-    ?? shadeReferenceByVariantId.get(variantId)
-    ?? getSystemShadeReference(productId, shade);
+  return productShadeVisualOverrides[productId]?.[shade.name ?? ""];
 }
 
 function mapProduct(product: SourceProduct): CatalogProduct {
-  const authoritativeProduct = authoritativeProductsById.get(product.id);
   // Cart requests are validated by the Go commerce API against Product.json.
-  // Use that same source for storefront variants so a visible shade is always
-  // a purchasable variant; external display metadata must never invent one.
+  // Use that same canonical source for every storefront variant and shade.
   const variantSource = product;
   const activeVariants = variantSource.variants.filter((variant) => variant.is_active);
-  const includedShades: CatalogIncludedShade[] = (authoritativeProduct?.palette_colors ?? []).map((shade, index) => ({
+  const includedShades: CatalogIncludedShade[] = (product.palette_colors ?? []).map((shade, index) => ({
     id: shade.code ?? `${product.id}-included-${index + 1}`,
     name: shade.name,
     hex: shade.hex ?? null,

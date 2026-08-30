@@ -4,13 +4,13 @@ info:
   version: 2.0.0
   description: |
     The full HTTP contract of the Go commerce API: catalogue, carts, orders,
-    Razorpay payments, session auth, and the YAFA beauty-profile flow.
+    Razorpay payments and session auth.
 
     Conventions:
 
-    - Commerce and YAFA resources live under `/api/v1`; session auth lives at
-      the root (`/auth/...`) because the storefront proxies it separately.
-    - Errors use two shapes. Commerce/YAFA handlers return
+    - Commerce resources live under `/api/v1`; session auth lives at the root
+      (`/auth/...`) because the storefront proxies it separately.
+    - Errors use two shapes. Commerce handlers return
       `{"error":{"code","message"}}`; auth handlers return `{"error":"message"}`.
     - Browser mutations while signed in must send `X-CSRF-Token` (double-submit
       with the `yafa_csrf` cookie obtained from `GET /auth/csrf`).
@@ -566,164 +566,6 @@ paths:
             application/json:
               schema: { $ref: "#/components/schemas/Error" }
 
-  /api/v1/me/beauty-profile:
-    get:
-      tags: [Beauty Profile]
-      summary: The signed-in user's confirmed shade profile
-      security:
-        - cookieAuth: []
-      responses:
-        "200":
-          description: Profile (has_profile false when none confirmed yet)
-          content:
-            application/json:
-              schema: { $ref: "#/components/schemas/BeautyProfile" }
-        "401": { $ref: "#/components/responses/SimpleUnauthorized" }
-  /api/v1/yafa/session/start:
-    post:
-      tags: [Beauty Profile]
-      summary: Start a shade-finder session
-      description: Anonymous sessions receive a session_token that must travel in the X-Yafa-Session-Token header on subsequent calls; signed-in sessions are authorized by cookie.
-      security:
-        - cookieAuth: []
-        - {}
-      responses:
-        "201":
-          description: Session started
-          content:
-            application/json:
-              schema: { $ref: "#/components/schemas/YafaSessionStart" }
-        "503": { $ref: "#/components/responses/ServiceUnavailable" }
-  /api/v1/yafa/session/{sessionID}/answer:
-    patch:
-      tags: [Beauty Profile]
-      summary: Save one quiz answer
-      security:
-        - cookieAuth: []
-        - yafaSessionToken: []
-      parameters:
-        - $ref: "#/components/parameters/SessionId"
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              type: object
-              additionalProperties: false
-              required: [step_id, answer]
-              properties:
-                step_id: { type: string }
-                answer: { type: string }
-      responses:
-        "204": { description: Answer saved }
-        "400": { $ref: "#/components/responses/BadRequest" }
-        "403": { $ref: "#/components/responses/AccessDenied" }
-        "404": { $ref: "#/components/responses/NotFound" }
-        "422": { $ref: "#/components/responses/Validation" }
-        "503": { $ref: "#/components/responses/ServiceUnavailable" }
-  /api/v1/yafa/session/{sessionID}/selfie:
-    post:
-      tags: [Beauty Profile]
-      summary: Attach a selfie for analysis (multipart/form-data, JPG/PNG up to 5 MB)
-      security:
-        - cookieAuth: []
-        - yafaSessionToken: []
-      parameters:
-        - $ref: "#/components/parameters/SessionId"
-      requestBody:
-        required: true
-        content:
-          multipart/form-data:
-            schema:
-              type: object
-              required: [image]
-              properties:
-                image:
-                  type: string
-                  format: binary
-      responses:
-        "204": { description: Selfie stored }
-        "400": { $ref: "#/components/responses/BadRequest" }
-        "403": { $ref: "#/components/responses/AccessDenied" }
-        "404": { $ref: "#/components/responses/NotFound" }
-        "503": { $ref: "#/components/responses/ServiceUnavailable" }
-  /api/v1/yafa/session/{sessionID}/analyze:
-    post:
-      tags: [Beauty Profile]
-      summary: Run shade analysis for the session
-      security:
-        - cookieAuth: []
-        - yafaSessionToken: []
-      parameters:
-        - $ref: "#/components/parameters/SessionId"
-      responses:
-        "200":
-          description: Ranked shade candidates
-          content:
-            application/json:
-              schema: { $ref: "#/components/schemas/YafaAnalysis" }
-        "400": { $ref: "#/components/responses/BadRequest" }
-        "403": { $ref: "#/components/responses/AccessDenied" }
-        "404": { $ref: "#/components/responses/NotFound" }
-        "422":
-          description: Analysis could not determine a shade
-          content:
-            application/json:
-              schema: { $ref: "#/components/schemas/Error" }
-        "503": { $ref: "#/components/responses/ServiceUnavailable" }
-  /api/v1/yafa/session/{sessionID}/confirm:
-    post:
-      tags: [Beauty Profile]
-      summary: Confirm a recommended shade for the session
-      security:
-        - cookieAuth: []
-        - yafaSessionToken: []
-      parameters:
-        - $ref: "#/components/parameters/SessionId"
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema: { $ref: "#/components/schemas/YafaConfirmInput" }
-      responses:
-        "200":
-          description: Shade confirmed
-          content:
-            application/json:
-              schema: { $ref: "#/components/schemas/YafaConfirmation" }
-        "400": { $ref: "#/components/responses/BadRequest" }
-        "403": { $ref: "#/components/responses/AccessDenied" }
-        "404": { $ref: "#/components/responses/NotFound" }
-        "422": { $ref: "#/components/responses/Validation" }
-        "503": { $ref: "#/components/responses/ServiceUnavailable" }
-  /api/v1/yafa/confirm-shade:
-    post:
-      tags: [Beauty Profile]
-      summary: Confirm a shade by session ID in the body
-      security:
-        - cookieAuth: []
-        - yafaSessionToken: []
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              allOf:
-                - $ref: "#/components/schemas/YafaConfirmInput"
-                - type: object
-                  required: [quiz_session_id]
-      responses:
-        "200":
-          description: Shade confirmed
-          content:
-            application/json:
-              schema: { $ref: "#/components/schemas/YafaConfirmation" }
-        "400": { $ref: "#/components/responses/BadRequest" }
-        "403": { $ref: "#/components/responses/AccessDenied" }
-        "404": { $ref: "#/components/responses/NotFound" }
-        "422": { $ref: "#/components/responses/Validation" }
-        "503": { $ref: "#/components/responses/ServiceUnavailable" }
-
 components:
   securitySchemes:
     cookieAuth:
@@ -736,24 +578,12 @@ components:
       in: header
       name: X-Order-Access-Token
       description: Guest order credential returned as access_token when the order is created (no-auth mode only).
-    yafaSessionToken:
-      type: apiKey
-      in: header
-      name: X-Yafa-Session-Token
-      description: Credential returned by session start for anonymous beauty-profile sessions.
   parameters:
     CartId:
       in: path
       name: cartId
       required: true
       schema: { type: string }
-    SessionId:
-      in: path
-      name: sessionID
-      required: true
-      schema:
-        type: string
-        format: uuid
   responses:
     NotFound:
       description: Resource not found
@@ -1101,50 +931,3 @@ components:
         verified: { type: boolean, const: true }
         order_number: { type: string }
         payment_status: { type: string, const: AUTHORIZED }
-
-    YafaSessionStart:
-      type: object
-      required: [session_id]
-      properties:
-        session_id: { type: string, format: uuid }
-        session_token:
-          type: string
-          description: Present for anonymous sessions only; send as X-Yafa-Session-Token.
-    BeautyProfile:
-      type: object
-      required: [has_profile]
-      properties:
-        has_profile: { type: boolean }
-        shade_id: { type: string }
-        shade_name: { type: string }
-        shade_code: { type: string }
-        hex: { type: string }
-    YafaAnalysisCandidate:
-      type: object
-      required: [shade_id, shade_name, hex, confidence, reason]
-      properties:
-        shade_id: { type: string, format: uuid }
-        shade_name: { type: string }
-        hex: { type: string }
-        confidence: { type: number, minimum: 0, maximum: 1 }
-        reason: { type: string, maxLength: 280 }
-    YafaAnalysis:
-      type: object
-      required: [candidates, primary_recommendation]
-      properties:
-        candidates:
-          type: array
-          items: { $ref: "#/components/schemas/YafaAnalysisCandidate" }
-        primary_recommendation: { type: string, format: uuid }
-    YafaConfirmInput:
-      type: object
-      additionalProperties: false
-      properties:
-        quiz_session_id: { type: string, format: uuid }
-        shade_id: { type: string, format: uuid }
-    YafaConfirmation:
-      type: object
-      required: [shade_id, saved_to_profile]
-      properties:
-        shade_id: { type: string, format: uuid }
-        saved_to_profile: { type: boolean }

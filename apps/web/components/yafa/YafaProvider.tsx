@@ -13,28 +13,17 @@ import { trackEvent } from "../../lib/analytics";
 import {
   sendYafaMessage,
   type YafaChatResponse,
-  type YafaChatRequestAttachment,
   type YafaPageContext,
-  type YafaProfilePayload,
 } from "../../lib/yafa-chat";
 
 export type YafaRole = "user" | "yafa";
-
-/** Client-side only: local preview URL for an uploaded image (never sent upstream). */
-export type YafaAttachment = {
-  kind: "outfit" | "selfie" | "reference";
-  previewUrl: string;
-  label?: string;
-};
 
 export type YafaMessage = {
   id: string;
   role: YafaRole;
   text: string;
-  recommendations?: YafaChatResponse["recommendations"];
   grounding?: YafaChatResponse["grounding"];
   requires?: YafaChatResponse["requires"];
-  attachments?: YafaAttachment[];
 };
 
 type YafaContextValue = {
@@ -49,27 +38,13 @@ type YafaContextValue = {
   setQuickQuestions: (questions: string[]) => void;
   pageContext: YafaPageContext | null;
   setPageContext: (context: YafaPageContext | null) => void;
-  profile: YafaProfilePayload;
-  mergeProfile: (patch: YafaProfilePayload) => void;
   resetConversation: () => void;
-  shadeResult: ShadeResultSummary | null;
-  setShadeResult: (result: ShadeResultSummary | null) => void;
   send: (
     text: string,
     overrides?: {
       pageContext?: YafaPageContext | null;
-      profile?: YafaProfilePayload;
-      attachment?: YafaChatRequestAttachment | null;
-      displayAttachments?: YafaAttachment[];
     },
   ) => Promise<void>;
-};
-
-export type ShadeResultSummary = {
-  candidates: Array<{ code: string; name?: string | null; confidence: number }>;
-  depthFamily?: string | null;
-  undertone?: string | null;
-  source: "selfie" | "manual";
 };
 
 const YafaContext = createContext<YafaContextValue | null>(null);
@@ -84,8 +59,6 @@ export function YafaProvider({ children }: { children: ReactNode }) {
   const [error, setError] = useState<string | null>(null);
   const [quickQuestions, setQuickQuestions] = useState<string[]>([]);
   const [pageContext, setPageContext] = useState<YafaPageContext | null>(null);
-  const [profile, setProfile] = useState<YafaProfilePayload>({});
-  const [shadeResult, setShadeResult] = useState<ShadeResultSummary | null>(null);
   const conversationIdRef = useRef<string | null>(null);
 
   const openDrawer = useCallback(() => {
@@ -95,16 +68,10 @@ export function YafaProvider({ children }: { children: ReactNode }) {
   const closeDrawer = useCallback(() => setIsOpen(false), []);
   const toggleDrawer = useCallback(() => setIsOpen((open) => !open), []);
 
-  const mergeProfile = useCallback((patch: YafaProfilePayload) => {
-    setProfile((current) => deepMerge(current, patch));
-  }, []);
-
   const resetConversation = useCallback(() => {
     conversationIdRef.current = null;
     setMessages([]);
     setError(null);
-    setProfile({});
-    setShadeResult(null);
   }, []);
 
   const pushMessage = useCallback((message: YafaMessage) => {
@@ -116,9 +83,6 @@ export function YafaProvider({ children }: { children: ReactNode }) {
       text: string,
       overrides?: {
         pageContext?: YafaPageContext | null;
-        profile?: YafaProfilePayload;
-        attachment?: YafaChatRequestAttachment | null;
-        displayAttachments?: YafaAttachment[];
       },
     ) => {
       const trimmed = text.trim();
@@ -128,7 +92,6 @@ export function YafaProvider({ children }: { children: ReactNode }) {
         id: nextMessageId(),
         role: "user",
         text: trimmed,
-        attachments: overrides?.displayAttachments,
       });
       setIsThinking(true);
       trackEvent("yafa_message_sent", {
@@ -143,17 +106,12 @@ export function YafaProvider({ children }: { children: ReactNode }) {
           message: trimmed,
           conversationId: conversationIdRef.current,
           pageContext: effectiveContext,
-          profile: overrides?.profile ?? profile,
-          attachment: overrides?.attachment ?? null,
         });
         conversationIdRef.current = response.conversation_id;
         pushMessage({
           id: nextMessageId(),
           role: "yafa",
           text: response.message,
-          recommendations: response.recommendations.length
-            ? response.recommendations
-            : undefined,
           grounding: response.grounding.length ? response.grounding : undefined,
           requires: response.requires,
         });
@@ -163,7 +121,7 @@ export function YafaProvider({ children }: { children: ReactNode }) {
         setIsThinking(false);
       }
     },
-    [isThinking, pageContext, profile, pushMessage],
+    [isThinking, pageContext, pushMessage],
   );
 
   const value = useMemo<YafaContextValue>(
@@ -179,11 +137,7 @@ export function YafaProvider({ children }: { children: ReactNode }) {
       setQuickQuestions,
       pageContext,
       setPageContext,
-      profile,
-      mergeProfile,
       resetConversation,
-      shadeResult,
-      setShadeResult,
       send,
     }),
     [
@@ -196,10 +150,7 @@ export function YafaProvider({ children }: { children: ReactNode }) {
       error,
       quickQuestions,
       pageContext,
-      profile,
-      mergeProfile,
       resetConversation,
-      shadeResult,
       send,
     ],
   );
@@ -211,22 +162,4 @@ export function useYafa(): YafaContextValue {
   const context = useContext(YafaContext);
   if (!context) throw new Error("useYafa must be used inside YafaProvider");
   return context;
-}
-
-function deepMerge(base: YafaProfilePayload, patch: YafaProfilePayload): YafaProfilePayload {
-  const result: YafaProfilePayload = { ...base };
-  for (const [key, value] of Object.entries(patch)) {
-    if (
-      value && typeof value === "object" && !Array.isArray(value) &&
-      result[key] && typeof result[key] === "object" && !Array.isArray(result[key])
-    ) {
-      result[key] = deepMerge(
-        result[key] as YafaProfilePayload,
-        value as YafaProfilePayload,
-      );
-    } else if (value !== undefined) {
-      result[key] = value;
-    }
-  }
-  return result;
 }

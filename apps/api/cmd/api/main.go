@@ -14,7 +14,6 @@ import (
 	"github.com/BuildWithAveeck/yafa-vanam/apps/api/internal/auth"
 	"github.com/BuildWithAveeck/yafa-vanam/apps/api/internal/commerce"
 	"github.com/BuildWithAveeck/yafa-vanam/apps/api/internal/database"
-	"github.com/BuildWithAveeck/yafa-vanam/apps/api/internal/yafa"
 	"github.com/BuildWithAveeck/yafa-vanam/apps/api/platform/httpserver"
 	awsconfig "github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/aws-sdk-go-v2/service/sqs"
@@ -64,7 +63,6 @@ func main() {
 	}
 	origins := strings.Split(envOrDefault("CORS_ALLOWED_ORIGINS", "http://localhost:3000"), ",")
 	var authHandler *auth.Handler
-	var yafaService *yafa.Service
 	var healthDB *pgxpool.Pool
 	var healthRedis *redis.Client
 	if databaseURL, redisURL, secret := strings.TrimSpace(os.Getenv("DATABASE_URL")), strings.TrimSpace(os.Getenv("REDIS_URL")), strings.TrimSpace(os.Getenv("JWT_SECRET")); databaseURL != "" && redisURL != "" && len(secret) >= 32 {
@@ -98,20 +96,6 @@ func main() {
 			authHandler.SetCognitoVerifier(verifier)
 		} else {
 			logger.Warn("Cognito sign-in bridge disabled until COGNITO_REGION, COGNITO_USER_POOL_ID, and COGNITO_CLIENT_ID are all set")
-		}
-		yafaService = yafa.New(db)
-		storage, storageErr := yafa.NewStorage(context.Background(), yafa.StorageConfig{Endpoint: strings.TrimSpace(os.Getenv("YAFA_STORAGE_ENDPOINT")), Region: strings.TrimSpace(os.Getenv("YAFA_STORAGE_REGION")), Bucket: strings.TrimSpace(os.Getenv("YAFA_STORAGE_BUCKET")), AccessKeyID: strings.TrimSpace(os.Getenv("YAFA_STORAGE_ACCESS_KEY_ID")), SecretAccessKey: strings.TrimSpace(os.Getenv("YAFA_STORAGE_SECRET_ACCESS_KEY"))})
-		analyzer, analyzerErr := yafa.NewAnalyzer(strings.TrimSpace(os.Getenv("YAFA_ANALYZER_URL")), strings.TrimSpace(os.Getenv("YAFA_INTERNAL_SERVICE_TOKEN")))
-		if storageErr == nil && analyzerErr == nil {
-			yafaService.SetInfrastructure(storage, analyzer)
-		} else if production {
-			// Railway's log view can hide structured fields, so retain the safe error
-			// descriptions in the message itself. Neither constructor includes a
-			// credential value in its error text.
-			logger.Error(fmt.Sprintf("Yafa configuration failed: storage=%v; analyzer=%v", storageErr, analyzerErr))
-			os.Exit(1)
-		} else {
-			logger.Warn("Yafa selfie analysis disabled until private storage and analyzer are configured")
 		}
 	} else if production {
 		logger.Error("database, Redis, and a 32+ character JWT_SECRET are required in production")
@@ -167,7 +151,7 @@ func main() {
 		// healthRedis is a typed nil (*redis.Client) when Redis is not
 		// configured; storing it in the UniversalClient interface would make
 		// the rate limiter's != nil check pass and panic on Incr.
-		AllowedOrigins: origins, Logger: logger, DependencyHealth: dependencyHealth, RateLimitStore: redisRateLimitStore(healthRedis), Auth: authHandler, Yafa: yafaService,
+		AllowedOrigins: origins, Logger: logger, DependencyHealth: dependencyHealth, RateLimitStore: redisRateLimitStore(healthRedis), Auth: authHandler,
 		PanicReporter: func(request *http.Request, recovered any, stack []byte) {
 			sentry.WithScope(func(scope *sentry.Scope) {
 				scope.SetRequest(request)
@@ -180,8 +164,7 @@ func main() {
 		RazorpayKeySecret:       strings.TrimSpace(os.Getenv("RAZORPAY_KEY_SECRET")),
 		RazorpayWebhookSecret:   strings.TrimSpace(os.Getenv("RAZORPAY_WEBHOOK_SECRET")),
 		RazorpayCheckoutEnabled: strings.EqualFold(strings.TrimSpace(os.Getenv("RAZORPAY_CHECKOUT_ENABLED")), "true"),
-		// Same trust domain as the outbound analyzer call: our own Lambda
-		// presenting the shared secret to mint welcome coupons.
+		// Shared service token for trusted lifecycle and support integrations.
 		InternalServiceToken:       strings.TrimSpace(os.Getenv("YAFA_INTERNAL_SERVICE_TOKEN")),
 		OrderConfirmationPublisher: orderConfirmationPublisher,
 	})
@@ -214,7 +197,7 @@ func main() {
 }
 
 func orderConfirmationAWSRegion() string {
-	for _, name := range []string{"AWS_REGION", "AWS_DEFAULT_REGION", "YAFA_STORAGE_REGION"} {
+	for _, name := range []string{"AWS_REGION", "AWS_DEFAULT_REGION"} {
 		if region := strings.TrimSpace(os.Getenv(name)); region != "" {
 			return region
 		}

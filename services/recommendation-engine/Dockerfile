@@ -9,7 +9,6 @@ COPY data/processed/Product.json /app/data/processed/Product.json
 COPY data/processed/BrandKnowledge.json /app/data/processed/BrandKnowledge.json
 COPY services/recommendation-engine/migrations ./migrations
 COPY services/recommendation-engine/scripts ./scripts
-COPY services/recommendation-engine/calibration_config.json ./calibration_config.json
 
 USER yafa
 EXPOSE 8000

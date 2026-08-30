@@ -8,7 +8,7 @@ const YafaDrawer = dynamic(() => import("../yafa/YafaDrawer"), { ssr: false });
 /**
  * The single YAFA assistant is available site-wide but is not part of the
  * first visible page. Waiting briefly lets the storefront become interactive
- * before its chat and voice code is downloaded.
+ * before its chat code is downloaded.
  */
 export default function DeferredAssistantTools() {
   const [ready, setReady] = useState(false);

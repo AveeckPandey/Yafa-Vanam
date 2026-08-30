@@ -16,10 +16,21 @@ const lipstickShades: LipstickShade[] = [
   { key: "terracotta-dream", name: "Terracotta Dream", hex: "#83324A", description: "Deep plum-berry" },
 ];
 
+const riverroseShades: Record<string, LipstickShade> = {
+  "petal-nude": { key: "petal-nude", name: "Petal Nude", hex: "#C78A69", description: "Muted rosy nude" },
+  "clay-bloom": { key: "clay-rose", name: "Clay Bloom", hex: "#B96E56", description: "Warm clay rose" },
+  "rose-bark": { key: "cocoa-blush", name: "Rose Bark", hex: "#A85C52", description: "Rose-brown nude" },
+  "soft-fig": { key: "mauve-wood", name: "Soft Fig", hex: "#9D4B58", description: "Soft berry fig" },
+  "berry-veil": { key: "berry-soft", name: "Berry Veil", hex: "#B6505D", description: "Sheer berry rose" },
+  "amber-rose": { key: "rose-mist", name: "Amber Rose", hex: "#C16F5B", description: "Warm amber rose" },
+  "moss-nude": { key: "terracotta-dream", name: "Moss Nude", hex: "#98664E", description: "Earthy muted nude" },
+  "brick-petal": { key: "brick-petal", name: "Brick Petal", hex: "#913C43", description: "Deep brick petal" },
+};
+
 const sourceVariantIdsByProduct: Record<string, string[]> = {
   "yv-lip-001": ["petal-nude", "clay-bloom", "rose-bark", "soft-fig", "berry-veil", "amber-rose", "moss-nude", "brick-petal"],
   "yv-lip-002": ["petal-nude", "clay-bloom", "rose-bark", "soft-fig", "berry-veil", "amber-rose", "moss-nude", "brick-petal"],
-  "yv-lip-003": ["nude-beige", "dusty-rose", "rosewood-pink", "terracotta-red", "rust-brick", "berry-wine", "plum-brown", "deep-crimson"],
+  "yv-lip-003": ["petal-nude", "clay-bloom", "rose-bark", "soft-fig", "berry-veil", "amber-rose", "moss-nude", "brick-petal"],
 };
 
 const lipstickImagePaths: Record<string, Record<string, string>> = {
@@ -56,6 +67,10 @@ const lipstickImagePaths: Record<string, Record<string, string>> = {
 };
 
 export function getLipstickShade(productId: string, variantId: string): LipstickShade | null {
+  if (productId === "yv-lip-003") {
+    const riverroseKey = variantId.replace(`${productId}-`, "");
+    return riverroseShades[riverroseKey] ?? null;
+  }
   const sourceIds = sourceVariantIdsByProduct[productId];
   if (!sourceIds) return null;
   const position = sourceIds.findIndex((id) => variantId === `${productId}-${id}`);

@@ -3,7 +3,7 @@ import { getAllCatalogProducts } from "@/lib/catalog";
 import { SITE_URL } from "@/lib/seo";
 
 const publicRoutes = [
-  "", "/shop", "/makeup", "/skincare", "/body-care", "/fragrance", "/build-my-kit", "/yafa",
+  "", "/shop", "/makeup", "/skincare", "/body-care", "/fragrance",
   "/about", "/contact", "/faq", "/shipping", "/returns", "/privacy-policy", "/terms", "/accessibility", "/cookie-policy",
 ];
 

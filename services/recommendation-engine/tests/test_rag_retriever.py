@@ -9,7 +9,7 @@ from __future__ import annotations
 
 import pytest
 
-from app.rag.providers import HashingEmbeddingProvider
+from app.rag.providers import EmbeddingRateLimitError, HashingEmbeddingProvider
 from app.rag.models import TrustLevel
 from app.rag.repository import AliasMatch, SearchHit, _alias_match_rank
 from app.rag.retriever import RagRetriever
@@ -37,6 +37,8 @@ class StubRepo:
         self.aliases = aliases or []
         self.document = document
         self.search_calls: list[dict] = []
+        self.fallback_calls: list[dict] = []
+        self.keyword_fallback_calls: list[dict] = []
 
     def search(self, query_vector, *, product_ids=None, customer_factual_only=True, top_k=5,
                chunk_types=None, trust_levels=None):
@@ -49,6 +51,32 @@ class StubRepo:
             pool = [h for h in pool if h.product_id in set(product_ids)]
         if customer_factual_only:
             pool = [h for h in pool if h.customer_factual_eligible]
+        return pool[:top_k]
+
+    def fetch_eligible_chunks(self, *, customer_factual_only=True, top_k=120,
+                              chunk_types=None, trust_levels=None):
+        self.keyword_fallback_calls.append({
+            "customer_only": customer_factual_only, "top_k": top_k,
+            "chunk_types": chunk_types, "trust_levels": trust_levels,
+        })
+        pool = list(self.hits)
+        if chunk_types:
+            pool = [hit for hit in pool if hit.chunk_type in set(chunk_types)]
+        if customer_factual_only:
+            pool = [hit for hit in pool if hit.customer_factual_eligible]
+        return pool[:top_k]
+
+    def fetch_verified_chunks(self, *, product_id, customer_factual_only=True, top_k=5,
+                              chunk_types=None, trust_levels=None):
+        self.fallback_calls.append({
+            "product_id": product_id, "customer_only": customer_factual_only,
+            "top_k": top_k, "chunk_types": chunk_types, "trust_levels": trust_levels,
+        })
+        pool = [hit for hit in self.hits if hit.product_id == product_id]
+        if chunk_types:
+            pool = [hit for hit in pool if hit.chunk_type in set(chunk_types)]
+        if customer_factual_only:
+            pool = [hit for hit in pool if hit.customer_factual_eligible]
         return pool[:top_k]
 
     def resolve_aliases(self, normalized_query: str) -> list[AliasMatch]:
@@ -105,6 +133,50 @@ class TestAliasResolution:
         assert response.resolution == "normalized_alias"
         assert repo.search_calls[0]["product_ids"] == ["yv-frag-010"]
 
+    async def test_known_product_fact_uses_vetted_record_during_embedding_rate_limit(self):
+        class RateLimitedProvider:
+            async def embed_query(self, query: str):
+                raise EmbeddingRateLimitError("rate limited")
+
+        repo = StubRepo(
+            [hit("yv-frag-010", "scent_profile", "Warm amber scent.")],
+            aliases=[AliasMatch("yv-frag-010", "soft ember", 2, 10)],
+        )
+        response = await RagRetriever(repo, RateLimitedProvider()).search(make_request(
+            "What does Soft Ember smell like?", chunk_types=["scent_profile"],
+        ))
+        assert [result.content for result in response.results] == ["Warm amber scent."]
+        assert repo.search_calls == []
+        assert repo.fallback_calls[0]["product_id"] == "yv-frag-010"
+        assert repo.fallback_calls[0]["chunk_types"] == ["scent_profile"]
+
+    @pytest.mark.parametrize(
+        ("query", "expected_product"),
+        [
+            ("Do you have any strong woody scent?", "yv-frag-wood"),
+            ("Do you have any aqua scent?", "yv-frag-aqua"),
+        ],
+    )
+    async def test_generic_scent_uses_verified_keyword_fallback_during_rate_limit(
+        self, query, expected_product
+    ):
+        class RateLimitedProvider:
+            async def embed_query(self, query: str):
+                raise EmbeddingRateLimitError("rate limited")
+
+        repo = StubRepo([
+            hit("yv-frag-wood", "scent_profile", "Facets: dark, woody, resinous."),
+            hit("yv-frag-aqua", "scent_profile", "Facets: clean, watery, mineral and fresh."),
+            hit("yv-frag-other", "scent_profile", "Facets: bright citrus and floral."),
+        ])
+        response = await RagRetriever(repo, RateLimitedProvider()).search(make_request(
+            query, chunk_types=["scent_profile"],
+        ))
+
+        assert any(result.product_id == expected_product for result in response.results)
+        assert repo.search_calls == []
+        assert repo.keyword_fallback_calls[0]["chunk_types"] == ["scent_profile"]
+
     async def test_exact_alias_reported_as_exact(self, retriever_factory):
         repo = StubRepo(
             [hit("yv-eye-001", "product_overview", "Fernwing Volume Mascara overview.")],
@@ -148,6 +220,21 @@ class TestAliasResolution:
         )
         assert response.resolved_product_id == "yv-frag-010"
         assert repo.search_calls[0]["product_ids"] == ["yv-frag-010"]
+
+    async def test_longer_alias_breaks_same_rank_tie(self, retriever_factory):
+        repo = StubRepo(
+            [hit("yv-frag-001", "scent_profile", "Fresh forest scent.")],
+            aliases=[
+                AliasMatch("yv-frag-001", "forest rain body mist", 2, 22),
+                AliasMatch("yv-frag-006", "forest rain", 2, 11),
+            ],
+        )
+        response = await retriever_factory(repo).search(make_request(
+            "What does Forest Rain Body Mist smell like?"
+        ))
+        assert response.resolved_product_id == "yv-frag-001"
+        assert response.resolution == "normalized_alias"
+        assert repo.search_calls[0]["product_ids"] == ["yv-frag-001"]
 
 
 class TestAliasMatchRanking:

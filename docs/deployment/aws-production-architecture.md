@@ -20,15 +20,14 @@ authentication, checkout, cart, or personalised responses.
   TLS. Use a separate PostgreSQL database with `pgvector` for RAG content;
   never use the commerce schema as a vector store.
 - DynamoDB provides high-volume, low-latency non-transactional reads (for
-  example materialised recommendation/cache records), with point-in-time
+  example materialised cache records), with point-in-time
   recovery enabled.
 - SQS FIFO receives order/lifecycle events. Lambda consumes messages
   idempotently and sends approved transactional messages through SES.
 - Bedrock uses `amazon.titan-embed-text-v2:0` through the EC2 instance profile.
-  The recommendation engine now supports `EMBEDDING_PROVIDER=bedrock` without
+  The private RAG service supports `EMBEDDING_PROVIDER=bedrock` without
   an API key. Enable model access for the chosen region before release.
-- S3 stores only static public assets behind CloudFront and private selfie
-  uploads in a separate blocked-public-access bucket. EC2 instance roles use
+- S3 stores only static public assets behind CloudFront. EC2 instance roles use
   least-privilege bucket access; no AWS access keys are stored in application
   secrets.
 
@@ -38,8 +37,8 @@ authentication, checkout, cart, or personalised responses.
    gateways or VPC endpoints for ECR, S3, Secrets Manager, CloudWatch, SQS,
    DynamoDB, Bedrock Runtime, and SES.
 2. Security groups: Internet → ALB (443 only); ALB → web/API (3000/4000);
-   web/API → RDS/Redis/advisor; no public inbound path to databases, queues,
-   Lambda, or the recommendation service.
+   web → RAG service and web/API → RDS/Redis; no public inbound path to
+   databases, queues, Lambda, or the RAG service.
 3. Store database passwords, JWT, Razorpay keys, Cognito client secret, and
    service tokens in Secrets Manager. Give the EC2 instance profile permission
    only to read the service-specific secret ARNs.
@@ -52,8 +51,8 @@ authentication, checkout, cart, or personalised responses.
 
 Use `EMBEDDING_PROVIDER=bedrock`,
 `EMBEDDING_MODEL=amazon.titan-embed-text-v2:0`,
-`EMBEDDING_DIMENSION=1024`, and `BEDROCK_REGION=ap-south-1` for the
-recommendation service. Grant its instance profile `bedrock:InvokeModel` only
+`EMBEDDING_DIMENSION=1024`, and `BEDROCK_REGION=ap-south-1` for the RAG
+service. Grant its instance profile `bedrock:InvokeModel` only
 for the Titan embedding model ARN. Keep `VECTOR_DATABASE_URL` pointed at the
 dedicated private pgvector database.
 

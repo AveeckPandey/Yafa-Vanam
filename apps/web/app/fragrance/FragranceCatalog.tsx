@@ -1,7 +1,6 @@
 "use client";
 
 import Image from "next/image";
-import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import ProductCard from "@/components/product/ProductCard";
@@ -55,10 +54,11 @@ export default function FragranceCatalog({ products }: { products: CatalogProduc
 
   return (
     <main id="main-content" className="fragrance-collection-page">
-      <section className="collection-intro" aria-labelledby="fragrance-title">
+      <section className="collection-intro collection-intro--image collection-intro--fragrance" aria-labelledby="fragrance-title">
+        <Image className="collection-intro__image" src="/images/home/campaign/hero-fragrance-lakeside.png" alt="" fill priority sizes="100vw" />
+        <div className="collection-intro__veil" aria-hidden="true" />
         <div className="collection-intro__eyebrow">Fragrance</div>
         <h1 id="fragrance-title">Fragrance, in its<br />quietest form.</h1>
-        <p>Twelve compositions designed to become part of your ritual.</p>
       </section>
 
       <section className="collection-shop" aria-label="Fragrance collection">
@@ -79,9 +79,6 @@ export default function FragranceCatalog({ products }: { products: CatalogProduc
             <div className="commerce-grid__item" key={product.id}>
               {category === "all" && !selectedTypes.length && sortOrder === "featured" && index === 0 ? (
                 <article className="collection-editorial-tile"><Image src="/images/hero/yafa-vanam-fragrance-collection.png" alt="YAFA VANAM fragrance collection campaign" fill sizes="25vw" /><div className="collection-editorial-tile__shade" /><div className="collection-editorial-tile__content"><p>From the atelier</p><h3>Fragrance as a quiet ritual.</h3><span>Discover the collection</span></div></article>
-              ) : null}
-              {category === "all" && !selectedTypes.length && sortOrder === "featured" && index === 5 ? (
-                <article className="collection-kit-tile"><div className="collection-kit-tile__mark" aria-hidden="true">YV</div><div><p>Personal fragrance edit</p><h3>Build your own YAFA VANAM ritual.</h3><span>Choose from the collection. Each piece is individually priced.</span></div><Link href="/build-my-kit">Build My Kit <span aria-hidden="true">↗</span></Link></article>
               ) : null}
               <ProductCard product={product} onQuickShop={setQuickProduct} eager={index < 3} />
             </div>

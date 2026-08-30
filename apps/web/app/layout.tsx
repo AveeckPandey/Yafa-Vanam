@@ -1,7 +1,9 @@
 import type { Metadata } from "next";
 import "./globals.css";
+import "./campaign.css";
 import "./yafa-match.css";
 import "./yafa-drawer.css";
+import "./palette.css";
 import Navbar from "../components/layout/Navbar";
 import Footer from "../components/layout/Footer";
 import CartDrawer from "../components/cart/CartDrawer";
@@ -10,7 +12,6 @@ import WelcomePromo from "../components/promo/WelcomePromo";
 import AnalyticsProvider from "../components/analytics/AnalyticsProvider";
 import { CookieBanner } from "../components/consent/CookieBanner";
 import { YafaProvider } from "../components/yafa/YafaProvider";
-import { YafaResultsProvider } from "./yafa/YafaResultsContext";
 import DeferredAssistantTools from "../components/layout/DeferredAssistantTools";
 import { SITE_URL } from "@/lib/seo";
 
@@ -70,7 +71,7 @@ export default function RootLayout({
 }: Readonly<{ children: React.ReactNode }>) {
   return (
     <html lang="en" data-scroll-behavior="smooth">
-      <body><AnalyticsProvider><AuthProvider><YafaResultsProvider><YafaProvider>
+      <body><AnalyticsProvider><AuthProvider><YafaProvider>
         <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(siteSchema) }} />
         <a className="skip-link" href="#page-content">Skip to main content</a>
         <Navbar />
@@ -80,7 +81,7 @@ export default function RootLayout({
         <DeferredAssistantTools />
         <CookieBanner />
         <WelcomePromo />
-      </YafaProvider></YafaResultsProvider></AuthProvider></AnalyticsProvider></body>
+      </YafaProvider></AuthProvider></AnalyticsProvider></body>
     </html>
   );
 }

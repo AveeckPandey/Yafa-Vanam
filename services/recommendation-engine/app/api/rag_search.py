@@ -17,6 +17,7 @@ from fastapi import APIRouter, Header, HTTPException
 
 from app.rag.config import EmbeddingSpaceMismatchError, RagSettings, validate_dimensions
 from app.rag.providers import provider_identity
+from app.rag.providers.base import EmbeddingProviderError
 from app.rag.repository import RagRepository
 from app.rag.schemas import RagHealthResponse, RagSearchRequest, RagSearchResponse
 
@@ -36,7 +37,13 @@ async def rag_search(
 ) -> RagSearchResponse:
     _require_service_token(x_yafa_service_token)
     retriever = _get_retriever()
-    return await retriever.search(request)
+    try:
+        return await retriever.search(request)
+    except EmbeddingProviderError as error:
+        raise HTTPException(
+            status_code=503,
+            detail="RAG embedding service is temporarily unavailable. Please try again shortly.",
+        ) from error
 
 
 @router.get("/health", response_model=RagHealthResponse)

@@ -1,0 +1,36 @@
+/* Homepage campaign carousel, collection imagery, and Riverrose shade controls. */
+.hero-carousel{isolation:isolate}.hero-carousel__slide{position:absolute;inset:0;z-index:0;opacity:0;pointer-events:none;transform:scale(1.015);transition:opacity .7s ease,transform 1.1s cubic-bezier(.2,.7,.2,1)}.hero-carousel__slide.is-active{z-index:1;opacity:1;pointer-events:auto;transform:scale(1)}.hero-carousel__slide .hero-campaign__content,.hero-carousel__slide .hero-campaign__caption{z-index:2}.hero-carousel__controls{position:absolute;z-index:4;right:clamp(16px,3vw,48px);bottom:48px;display:flex;gap:13px;align-items:center;color:#fff}.hero-carousel__controls>button{display:grid;width:33px;height:33px;padding:0;border:1px solid rgba(255,255,255,.7);border-radius:50%;color:inherit;background:rgba(18,32,25,.2);cursor:pointer;place-items:center}.hero-carousel__dots{display:flex;gap:7px}.hero-carousel__dots button{display:grid;width:23px;height:23px;padding:0;border:0;background:transparent;cursor:pointer;place-items:center}.hero-carousel__dots span{display:block;width:6px;height:6px;border-radius:99px;background:rgba(255,255,255,.66);transition:width .25s ease,background .25s ease}.hero-carousel__dots button.is-active span{width:19px;background:#fff}.hero-logo-transition__anchor{position:absolute;z-index:2;top:clamp(26px,4vw,52px);left:clamp(24px,7vw,112px);width:190px;height:57px;pointer-events:none}.hero-logo-transition,.hero-logo-transition__anchor{color:#173b28}.hero-logo-transition{position:fixed;z-index:110;visibility:hidden;pointer-events:none;transform-origin:top left}.hero-logo-transition__wordmark{display:inline-flex;flex-direction:column;font:500 29px/.78 Georgia,"Times New Roman",serif;letter-spacing:.17em}.hero-logo-transition__wordmark span{display:block}html[data-navigation-overlay] .hero-logo-transition{opacity:0!important}html[data-navigation-overlay] .primary-nav__brand{color:inherit!important}.collection-intro--image,.makeup-collection-intro--image{position:relative;isolation:isolate;overflow:hidden;background:#e9e3d7}.collection-intro--image>.collection-intro__image,.makeup-collection-intro--image>.makeup-collection-intro__image{object-fit:cover;object-position:center}.collection-intro__veil,.makeup-collection-intro__veil{position:absolute;z-index:0;inset:0;background:linear-gradient(90deg,rgba(251,248,241,.98) 0%,rgba(251,248,241,.82) 34%,rgba(251,248,241,.17) 68%,rgba(251,248,241,.06) 100%)}.collection-intro--image>:not(img):not(.collection-intro__veil),.makeup-collection-intro--image>:not(img):not(.makeup-collection-intro__veil){position:relative;z-index:1}.makeup-collection-intro__veil{background:linear-gradient(90deg,rgba(248,238,224,.98) 0%,rgba(248,238,224,.81) 37%,rgba(248,238,224,.14) 70%)}.pdp-shade-selector--lip-color button{min-width:116px;justify-content:flex-start;padding:7px 10px}.pdp-shade-selector--lip-color button span{white-space:nowrap}.pdp-shade-selector--lip-color button.is-selected{background:#f1e3e5}.pdp-shade-selector--riverrose{padding:18px;border:1px solid #dfcfd1;background:#fcf7f8}.pdp-shade-selector--riverrose .pdp-shade-preview p{font-weight:700}.pdp-shade-selector--riverrose .pdp-shade-preview span{display:block;margin-top:5px;color:#76565a;font-size:12px;line-height:1.45}@media(max-width:760px){.hero-carousel__controls{right:14px;bottom:12px}.hero-carousel__controls>button{width:30px;height:30px}.hero-logo-transition,.hero-logo-transition__anchor{display:none}.collection-intro--image{min-height:510px}.collection-intro--image>.collection-intro__image,.makeup-collection-intro--image>.makeup-collection-intro__image{object-position:62% center}.collection-intro__veil,.makeup-collection-intro__veil{background:linear-gradient(0deg,rgba(251,248,241,.98) 0%,rgba(251,248,241,.8) 38%,rgba(251,248,241,.08) 72%)}.pdp-shade-selector--lip-color button{min-width:calc(50% - 4px);flex:1 1 145px}}@media(prefers-reduced-motion:reduce){.hero-carousel__slide,.hero-carousel__dots span{transition:none}.hero-carousel__controls{display:none}.hero-logo-transition__anchor{display:none}}
+/* Next Image with fill needs a positioned tile wrapper. */
+.editorial-grid article>a:first-child{position:relative}
+/* The anchor is a hidden measurement target; the floating wordmark is the only visible instance. */
+.hero-logo-transition__anchor{top:clamp(22px,3vw,42px);left:clamp(20px,8vw,124px);width:220px;visibility:hidden;transform:none}
+html .hero-logo-transition.is-logo-transition-complete{opacity:0!important;visibility:hidden!important}
+/* Keep the campaign wordmark clear of the copy while preserving the full hero composition. */
+@media(min-width:761px){
+  .hero-carousel__slide .hero-campaign__content{padding-top:clamp(96px,10vw,156px)}
+}
+.hero-carousel__slide--makeup .hero-campaign__image{object-position:center bottom}
+
+/* Quick picks sit in their own colour zone below the makeup banner. */
+.makeup-quick-picks{border-bottom:1px solid var(--palette-border,rgba(38,34,32,.18));background:var(--palette-accent-soft,#f1e5df)}
+.makeup-quick-picks__inner{width:min(100%,1680px);padding:clamp(24px,3vw,44px) clamp(18px,3vw,52px) clamp(28px,4vw,56px);margin:auto}
+.makeup-quick-picks__eyebrow{margin:0;color:var(--palette-accent,#B87355);font-size:10px;font-weight:700;letter-spacing:.18em;text-transform:uppercase}
+.makeup-quick-picks .makeup-category-nav{margin-top:18px}
+.makeup-quick-picks .makeup-category-nav button>span{background:var(--palette-background,#F9F6F0)}
+
+/* The makeup landing image needs a real viewport of its own after quick picks leave it. */
+.makeup-collection-intro--image{min-height:clamp(380px,38vw,560px)}
+.makeup-collection-intro--image>.makeup-collection-intro__image{object-position:center 62%}
+
+/* Lip products use the compact swatch strip; other product option controls stay unchanged. */
+.pdp-shade-selector--lip-color .pdp-shade-selector__palette{display:flex;max-height:none;flex-wrap:nowrap;gap:4px;overflow-x:auto;padding:2px 0 7px;scrollbar-width:thin}
+.pdp-shade-selector--lip-color .pdp-shade-selector__palette button{display:block;flex:0 0 31px;width:31px;min-width:31px;min-height:24px;padding:2px;border:1px solid transparent;background:transparent;font-size:0;line-height:1}
+.pdp-shade-selector--lip-color .pdp-shade-selector__palette button i{display:block;width:100%;height:18px;border:0;border-radius:1px}
+.pdp-shade-selector--lip-color .pdp-shade-selector__palette button span{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}
+.pdp-shade-selector--lip-color .pdp-shade-selector__palette button.is-selected{border-color:var(--palette-ink,#262220);background:transparent;box-shadow:none}
+
+@media(max-width:760px){
+  .hero-carousel__slide--makeup .hero-campaign__image{object-position:60% bottom}
+  .makeup-quick-picks .makeup-category-nav{margin-top:16px}
+  .makeup-collection-intro--image{min-height:430px}
+}
