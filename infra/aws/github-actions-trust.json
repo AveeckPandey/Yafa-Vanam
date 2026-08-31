@@ -10,7 +10,7 @@
       "Condition": {
         "StringEquals": {
           "token.actions.githubusercontent.com:aud": "sts.amazonaws.com",
-          "token.actions.githubusercontent.com:sub": "repo:AveeckPandey/Yafa-Vanam:ref:refs/heads/main"
+        "token.actions.githubusercontent.com:sub": "repo:AveeckPandey@177404548/Yafa-Vanam@1351692987:ref:refs/heads/main"
         }
       }
     }
