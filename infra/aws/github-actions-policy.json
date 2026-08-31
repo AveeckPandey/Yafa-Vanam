@@ -24,7 +24,22 @@
     },
     {
       "Effect": "Allow",
-      "Action": ["autoscaling:StartInstanceRefresh", "autoscaling:DescribeInstanceRefreshes"],
+      "Action": "ec2:CreateLaunchTemplateVersion",
+      "Resource": "arn:aws:ec2:ap-south-1:758388043025:launch-template/lt-0e3c82ebc96c3b62b"
+    },
+    {
+      "Effect": "Allow",
+      "Action": "ec2:DescribeLaunchTemplateVersions",
+      "Resource": "*"
+    },
+    {
+      "Effect": "Allow",
+      "Action": "autoscaling:StartInstanceRefresh",
+      "Resource": "arn:aws:autoscaling:ap-south-1:758388043025:autoScalingGroup:*:autoScalingGroupName/yafa-prod-app"
+    },
+    {
+      "Effect": "Allow",
+      "Action": "autoscaling:DescribeInstanceRefreshes",
       "Resource": "*"
     }
   ]

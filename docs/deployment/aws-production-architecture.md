@@ -52,9 +52,16 @@ authentication, checkout, cart, or personalised responses.
 Use `EMBEDDING_PROVIDER=bedrock`,
 `EMBEDDING_MODEL=amazon.titan-embed-text-v2:0`,
 `EMBEDDING_DIMENSION=1024`, and `BEDROCK_REGION=ap-south-1` for the RAG
-service. Grant its instance profile `bedrock:InvokeModel` only
-for the Titan embedding model ARN. Keep `VECTOR_DATABASE_URL` pointed at the
-dedicated private pgvector database.
+service. Enable the bounded agent with `YAFA_AGENTIC_RAG_ENABLED=true` and
+`YAFA_AGENT_MODEL=amazon.nova-lite-v1:0`. Grant its instance profile
+`bedrock:InvokeModel` only for the Titan embedding and Nova Lite model ARNs.
+Keep `VECTOR_DATABASE_URL` pointed at the dedicated private pgvector database.
+
+The agent may call only the verified RAG search tool, at most twice per
+customer question. A response without chunk citations is rejected in favour of
+deterministic source composition. Configure short query-result caching,
+embedding concurrency limits, timeouts, and CloudWatch alarms for Bedrock
+throttles, RDS connections, p95 latency, and cache misses.
 
 The existing welcome-coupon Lambda is already designed for Cognito
 PostConfirmation and SES. Place it in private subnets only if it needs private

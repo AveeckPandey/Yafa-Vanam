@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"sort"
 	"strings"
 	"time"
 
@@ -31,6 +32,29 @@ type dbQuerier interface {
 
 func NewPostgresStore(db *pgxpool.Pool, catalog *Catalog) *PostgresStore {
 	return &PostgresStore{db: db, catalog: catalog, now: time.Now}
+}
+
+// EnsureInventoryLevels registers every canonical catalogue variant without
+// overwriting warehouse-managed quantities. Catalogue null stock intentionally
+// becomes zero so production fails closed until a real receipt is recorded.
+func (store *PostgresStore) EnsureInventoryLevels(ctx context.Context) error {
+	variantIDs := make([]string, 0, len(store.catalog.variants))
+	for variantID := range store.catalog.variants {
+		variantIDs = append(variantIDs, variantID)
+	}
+	sort.Strings(variantIDs)
+	for _, variantID := range variantIDs {
+		stock := 0
+		if configured := store.catalog.variants[variantID].variant.Stock; configured != nil {
+			stock = max(0, *configured)
+		}
+		if _, err := store.db.Exec(ctx,
+			`INSERT INTO inventory_levels (variant_id, on_hand_quantity)
+			 VALUES ($1, $2) ON CONFLICT (variant_id) DO NOTHING`, variantID, stock); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 // postgresTimeout bounds every store operation. The CommerceStore interface
@@ -627,6 +651,12 @@ func (store *PostgresStore) createOrder(ownerID string, input CreateOrderInput, 
 		}
 	}
 
+	// The database is the final inventory authority. All variant rows are
+	// locked in stable order, preventing concurrent checkouts from overselling.
+	if err := store.reserveOrderInventory(ctx, tx, order.ID, order.Items, now.Add(30*time.Minute)); err != nil {
+		return Order{}, false, err
+	}
+
 	for _, line := range order.Items {
 		subtotal := line.UnitPrice * float64(line.Quantity)
 		if _, err := tx.Exec(ctx,
@@ -643,6 +673,122 @@ func (store *PostgresStore) createOrder(ownerID string, input CreateOrderInput, 
 		return Order{}, false, err
 	}
 	return order, false, nil
+}
+
+func (store *PostgresStore) reserveOrderInventory(ctx context.Context, tx pgx.Tx, orderID string, lines []CartLine, expiresAt time.Time) error {
+	ordered := append([]CartLine(nil), lines...)
+	sort.Slice(ordered, func(i, j int) bool { return ordered[i].VariantID < ordered[j].VariantID })
+	for _, line := range ordered {
+		var available int
+		err := tx.QueryRow(ctx,
+			`UPDATE inventory_levels
+			 SET reserved_quantity=reserved_quantity+$2, version=version+1, updated_at=NOW()
+			 WHERE variant_id=$1 AND on_hand_quantity-reserved_quantity >= $2
+			 RETURNING on_hand_quantity-reserved_quantity`, line.VariantID, line.Quantity).Scan(&available)
+		if errors.Is(err, pgx.ErrNoRows) {
+			return ErrInsufficientStock
+		}
+		if err != nil {
+			return err
+		}
+		var reservationID string
+		if err := tx.QueryRow(ctx,
+			`INSERT INTO inventory_reservations (order_id, variant_id, quantity, expires_at)
+			 VALUES ($1::uuid, $2, $3, $4) RETURNING id::text`, orderID, line.VariantID, line.Quantity, expiresAt).
+			Scan(&reservationID); err != nil {
+			return err
+		}
+		if _, err := tx.Exec(ctx,
+			`INSERT INTO inventory_movements
+			 (variant_id, order_id, reservation_id, movement_type, quantity_delta, reason, actor)
+			 VALUES ($1, $2::uuid, $3::uuid, 'RESERVATION', $4, 'checkout reservation', 'commerce-api')`,
+			line.VariantID, orderID, reservationID, -line.Quantity); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// commitOrderInventory is webhook-idempotent: only RESERVED rows transition,
+// and the order lock in RecordRazorpayPayment serializes duplicate deliveries.
+func (store *PostgresStore) commitOrderInventory(ctx context.Context, tx pgx.Tx, orderID string) error {
+	rows, err := tx.Query(ctx,
+		`SELECT id::text, variant_id, quantity
+		 FROM inventory_reservations
+		 WHERE order_id=$1::uuid AND status='RESERVED'
+		 ORDER BY variant_id, id FOR UPDATE`, orderID)
+	if err != nil {
+		return err
+	}
+	type reservation struct {
+		id, variantID string
+		quantity      int
+	}
+	reservations := []reservation{}
+	for rows.Next() {
+		var item reservation
+		if err := rows.Scan(&item.id, &item.variantID, &item.quantity); err != nil {
+			rows.Close()
+			return err
+		}
+		reservations = append(reservations, item)
+	}
+	if err := rows.Err(); err != nil {
+		rows.Close()
+		return err
+	}
+	rows.Close()
+	for _, item := range reservations {
+		var availableQuantity, lowStockThreshold int
+		var lowStockAlerted bool
+		var inventoryVersion int64
+		err := tx.QueryRow(ctx,
+			`UPDATE inventory_levels
+			 SET on_hand_quantity=on_hand_quantity-$2,
+			     reserved_quantity=reserved_quantity-$2,
+			     version=version+1, updated_at=NOW()
+			 WHERE variant_id=$1 AND on_hand_quantity >= $2 AND reserved_quantity >= $2
+			 RETURNING on_hand_quantity-reserved_quantity, low_stock_threshold, low_stock_alerted, version`,
+			item.variantID, item.quantity).Scan(&availableQuantity, &lowStockThreshold, &lowStockAlerted, &inventoryVersion)
+		if errors.Is(err, pgx.ErrNoRows) {
+			return ErrInsufficientStock
+		}
+		if err != nil {
+			return err
+		}
+		if availableQuantity <= lowStockThreshold && !lowStockAlerted {
+			result, err := tx.Exec(ctx,
+				`UPDATE inventory_levels SET low_stock_alerted=TRUE
+				 WHERE variant_id=$1 AND low_stock_alerted=FALSE`, item.variantID)
+			if err != nil {
+				return err
+			}
+			if result.RowsAffected() == 1 {
+				_, err = tx.Exec(ctx,
+					`INSERT INTO inventory_alert_outbox
+				 (variant_id, available_quantity, low_stock_threshold, inventory_version)
+				 VALUES ($1, $2, $3, $4)
+				 ON CONFLICT (variant_id, inventory_version) DO NOTHING`,
+					item.variantID, availableQuantity, lowStockThreshold, inventoryVersion)
+			}
+			if err != nil {
+				return err
+			}
+		}
+		if _, err := tx.Exec(ctx,
+			`UPDATE inventory_reservations SET status='COMMITTED', committed_at=NOW() WHERE id=$1::uuid`,
+			item.id); err != nil {
+			return err
+		}
+		if _, err := tx.Exec(ctx,
+			`INSERT INTO inventory_movements
+			 (variant_id, order_id, reservation_id, movement_type, quantity_delta, reason, actor)
+			 VALUES ($1, $2::uuid, $3::uuid, 'SALE', $4, 'payment captured', 'commerce-api')`,
+			item.variantID, orderID, item.id, -item.quantity); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 // replayedOrder applies the user binding the memory store performed after a
@@ -843,6 +989,11 @@ func (store *PostgresStore) RecordRazorpayPayment(razorpayOrderID, paymentID, st
 		return Order{}, err
 	}
 	firstCapture := capturedOrPaid && (priorStatus == "PENDING" || priorStatus == "FAILED")
+	if firstCapture {
+		if err := store.commitOrderInventory(ctx, tx, orderID); err != nil {
+			return Order{}, err
+		}
+	}
 	if firstCapture && discountCode != "" {
 		if err := redeemOrderPromotion(ctx, tx, orderID, userID, discountCode, discountAmount); err != nil {
 			return Order{}, err

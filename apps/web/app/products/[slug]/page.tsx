@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 import ProductPageClient from "@/components/product/ProductPageClient";
 import { getAllCatalogProducts, getProductBySlug, getRelatedProducts } from "@/lib/catalog";
 import { absoluteUrl } from "@/lib/seo";
+import { getSampleReviews } from "@/lib/sample-reviews";
 
 export function generateStaticParams() {
   return getAllCatalogProducts().map((product) => ({ slug: product.slug }));
@@ -40,6 +41,7 @@ export default async function ProductPage({ params }: { params: Promise<{ slug: 
       ) ?? null
     : null;
   const related = getRelatedProducts(product, 5).filter((candidate) => candidate.id !== layerMatch?.id).slice(0, 4);
+  const sampleReviews = process.env.SHOW_SAMPLE_REVIEWS === "true" ? getSampleReviews(product) : [];
   const defaultVariant = product.variants.find((variant) => variant.id === product.defaultVariantId);
   const productSchema = {
     "@context": "https://schema.org",
@@ -54,7 +56,6 @@ export default async function ProductPage({ params }: { params: Promise<{ slug: 
       url: absoluteUrl(`/products/${product.slug}`),
       priceCurrency: product.currency,
       price: defaultVariant?.price ?? product.price,
-      availability: product.variants.some((variant) => variant.isActive) ? "https://schema.org/InStock" : "https://schema.org/OutOfStock",
     },
   };
   const breadcrumbSchema = {
@@ -69,6 +70,6 @@ export default async function ProductPage({ params }: { params: Promise<{ slug: 
   return <>
     <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(productSchema) }} />
     <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(breadcrumbSchema) }} />
-    <ProductPageClient product={product} related={related} layerMatch={layerMatch} />
+    <ProductPageClient product={product} related={related} layerMatch={layerMatch} sampleReviews={sampleReviews} />
   </>;
 }

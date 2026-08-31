@@ -10,6 +10,7 @@ from __future__ import annotations
 import hashlib
 import json
 import re
+import uuid
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
@@ -34,6 +35,7 @@ class ChunkUpsert:
     metadata: dict[str, Any]
     source_hash: str
     embedding: list[float]
+    tenant_id: str = "public"
 
 
 @dataclass(frozen=True)
@@ -116,6 +118,24 @@ class RagRepository:
         if self._connection is not None and not self._connection.closed:
             self._connection.close()
         self._connection = None
+
+    def acquire_ingestion_lock(self) -> None:
+        """Serialize full ingestions across workers/instances."""
+        with self.connection().cursor() as cursor:
+            cursor.execute("SELECT pg_advisory_lock(hashtext('yafa_rag_catalogue_ingestion'))")
+
+    def release_ingestion_lock(self) -> None:
+        with self.connection().cursor() as cursor:
+            cursor.execute("SELECT pg_advisory_unlock(hashtext('yafa_rag_catalogue_ingestion'))")
+
+    def _set_tenant_scope(self, tenant_id: str) -> None:
+        """Set the PostgreSQL RLS tenant setting for this authenticated call.
+
+        Every read sets it explicitly, including ``public``, so a reused
+        connection cannot retain a previous request's tenant context.
+        """
+        with self.connection().cursor() as cursor:
+            cursor.execute("SELECT set_config('app.rag_tenant', %s, false)", (tenant_id,))
 
     # -- schema -----------------------------------------------------------
 
@@ -250,6 +270,7 @@ class RagRepository:
 
     def clear_all_embeddings(self) -> int:
         """Null out every stored vector (rebuild safety: no mixed spaces mid-rebuild)."""
+        self._set_tenant_scope("*")
         conn = self.connection()
         with conn.cursor() as cursor:
             cursor.execute("UPDATE rag_chunks SET embedding = NULL")
@@ -258,22 +279,28 @@ class RagRepository:
     # -- writes -----------------------------------------------------------
 
     def upsert_document(self, document: dict[str, Any]) -> str:
+        document = dict(document)
+        tenant_id = str(document.get("tenant_id") or "public")
+        document["tenant_id"] = tenant_id
+        self._set_tenant_scope(tenant_id)
+        if tenant_id != "public":
+            document["id"] = str(uuid.uuid5(uuid.NAMESPACE_URL, f"yafa-rag:{tenant_id}:{document['canonical_product_id']}"))
         conn = self.connection()
         with conn.cursor() as cursor:
             cursor.execute(
                 """
                 INSERT INTO rag_documents (
-                    id, canonical_product_id, product_name, category, subcategory, product_type,
+                    id, tenant_id, canonical_product_id, product_name, category, subcategory, product_type,
                     source_file, source_version, data_version, answer_policy,
                     citation_required_topics, medical_escalation_topics, guardrails, updated_at
                 )
                 VALUES (
-                    %(id)s, %(canonical_product_id)s, %(product_name)s, %(category)s, %(subcategory)s,
+                    %(id)s, %(tenant_id)s, %(canonical_product_id)s, %(product_name)s, %(category)s, %(subcategory)s,
                     %(product_type)s, %(source_file)s, %(source_version)s, %(data_version)s,
                     %(answer_policy)s::jsonb, %(citation_required_topics)s::jsonb,
                     %(medical_escalation_topics)s::jsonb, %(guardrails)s::jsonb, NOW()
                 )
-                ON CONFLICT (canonical_product_id) DO UPDATE SET
+                ON CONFLICT (tenant_id, canonical_product_id) DO UPDATE SET
                     product_name = EXCLUDED.product_name,
                     category = EXCLUDED.category,
                     subcategory = EXCLUDED.subcategory,
@@ -285,6 +312,8 @@ class RagRepository:
                     citation_required_topics = EXCLUDED.citation_required_topics,
                     medical_escalation_topics = EXCLUDED.medical_escalation_topics,
                     guardrails = EXCLUDED.guardrails,
+                    is_active = TRUE,
+                    revoked_at = NULL,
                     updated_at = NOW()
                 RETURNING id
                 """,
@@ -298,60 +327,151 @@ class RagRepository:
             )
             return cursor.fetchone()["id"]
 
-    def replace_aliases(self, canonical_product_id: str, aliases: list[tuple[str, bool]]) -> None:
+    def revoke_document(self, canonical_product_id: str, *, tenant_id: str = "public") -> bool:
+        """Immediately withdraw a source before its replacement ingestion runs."""
+        self._set_tenant_scope(tenant_id)
+        conn = self.connection()
+        with conn.transaction():
+            with conn.cursor() as cursor:
+                cursor.execute(
+                    """
+                    UPDATE rag_documents
+                    SET is_active = FALSE, revoked_at = NOW(), updated_at = NOW()
+                    WHERE canonical_product_id = %s AND tenant_id = %s AND is_active
+                    """,
+                    (canonical_product_id, tenant_id),
+                )
+                changed = cursor.rowcount == 1
+                if changed:
+                    self._bump_corpus_revision_cursor(cursor, tenant_id)
+                return changed
+
+    def revoke_missing_documents(
+        self, *, tenant_id: str, source_files: set[str], keep_product_ids: set[str]
+    ) -> int:
+        """Withdraw documents removed entirely from a complete source snapshot."""
+        if not source_files:
+            return 0
+        self._set_tenant_scope(tenant_id)
+        conn = self.connection()
+        with conn.transaction():
+            with conn.cursor() as cursor:
+                cursor.execute(
+                    """
+                    UPDATE rag_documents
+                    SET is_active = FALSE, revoked_at = NOW(), updated_at = NOW()
+                    WHERE tenant_id = %(tenant_id)s AND is_active
+                      AND source_file = ANY(%(source_files)s::text[])
+                      AND NOT (canonical_product_id = ANY(%(keep_ids)s::text[]))
+                    """,
+                    {
+                        "tenant_id": tenant_id,
+                        "source_files": sorted(source_files),
+                        "keep_ids": sorted(keep_product_ids) or ["__none__"],
+                    },
+                )
+                changed = cursor.rowcount
+                if changed:
+                    self._bump_corpus_revision_cursor(cursor, tenant_id)
+                return changed
+
+    def get_corpus_revision(self, tenant_id: str = "public") -> int:
         conn = self.connection()
         with conn.cursor() as cursor:
-            cursor.execute("DELETE FROM rag_product_aliases WHERE canonical_product_id = %s", (canonical_product_id,))
+            cursor.execute(
+                "SELECT revision FROM rag_corpus_revisions WHERE tenant_id = %s",
+                (tenant_id,),
+            )
+            row = cursor.fetchone()
+        return int(row["revision"]) if row else 1
+
+    def bump_corpus_revision(self, tenant_id: str = "public") -> int:
+        conn = self.connection()
+        with conn.cursor() as cursor:
+            return self._bump_corpus_revision_cursor(cursor, tenant_id)
+
+    @staticmethod
+    def _bump_corpus_revision_cursor(cursor, tenant_id: str) -> int:
+        cursor.execute(
+            """
+            INSERT INTO rag_corpus_revisions (tenant_id, revision, updated_at)
+            VALUES (%s, 1, NOW())
+            ON CONFLICT (tenant_id) DO UPDATE SET
+                revision = rag_corpus_revisions.revision + 1,
+                updated_at = NOW()
+            RETURNING revision
+            """,
+            (tenant_id,),
+        )
+        return int(cursor.fetchone()["revision"])
+
+    def replace_aliases(self, canonical_product_id: str, aliases: list[tuple[str, bool]], *, tenant_id: str = "public") -> None:
+        self._set_tenant_scope(tenant_id)
+        conn = self.connection()
+        with conn.cursor() as cursor:
+            cursor.execute("DELETE FROM rag_product_aliases WHERE canonical_product_id = %s AND tenant_id = %s", (canonical_product_id, tenant_id))
             cursor.executemany(
                 """
-                INSERT INTO rag_product_aliases (canonical_product_id, alias, normalized_alias, is_exact_name)
-                VALUES (%s, %s, %s, %s)
-                ON CONFLICT (canonical_product_id, normalized_alias) DO UPDATE
+                INSERT INTO rag_product_aliases (tenant_id, canonical_product_id, alias, normalized_alias, is_exact_name)
+                VALUES (%s, %s, %s, %s, %s)
+                ON CONFLICT (tenant_id, canonical_product_id, normalized_alias) DO UPDATE
                     SET alias = EXCLUDED.alias, is_exact_name = EXCLUDED.is_exact_name
                 """,
                 [
-                    (canonical_product_id, alias, normalized, is_exact)
+                    (tenant_id, canonical_product_id, alias, normalized, is_exact)
                     for alias, normalized, is_exact in aliases
                 ],
             )
 
-    def existing_chunk_hashes(self, canonical_product_id: str) -> dict[str, tuple[str, str]]:
+    def existing_chunk_hashes(self, canonical_product_id: str, *, tenant_id: str = "public") -> dict[str, tuple[str, str]]:
         """Return {chunk_id: (chunk_type, source_hash)} for skip-if-unchanged logic."""
+        self._set_tenant_scope(tenant_id)
         conn = self.connection()
         with conn.cursor() as cursor:
             cursor.execute(
-                "SELECT id, chunk_type, source_hash FROM rag_chunks WHERE canonical_product_id = %s",
-                (canonical_product_id,),
+                """
+                SELECT c.id, c.chunk_type, c.source_hash FROM rag_chunks c
+                JOIN rag_documents d ON d.id = c.document_id
+                WHERE c.canonical_product_id = %s AND d.tenant_id = %s
+                """,
+                (canonical_product_id, tenant_id),
             )
             rows = cursor.fetchall()
         # psycopg returns UUID objects for the id column; identity comparisons
         # downstream use the string form produced by stable_chunk_id().
         return {str(row["id"]): (row["chunk_type"], row["source_hash"]) for row in rows}
 
-    def delete_missing_chunks(self, canonical_product_id: str, keep_chunk_ids: set[str]) -> int:
+    def delete_missing_chunks(self, canonical_product_id: str, keep_chunk_ids: set[str], *, tenant_id: str = "public") -> int:
+        self._set_tenant_scope(tenant_id)
         conn = self.connection()
         with conn.cursor() as cursor:
             cursor.execute(
-                "DELETE FROM rag_chunks WHERE canonical_product_id = %s AND NOT (id = ANY(%s::uuid[]))",
+                """
+                DELETE FROM rag_chunks c USING rag_documents d
+                WHERE c.document_id = d.id AND c.canonical_product_id = %s AND d.tenant_id = %s
+                  AND NOT (c.id = ANY(%s::uuid[]))
+                """,
                 (
                     canonical_product_id,
+                    tenant_id,
                     list(keep_chunk_ids) or ["00000000-0000-0000-0000-000000000000"],
                 ),
             )
             return cursor.rowcount
 
     def upsert_chunk(self, chunk: ChunkUpsert) -> None:
+        self._set_tenant_scope(chunk.tenant_id)
         conn = self.connection()
         with conn.cursor() as cursor:
             cursor.execute(
                 """
                 INSERT INTO rag_chunks (
-                    id, document_id, canonical_product_id, chunk_type, content, trust_level,
+                    id, document_id, tenant_id, canonical_product_id, chunk_type, content, trust_level,
                     customer_factual_eligible, requires_qualification, metadata, embedding,
                     source_hash, updated_at
                 )
                 VALUES (
-                    %s, %s, %s, %s, %s, %s, %s, %s, %s, %s::vector, %s, NOW()
+                    %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s::vector, %s, NOW()
                 )
                 ON CONFLICT (id) DO UPDATE SET
                     content = EXCLUDED.content,
@@ -367,6 +487,7 @@ class RagRepository:
                 (
                     chunk.chunk_id,
                     chunk.document_id,
+                    chunk.tenant_id,
                     chunk.canonical_product_id,
                     chunk.chunk_type,
                     chunk.content,
@@ -406,7 +527,7 @@ class RagRepository:
 
     # -- reads ------------------------------------------------------------
 
-    def resolve_aliases(self, normalized_query: str) -> list[AliasMatch]:
+    def resolve_aliases(self, normalized_query: str, *, tenant_id: str = "public") -> list[AliasMatch]:
         """Exact/normalized alias matches, best first. Empty means 'use vectors'.
 
         Matches the query against aliases in both directions AND inside it:
@@ -416,6 +537,7 @@ class RagRepository:
         word boundaries and partial-name runs are awkward to express as SQL
         LIKE patterns and product names may contain regex metacharacters.
         """
+        self._set_tenant_scope(tenant_id)
         conn = self.connection()
         with conn.cursor() as cursor:
             cursor.execute(
@@ -423,8 +545,9 @@ class RagRepository:
                 SELECT a.canonical_product_id, d.product_name,
                        a.normalized_alias, a.is_exact_name
                 FROM rag_product_aliases a
-                JOIN rag_documents d ON d.canonical_product_id = a.canonical_product_id
-                """
+                JOIN rag_documents d ON d.canonical_product_id = a.canonical_product_id AND d.tenant_id = a.tenant_id
+                WHERE d.is_active AND d.tenant_id = %s AND a.tenant_id = %s
+                """, (tenant_id, tenant_id)
             )
             rows = cursor.fetchall()
 
@@ -453,27 +576,30 @@ class RagRepository:
             key=lambda m: (-m.match_rank, -m.matched_alias_length, m.canonical_product_id),
         )
 
-    def document_for_product(self, canonical_product_id: str) -> dict[str, Any] | None:
+    def document_for_product(self, canonical_product_id: str, *, tenant_id: str = "public") -> dict[str, Any] | None:
+        self._set_tenant_scope(tenant_id)
         conn = self.connection()
         with conn.cursor() as cursor:
             cursor.execute(
                 """
                 SELECT canonical_product_id, product_name, answer_policy,
                        citation_required_topics, medical_escalation_topics, guardrails
-                FROM rag_documents WHERE canonical_product_id = %s
+                FROM rag_documents WHERE canonical_product_id = %s AND is_active AND tenant_id = %s
                 """,
-                (canonical_product_id,),
+                (canonical_product_id, tenant_id),
             )
             return cursor.fetchone()
 
     def all_chunk_content(self) -> list[tuple[str, str]]:
         """(chunk_id, content) for every stored chunk — used by rebuild_embeddings."""
+        self._set_tenant_scope("*")
         conn = self.connection()
         with conn.cursor() as cursor:
             cursor.execute("SELECT id, content FROM rag_chunks ORDER BY id")
             return [(row["id"], row["content"]) for row in cursor.fetchall()]
 
     def store_embeddings(self, vectors: dict[str, list[float]]) -> None:
+        self._set_tenant_scope("*")
         conn = self.connection()
         with conn.cursor() as cursor:
             cursor.executemany(
@@ -490,7 +616,9 @@ class RagRepository:
         top_k: int = 5,
         chunk_types: list[str] | None = None,
         trust_levels: list[str] | None = None,
+        tenant_id: str = "public",
     ) -> list[SearchHit]:
+        self._set_tenant_scope(tenant_id)
         conn = self.connection()
         with conn.cursor() as cursor:
             cursor.execute(
@@ -502,6 +630,7 @@ class RagRepository:
                 FROM rag_chunks c
                 JOIN rag_documents d ON d.id = c.document_id
                 WHERE c.embedding IS NOT NULL
+                  AND d.is_active AND d.tenant_id = %(tenant_id)s
                   AND (%(product_ids)s::text[] IS NULL OR c.canonical_product_id = ANY(%(product_ids)s::text[]))
                   AND (%(types)s::text[] IS NULL OR c.chunk_type = ANY(%(types)s::text[]))
                   AND (%(trusts)s::text[] IS NULL OR c.trust_level = ANY(%(trusts)s::text[]))
@@ -516,6 +645,7 @@ class RagRepository:
                     "trusts": trust_levels,
                     "customer_only": customer_factual_only,
                     "top_k": top_k,
+                    "tenant_id": tenant_id,
                 },
             )
             rows = cursor.fetchall()
@@ -546,6 +676,7 @@ class RagRepository:
         chunk_types: list[str] | None = None,
         trust_levels: list[str] | None = None,
         top_k: int = 5,
+        tenant_id: str = "public",
     ) -> list[SearchHit]:
         """Fetch a known product's vetted facts without an embedding query.
 
@@ -554,6 +685,7 @@ class RagRepository:
         and the caller has supplied a fact-type filter. It cannot turn into a
         catalogue-wide keyword search or surface live commerce data.
         """
+        self._set_tenant_scope(tenant_id)
         conn = self.connection()
         with conn.cursor() as cursor:
             cursor.execute(
@@ -564,6 +696,7 @@ class RagRepository:
                 FROM rag_chunks c
                 JOIN rag_documents d ON d.id = c.document_id
                 WHERE c.canonical_product_id = %(product_id)s
+                  AND d.is_active AND d.tenant_id = %(tenant_id)s
                   AND (%(types)s::text[] IS NULL OR c.chunk_type = ANY(%(types)s::text[]))
                   AND (%(trusts)s::text[] IS NULL OR c.trust_level = ANY(%(trusts)s::text[]))
                   AND (%(customer_only)s = FALSE OR c.customer_factual_eligible)
@@ -576,6 +709,7 @@ class RagRepository:
                     "trusts": trust_levels,
                     "customer_only": customer_factual_only,
                     "top_k": top_k,
+                    "tenant_id": tenant_id,
                 },
             )
             rows = cursor.fetchall()
@@ -607,6 +741,7 @@ class RagRepository:
         chunk_types: list[str] | None = None,
         trust_levels: list[str] | None = None,
         top_k: int = 120,
+        tenant_id: str = "public",
     ) -> list[SearchHit]:
         """Return a bounded, verified static-fact pool without vectors.
 
@@ -615,6 +750,7 @@ class RagRepository:
         It contains no live-commerce fields and remains subject to the normal
         customer-fact policy check in the retriever.
         """
+        self._set_tenant_scope(tenant_id)
         conn = self.connection()
         with conn.cursor() as cursor:
             cursor.execute(
@@ -625,6 +761,7 @@ class RagRepository:
                 FROM rag_chunks c
                 JOIN rag_documents d ON d.id = c.document_id
                 WHERE (%(types)s::text[] IS NULL OR c.chunk_type = ANY(%(types)s::text[]))
+                  AND d.is_active AND d.tenant_id = %(tenant_id)s
                   AND (%(trusts)s::text[] IS NULL OR c.trust_level = ANY(%(trusts)s::text[]))
                   AND (%(customer_only)s = FALSE OR c.customer_factual_eligible)
                 ORDER BY d.product_name, c.chunk_type, c.id
@@ -635,6 +772,7 @@ class RagRepository:
                     "trusts": trust_levels,
                     "customer_only": customer_factual_only,
                     "top_k": top_k,
+                    "tenant_id": tenant_id,
                 },
             )
             rows = cursor.fetchall()

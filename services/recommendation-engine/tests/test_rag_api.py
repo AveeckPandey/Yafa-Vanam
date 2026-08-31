@@ -3,6 +3,8 @@ and response shapes. Health reports status flags only — never credentials."""
 
 from __future__ import annotations
 
+import hashlib
+import hmac
 import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
@@ -93,6 +95,29 @@ def test_request_validation_rejects_bad_top_k(client):
         headers={"X-Yafa-Service-Token": TOKEN},
     )
     assert response.status_code == 422
+
+
+def test_private_tenant_requires_gateway_signature(client, monkeypatch):
+    secret = "tenant-signing-secret-that-is-at-least-32-bytes"
+    monkeypatch.setenv("YAFA_TENANT_SIGNING_SECRET", secret)
+    rejected = client.post(
+        "/internal/rag/search",
+        json={"query": "private", "tenant_id": "tenant-a"},
+        headers={"X-Yafa-Service-Token": TOKEN},
+    )
+    assert rejected.status_code == 403
+
+    signature = hmac.new(secret.encode(), b"tenant-a", hashlib.sha256).hexdigest()
+    accepted = client.post(
+        "/internal/rag/search",
+        json={"query": "private"},
+        headers={
+            "X-Yafa-Service-Token": TOKEN,
+            "X-Yafa-Tenant-Id": "tenant-a",
+            "X-Yafa-Tenant-Signature": signature,
+        },
+    )
+    assert accepted.status_code == 200
 
 
 def test_embedding_rate_limit_returns_safe_service_unavailable(client, monkeypatch):

@@ -3,11 +3,14 @@ from __future__ import annotations
 
 import logging
 from typing import Any
+from uuid import uuid4
 
 from fastapi import HTTPException
 
 from app.api.rag_search import _get_retriever
+from app.rag.config import RagSettings
 from app.rag.schemas import RagSearchRequest
+from app.yafa.agent import ToolSearchResult, get_agentic_responder
 from app.yafa import prompts
 from app.yafa.context import (
     detect_fact_type,
@@ -27,12 +30,14 @@ async def _rag_lookup(
     query: str,
     product_id: str | None,
     fact_label: str | None,
+    request_id: str,
 ) -> tuple[list[dict[str, Any]], list[str], list[str], bool]:
     """Retrieve eligible facts only; a RAG failure must not break the chat."""
     try:
         response = await _get_retriever().search(
             RagSearchRequest(
                 query=query,
+                request_id=request_id,
                 product_id=product_id,
                 top_k=5,
                 allowed_for_customer=True,
@@ -46,6 +51,7 @@ async def _rag_lookup(
         return [], [], [], False
     chunks = [
         {
+            "chunk_id": chunk.chunk_id,
             "product_id": chunk.product_id,
             "chunk_type": chunk.chunk_type,
             "content": chunk.content,
@@ -58,7 +64,51 @@ async def _rag_lookup(
     return chunks, list(response.citation_required_topics), list(response.medical_escalation_topics), True
 
 
+async def _agentic_answer(
+    *,
+    message: str,
+    page_product_id: str | None,
+    fact_label: str | None,
+    request_id: str,
+):
+    """Ask Bedrock to use the verified-search tool, never raw data access."""
+    settings = RagSettings.from_env()
+    if not settings.agentic_enabled:
+        return None
+
+    async def search(query: str, locked_product_id: str | None) -> ToolSearchResult:
+        chunks, citations, medical, available = await _rag_lookup(query, locked_product_id, fact_label, request_id)
+        if fact_label:
+            chunks = [chunk for chunk in chunks if chunk["chunk_type"] in set(fact_chunk_types(fact_label))]
+        # The model receives only high-confidence semantic matches. A zero
+        # score is an explicit verified keyword fallback from the retriever.
+        chunks = [
+            chunk
+            for chunk in chunks
+            if chunk["similarity"] == 0.0
+            or chunk["similarity"] >= settings.min_grounding_similarity
+        ]
+        return ToolSearchResult(
+            chunks=chunks,
+            citation_required_topics=citations,
+            medical_escalation_topics=medical,
+            available=available,
+        )
+
+    try:
+        return await get_agentic_responder(settings).answer(
+            message=message,
+            page_product_id=page_product_id,
+            search=search,
+            request_id=request_id,
+        )
+    except Exception:  # no model/provider details should reach customers
+        logger.exception("agentic RAG failed; using deterministic evidence fallback")
+        return None
+
+
 async def handle_chat(request: YafaChatRequest) -> YafaChatResponse:
+    request_id = uuid4().hex
     conversation = conversation_store().get_or_create(
         request.conversation_id, user_id=request.user_id, page_context=request.page_context
     )
@@ -83,10 +133,28 @@ async def handle_chat(request: YafaChatRequest) -> YafaChatResponse:
             response = YafaChatResponse(conversation_id=conversation.conversation_id, intent=intent.value, message=prompts.general_message())
         else:
             fact_label = detect_fact_type(request.message)
+            agent_answer = await _agentic_answer(
+                message=request.message,
+                page_product_id=(page_product or {}).get("id"),
+                fact_label=fact_label,
+                request_id=request_id,
+            )
+            if agent_answer is not None:
+                response = YafaChatResponse(
+                    conversation_id=conversation.conversation_id,
+                    request_id=request_id,
+                    intent=intent.value,
+                    message=agent_answer.message,
+                    grounding=[GroundingChunk(**chunk) for chunk in agent_answer.chunks[:4]],
+                    citation_required_topics=agent_answer.citation_required_topics,
+                    medical_escalation_topics=agent_answer.medical_escalation_topics,
+                )
+                conversation.record_turn("user", request.message)
+                conversation.record_turn("yafa", response.message)
+                return response
+
             chunks, citations, medical, available = await _rag_lookup(
-                request.message,
-                (page_product or {}).get("id"),
-                fact_label,
+                request.message, (page_product or {}).get("id"), fact_label, request_id
             )
             if fact_label:
                 chunks = [chunk for chunk in chunks if chunk["chunk_type"] in set(fact_chunk_types(fact_label))]
@@ -104,6 +172,7 @@ async def handle_chat(request: YafaChatRequest) -> YafaChatResponse:
                 message = prompts.product_information_message(chunks, rag_available=available)
             response = YafaChatResponse(
                 conversation_id=conversation.conversation_id,
+                request_id=request_id,
                 intent=intent.value,
                 message=message,
                 grounding=[GroundingChunk(**chunk) for chunk in chunks[:4]],
@@ -111,6 +180,7 @@ async def handle_chat(request: YafaChatRequest) -> YafaChatResponse:
                 medical_escalation_topics=medical,
             )
 
+    response.request_id = request_id
     conversation.record_turn("user", request.message)
     conversation.record_turn("yafa", response.message)
     return response

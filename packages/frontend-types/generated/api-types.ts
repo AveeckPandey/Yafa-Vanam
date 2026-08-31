@@ -629,6 +629,90 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/products/{productID}/reviews": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List approved reviews for a product */
+        get: {
+            parameters: {
+                query?: {
+                    limit?: number;
+                    offset?: number;
+                };
+                header?: never;
+                path: {
+                    productID: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Approved moderated reviews and aggregate rating */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ProductReviewList"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        /**
+         * Submit a verified-purchase review for moderation
+         * @description Product, variant, and verified status are derived from the signed-in customer's paid order item.
+         */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    productID: string;
+                };
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": components["schemas"]["CreateProductReview"];
+                };
+            };
+            responses: {
+                /** @description Review accepted for moderation */
+                202: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                401: components["responses"]["SimpleUnauthorized"];
+                /** @description No eligible paid order item */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Order item already reviewed */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                422: components["responses"]["Validation"];
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/carts": {
         parameters: {
             query?: never;
@@ -1153,321 +1237,6 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/v1/me/beauty-profile": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** The signed-in user's confirmed shade profile */
-        get: {
-            parameters: {
-                query?: never;
-                header?: never;
-                path?: never;
-                cookie?: never;
-            };
-            requestBody?: never;
-            responses: {
-                /** @description Profile (has_profile false when none confirmed yet) */
-                200: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["BeautyProfile"];
-                    };
-                };
-                401: components["responses"]["SimpleUnauthorized"];
-            };
-        };
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/yafa/session/start": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /**
-         * Start a shade-finder session
-         * @description Anonymous sessions receive a session_token that must travel in the X-Yafa-Session-Token header on subsequent calls; signed-in sessions are authorized by cookie.
-         */
-        post: {
-            parameters: {
-                query?: never;
-                header?: never;
-                path?: never;
-                cookie?: never;
-            };
-            requestBody?: never;
-            responses: {
-                /** @description Session started */
-                201: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["YafaSessionStart"];
-                    };
-                };
-                503: components["responses"]["ServiceUnavailable"];
-            };
-        };
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/yafa/session/{sessionID}/answer": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        /** Save one quiz answer */
-        patch: {
-            parameters: {
-                query?: never;
-                header?: never;
-                path: {
-                    sessionID: components["parameters"]["SessionId"];
-                };
-                cookie?: never;
-            };
-            requestBody: {
-                content: {
-                    "application/json": {
-                        step_id: string;
-                        answer: string;
-                    };
-                };
-            };
-            responses: {
-                /** @description Answer saved */
-                204: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content?: never;
-                };
-                400: components["responses"]["BadRequest"];
-                403: components["responses"]["AccessDenied"];
-                404: components["responses"]["NotFound"];
-                422: components["responses"]["Validation"];
-                503: components["responses"]["ServiceUnavailable"];
-            };
-        };
-        trace?: never;
-    };
-    "/api/v1/yafa/session/{sessionID}/selfie": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /** Attach a selfie for analysis (multipart/form-data, JPG/PNG up to 5 MB) */
-        post: {
-            parameters: {
-                query?: never;
-                header?: never;
-                path: {
-                    sessionID: components["parameters"]["SessionId"];
-                };
-                cookie?: never;
-            };
-            requestBody: {
-                content: {
-                    "multipart/form-data": {
-                        /** Format: binary */
-                        image: string;
-                    };
-                };
-            };
-            responses: {
-                /** @description Selfie stored */
-                204: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content?: never;
-                };
-                400: components["responses"]["BadRequest"];
-                403: components["responses"]["AccessDenied"];
-                404: components["responses"]["NotFound"];
-                503: components["responses"]["ServiceUnavailable"];
-            };
-        };
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/yafa/session/{sessionID}/analyze": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /** Run shade analysis for the session */
-        post: {
-            parameters: {
-                query?: never;
-                header?: never;
-                path: {
-                    sessionID: components["parameters"]["SessionId"];
-                };
-                cookie?: never;
-            };
-            requestBody?: never;
-            responses: {
-                /** @description Ranked shade candidates */
-                200: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["YafaAnalysis"];
-                    };
-                };
-                400: components["responses"]["BadRequest"];
-                403: components["responses"]["AccessDenied"];
-                404: components["responses"]["NotFound"];
-                /** @description Analysis could not determine a shade */
-                422: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["Error"];
-                    };
-                };
-                503: components["responses"]["ServiceUnavailable"];
-            };
-        };
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/yafa/session/{sessionID}/confirm": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /** Confirm a recommended shade for the session */
-        post: {
-            parameters: {
-                query?: never;
-                header?: never;
-                path: {
-                    sessionID: components["parameters"]["SessionId"];
-                };
-                cookie?: never;
-            };
-            requestBody: {
-                content: {
-                    "application/json": components["schemas"]["YafaConfirmInput"];
-                };
-            };
-            responses: {
-                /** @description Shade confirmed */
-                200: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["YafaConfirmation"];
-                    };
-                };
-                400: components["responses"]["BadRequest"];
-                403: components["responses"]["AccessDenied"];
-                404: components["responses"]["NotFound"];
-                422: components["responses"]["Validation"];
-                503: components["responses"]["ServiceUnavailable"];
-            };
-        };
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/yafa/confirm-shade": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /** Confirm a shade by session ID in the body */
-        post: {
-            parameters: {
-                query?: never;
-                header?: never;
-                path?: never;
-                cookie?: never;
-            };
-            requestBody: {
-                content: {
-                    "application/json": components["schemas"]["YafaConfirmInput"] & Record<string, never>;
-                };
-            };
-            responses: {
-                /** @description Shade confirmed */
-                200: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["YafaConfirmation"];
-                    };
-                };
-                400: components["responses"]["BadRequest"];
-                403: components["responses"]["AccessDenied"];
-                404: components["responses"]["NotFound"];
-                422: components["responses"]["Validation"];
-                503: components["responses"]["ServiceUnavailable"];
-            };
-        };
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -1590,6 +1359,62 @@ export interface components {
             limit: number;
             offset: number;
         };
+        ProductReview: {
+            /** Format: uuid */
+            id: string;
+            product_id: string;
+            variant_id?: string;
+            rating: number;
+            title: string;
+            body: string;
+            display_name: string;
+            is_verified_purchase: boolean;
+            /** Format: date-time */
+            created_at: string;
+        };
+        ProductReviewList: {
+            items: components["schemas"]["ProductReview"][];
+            review_count: number;
+            average_rating: number;
+        };
+        CreateProductReview: {
+            /** Format: uuid */
+            order_item_id: string;
+            rating: number;
+            title: string;
+            body: string;
+        };
+        BeautyProfile: {
+            has_profile: boolean;
+            shade_id?: string;
+            shade_name?: string;
+            shade_code?: string;
+            hex?: string;
+        };
+        YafaAnalysisCandidate: {
+            /** Format: uuid */
+            shade_id: string;
+            shade_name: string;
+            hex: string;
+            confidence: number;
+            reason: string;
+        };
+        YafaAnalysis: {
+            candidates: components["schemas"]["YafaAnalysisCandidate"][];
+            /** Format: uuid */
+            primary_recommendation: string;
+        };
+        YafaConfirmInput: {
+            /** Format: uuid */
+            quiz_session_id?: string;
+            /** Format: uuid */
+            shade_id?: string;
+        };
+        YafaConfirmation: {
+            /** Format: uuid */
+            shade_id: string;
+            saved_to_profile: boolean;
+        };
         CartLine: {
             key: string;
             product_id: string;
@@ -1681,43 +1506,6 @@ export interface components {
             order_number: string;
             /** @constant */
             payment_status: "AUTHORIZED";
-        };
-        YafaSessionStart: {
-            /** Format: uuid */
-            session_id: string;
-            /** @description Present for anonymous sessions only; send as X-Yafa-Session-Token. */
-            session_token?: string;
-        };
-        BeautyProfile: {
-            has_profile: boolean;
-            shade_id?: string;
-            shade_name?: string;
-            shade_code?: string;
-            hex?: string;
-        };
-        YafaAnalysisCandidate: {
-            /** Format: uuid */
-            shade_id: string;
-            shade_name: string;
-            hex: string;
-            confidence: number;
-            reason: string;
-        };
-        YafaAnalysis: {
-            candidates: components["schemas"]["YafaAnalysisCandidate"][];
-            /** Format: uuid */
-            primary_recommendation: string;
-        };
-        YafaConfirmInput: {
-            /** Format: uuid */
-            quiz_session_id?: string;
-            /** Format: uuid */
-            shade_id?: string;
-        };
-        YafaConfirmation: {
-            /** Format: uuid */
-            shade_id: string;
-            saved_to_profile: boolean;
         };
     };
     responses: {
@@ -1832,7 +1620,6 @@ export interface components {
     };
     parameters: {
         CartId: string;
-        SessionId: string;
     };
     requestBodies: never;
     headers: never;

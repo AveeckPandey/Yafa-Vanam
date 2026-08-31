@@ -14,9 +14,14 @@ the Yafa orchestrator (later phase) can decide presentation.
 
 from __future__ import annotations
 
+import asyncio
+import hashlib
+import json
 import re
+import time
 
 from app.rag.config import RagSettings
+from app.rag.cache import AsyncTTLCache
 from app.rag.providers import EmbeddingProvider, EmbeddingProviderError
 from app.rag.filters import _STOPWORDS as _QUERY_STOPWORDS
 from app.rag.filters import detect_live_data_domains, is_pure_live_data_query
@@ -24,6 +29,8 @@ from app.rag.models import LiveDataDomain, TrustLevel
 from app.rag.normalizer import normalize_alias
 from app.rag.repository import RagRepository, SearchHit
 from app.rag.reranker import rerank
+from app.rag.production import select_safe_evidence
+from app.rag.telemetry import RetrievalTrace
 from app.rag.schemas import (
     LiveRequirement,
     RagSearchRequest,
@@ -46,6 +53,10 @@ _LIVE_DOMAIN_REASONS = {
 
 # Vector-search candidate pool size before reranking/diversity capping.
 _POOL_MULTIPLIER = 4
+
+
+class RetrievalUnavailableError(EmbeddingProviderError):
+    """The vector store is unhealthy; callers must use the safe fallback."""
 
 # A free embedding endpoint can briefly rate-limit. These intentionally small
 # expansions keep common fragrance language useful during that outage without
@@ -77,9 +88,91 @@ class RagRetriever:
         self._repo = repo
         self._provider = provider
         self._settings = settings or RagSettings.from_env()
+        self._cache = AsyncTTLCache(
+            ttl_seconds=self._settings.cache_ttl_seconds,
+            max_entries=self._settings.cache_max_entries,
+        )
+        self._embedding_semaphore = asyncio.Semaphore(self._settings.max_concurrent_embeddings)
+        self._repository_failures = 0
+        self._repository_open_until = 0.0
+        self._known_revisions: dict[str, int] = {}
 
     async def search(self, request: RagSearchRequest) -> RagSearchResponse:
+        """Search verified knowledge with cache coalescing and a Bedrock budget.
+
+        The cache key intentionally excludes user and conversation state; this
+        endpoint returns only catalogue facts. Identical concurrent requests
+        share one Bedrock embedding call, which prevents a cache stampede when
+        traffic spikes.
+        """
+        revision = self._known_revisions.get(request.tenant_id, 1)
+        if time.monotonic() < self._repository_open_until:
+            cached = await self._cache.get(self._cache_key(request, revision))
+            if cached is not None:
+                return cached
+            raise RetrievalUnavailableError("knowledge store is temporarily unavailable")
+        if hasattr(self._repo, "get_corpus_revision"):
+            try:
+                current_revision = self._repo.get_corpus_revision(request.tenant_id)
+            except Exception as exc:
+                self._record_repository_failure()
+                cached = await self._cache.get(self._cache_key(request, revision))
+                if cached is not None:
+                    return cached
+                raise RetrievalUnavailableError("knowledge store is temporarily unavailable") from exc
+            if current_revision != revision:
+                await self._cache.invalidate_all()
+                revision = current_revision
+                self._known_revisions[request.tenant_id] = revision
+
+        key = self._cache_key(request, revision)
+        try:
+            response = await self._cache.get_or_load(key, lambda: self._search_uncached(request))
+        except EmbeddingProviderError:
+            raise
+        except Exception as exc:
+            self._record_repository_failure()
+            raise RetrievalUnavailableError("knowledge store is temporarily unavailable") from exc
+        self._repository_failures = 0
+        self._repository_open_until = 0.0
+        return response
+
+    def _record_repository_failure(self) -> None:
+        self._repository_failures += 1
+        if self._repository_failures >= self._settings.circuit_breaker_failures:
+            self._repository_open_until = time.monotonic() + self._settings.circuit_breaker_reset_seconds
+
+    def _cache_key(self, request: RagSearchRequest, corpus_revision: int = 1) -> str:
+        context = request.page_context
+        payload = {
+            "namespace": self._settings.cache_namespace,
+            "corpus_revision": corpus_revision,
+            "query": request.query.strip().lower(),
+            "product_id": request.product_id,
+            "page_product_id": context.product_id if context else None,
+            "page_type": context.type if context else None,
+            "top_k": request.top_k,
+            "customer": request.allowed_for_customer,
+            "chunk_types": sorted(request.chunk_types or []),
+            "trust_levels": sorted(level.value for level in request.trust_levels or []),
+            "tenant_id": request.tenant_id,
+        }
+        encoded = json.dumps(payload, separators=(",", ":"), sort_keys=True).encode("utf-8")
+        return hashlib.sha256(encoded).hexdigest()
+
+    async def _embed_query(self, query: str) -> list[float]:
+        """Bound inbound embedding concurrency and fail quickly under load."""
+        try:
+            async with self._embedding_semaphore:
+                return await asyncio.wait_for(
+                    self._provider.embed_query(query), timeout=self._settings.query_timeout_seconds
+                )
+        except TimeoutError as exc:
+            raise EmbeddingProviderError("embedding request timed out") from exc
+
+    async def _search_uncached(self, request: RagSearchRequest) -> RagSearchResponse:
         query = request.query.strip()
+        trace = RetrievalTrace(request_id=request.request_id, query=query, tenant_id=request.tenant_id)
         live_domains = detect_live_data_domains(query)
         # Pure live questions ("Is this in stock?") must never be answered from
         # static JSON: retrieval results stay empty and the orchestrator asks
@@ -92,7 +185,7 @@ class RagRetriever:
         alias_rank = 0
         ambiguous_candidates: list[dict[str, str]] = []
         if scope_id is None:
-            resolved_id, alias_rank, ambiguous_candidates = self._resolve_by_alias(query)
+            resolved_id, alias_rank, ambiguous_candidates = self._resolve_by_alias(query, request.tenant_id)
         effective_scope = scope_id or resolved_id
         if scope_id:
             resolution = scope_resolution
@@ -107,7 +200,7 @@ class RagRetriever:
         if not pure_live_question:
             trust_levels = [level.value for level in request.trust_levels] if request.trust_levels else None
             try:
-                query_vector = await self._provider.embed_query(query)
+                query_vector = await self._embed_query(query)
             except EmbeddingProviderError:
                 # A provider outage must not make an already-resolved product
                 # fact disappear. Generic product-fact searches can also use
@@ -122,12 +215,14 @@ class RagRetriever:
                         top_k=min(request.top_k * _POOL_MULTIPLIER, 40),
                         chunk_types=request.chunk_types,
                         trust_levels=trust_levels,
+                        tenant_id=request.tenant_id,
                     )
                 else:
                     hits = self._keyword_fallback(
                         query,
-                        request,
-                        trust_levels=trust_levels,
+                    request,
+                    trust_levels=trust_levels,
+                    tenant_id=request.tenant_id,
                     )
                     if not hits:
                         raise
@@ -139,17 +234,37 @@ class RagRetriever:
                     top_k=min(request.top_k * _POOL_MULTIPLIER, 40),
                     chunk_types=request.chunk_types,
                     trust_levels=trust_levels,
+                    tenant_id=request.tenant_id,
                 )
             pool = self._policy_filter(hits, request.allowed_for_customer)
+            pool = [
+                hit for hit in pool
+                if hit.similarity == 0.0 or hit.similarity >= self._settings.min_grounding_similarity
+            ]
+            selected = select_safe_evidence(
+                pool, tenant_id=request.tenant_id, max_items=min(request.top_k * _POOL_MULTIPLIER, 40)
+            )
+            trace.record(
+                "retrieval",
+                candidates=len(hits),
+                policy_eligible=len(pool),
+                injection_rejected=selected.rejected_injection,
+                conflicts=selected.conflicts,
+                chunk_ids=[str(hit.chunk_id) for hit in selected.hits[:8]],
+                scores=[round(hit.similarity, 4) for hit in selected.hits[:8]],
+            )
             if self._settings.rerank_enabled:
-                results = [self._to_chunk(hit) for hit in rerank(pool, query, request.top_k)]
+                results = [self._to_chunk(hit) for hit in rerank(selected.hits, query, request.top_k)]
             else:
                 # Phase 1 default: vector similarity order, or the explicit
                 # known-product fallback order when embeddings are unavailable.
-                results = [self._to_chunk(hit) for hit in pool[: request.top_k]]
+                results = [self._to_chunk(hit) for hit in selected.hits[: request.top_k]]
+        else:
+            selected = select_safe_evidence([], tenant_id=request.tenant_id, max_items=request.top_k)
 
-        document = self._repo.document_for_product(effective_scope) if effective_scope else None
-        return RagSearchResponse(
+        document = self._repo.document_for_product(effective_scope, tenant_id=request.tenant_id) if effective_scope else None
+        response = RagSearchResponse(
+            request_id=request.request_id,
             query=query,
             product_id=effective_scope,
             resolved_product_id=resolved_id,
@@ -161,11 +276,15 @@ class RagRetriever:
             answer_policy=(document or {}).get("answer_policy") or None,
             citation_required_topics=(document or {}).get("citation_required_topics") or [],
             medical_escalation_topics=(document or {}).get("medical_escalation_topics") or [],
+            conflicts=selected.conflicts,
         )
+        trace.record("response", result_count=len(results), live_domains=[item.domain.value for item in response.requires_live_data])
+        trace.emit(outcome="ok")
+        return response
 
     # -- helpers ---------------------------------------------------------------
 
-    def _resolve_by_alias(self, query: str) -> tuple[str | None, int, list[dict[str, str]]]:
+    def _resolve_by_alias(self, query: str, tenant_id: str = "public") -> tuple[str | None, int, list[dict[str, str]]]:
         """Exact/normalized alias match before any vector work.
 
         Returns (resolved_product_id | None, best_rank, ambiguous_candidates).
@@ -179,7 +298,7 @@ class RagRetriever:
         if len(normalized) < 3:
             # Very short fragments are not reliable product identifiers.
             return None, 0, []
-        matches = self._repo.resolve_aliases(normalized)
+        matches = self._repo.resolve_aliases(normalized, tenant_id=tenant_id)
         if not matches:
             return None, 0, []
         # A full product name must beat a shorter collection alias at the
@@ -221,6 +340,7 @@ class RagRetriever:
         request: RagSearchRequest,
         *,
         trust_levels: list[str] | None,
+        tenant_id: str,
     ) -> list[SearchHit]:
         """Rank a small verified fact pool when embeddings are temporarily down.
 
@@ -236,6 +356,7 @@ class RagRetriever:
             top_k=min(request.top_k * _POOL_MULTIPLIER * 3, 120),
             chunk_types=request.chunk_types,
             trust_levels=trust_levels,
+            tenant_id=tenant_id,
         )
         ranked: list[tuple[int, SearchHit]] = []
         for hit in candidates:

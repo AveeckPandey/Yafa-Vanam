@@ -12,10 +12,12 @@ import ProductAccordion from "./ProductAccordion";
 import ProductGallery from "./ProductGallery";
 import QuantitySelector from "./QuantitySelector";
 import StickyBuyBar from "./StickyBuyBar";
+import ProductReviews from "./ProductReviews";
 import YafaProductGuidance from "@/components/yafa/YafaProductGuidance";
 import { trackEvent } from "@/lib/analytics";
 import { useYafa } from "@/components/yafa/YafaProvider";
 import { getYafaProductQuestions } from "@/lib/yafa-product-questions";
+import type { SampleReview } from "@/lib/sample-reviews";
 
 function pretty(value: string) {
   return value.replaceAll("_", " ");
@@ -63,10 +65,12 @@ export default function ProductPageClient({
   product,
   related,
   layerMatch,
+  sampleReviews,
 }: {
   product: CatalogProduct;
   related: CatalogProduct[];
   layerMatch: CatalogProduct | null;
+  sampleReviews: SampleReview[];
 }) {
   const { setPageContext, setQuickQuestions } = useYafa();
   const [quantity, setQuantity] = useState(1);
@@ -281,10 +285,7 @@ export default function ProductPageClient({
         </section>
       ) : null}
 
-      <section className="reviews-empty" aria-labelledby="reviews-title">
-        <div><p>Customer reflections</p><h2 id="reviews-title">Reviews</h2></div>
-        <div><span aria-hidden="true">☆ ☆ ☆ ☆ ☆</span><h3>No reviews yet</h3><p>We are preparing verified customer reviews. In the meantime, explore the product details, ingredients and delivery information above.</p><span className="reviews-empty__coming">Reviews coming soon</span></div>
-      </section>
+      <ProductReviews productId={product.id} samples={sampleReviews} />
 
       {related.length > 0 ? (
         <section className="related-products" aria-labelledby="related-title">

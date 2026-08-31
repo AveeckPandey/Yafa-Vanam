@@ -264,6 +264,40 @@ paths:
               schema: { $ref: "#/components/schemas/Product" }
         "404": { $ref: "#/components/responses/NotFound" }
 
+  /api/v1/products/{productID}/reviews:
+    get:
+      tags: [Reviews]
+      summary: List approved reviews for a product
+      parameters:
+        - { in: path, name: productID, required: true, schema: { type: string } }
+        - { in: query, name: limit, schema: { type: integer, minimum: 1, maximum: 50, default: 20 } }
+        - { in: query, name: offset, schema: { type: integer, minimum: 0, default: 0 } }
+      responses:
+        "200":
+          description: Approved moderated reviews and aggregate rating
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ProductReviewList" }
+    post:
+      tags: [Reviews]
+      summary: Submit a verified-purchase review for moderation
+      description: Product, variant, and verified status are derived from the signed-in customer's paid order item.
+      security:
+        - cookieAuth: []
+      parameters:
+        - { in: path, name: productID, required: true, schema: { type: string } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/CreateProductReview" }
+      responses:
+        "202": { description: Review accepted for moderation }
+        "401": { $ref: "#/components/responses/SimpleUnauthorized" }
+        "403": { description: No eligible paid order item }
+        "409": { description: Order item already reviewed }
+        "422": { $ref: "#/components/responses/Validation" }
+
   /api/v1/carts:
     post:
       tags: [Carts]
@@ -823,6 +857,72 @@ components:
         total: { type: integer, minimum: 0 }
         limit: { type: integer }
         offset: { type: integer, minimum: 0 }
+
+    ProductReview:
+      type: object
+      required: [id, product_id, rating, title, body, display_name, is_verified_purchase, created_at]
+      properties:
+        id: { type: string, format: uuid }
+        product_id: { type: string }
+        variant_id: { type: string }
+        rating: { type: integer, minimum: 1, maximum: 5 }
+        title: { type: string, maxLength: 120 }
+        body: { type: string, maxLength: 3000 }
+        display_name: { type: string }
+        is_verified_purchase: { type: boolean }
+        created_at: { type: string, format: date-time }
+    ProductReviewList:
+      type: object
+      required: [items, review_count, average_rating]
+      properties:
+        items: { type: array, items: { $ref: "#/components/schemas/ProductReview" } }
+        review_count: { type: integer, minimum: 0 }
+        average_rating: { type: number, minimum: 0, maximum: 5 }
+    CreateProductReview:
+      type: object
+      additionalProperties: false
+      required: [order_item_id, rating, title, body]
+      properties:
+        order_item_id: { type: string, format: uuid }
+        rating: { type: integer, minimum: 1, maximum: 5 }
+        title: { type: string, minLength: 1, maxLength: 120 }
+        body: { type: string, minLength: 10, maxLength: 3000 }
+
+    BeautyProfile:
+      type: object
+      required: [has_profile]
+      properties:
+        has_profile: { type: boolean }
+        shade_id: { type: string }
+        shade_name: { type: string }
+        shade_code: { type: string }
+        hex: { type: string }
+    YafaAnalysisCandidate:
+      type: object
+      required: [shade_id, shade_name, hex, confidence, reason]
+      properties:
+        shade_id: { type: string, format: uuid }
+        shade_name: { type: string }
+        hex: { type: string }
+        confidence: { type: number }
+        reason: { type: string }
+    YafaAnalysis:
+      type: object
+      required: [candidates, primary_recommendation]
+      properties:
+        candidates: { type: array, items: { $ref: "#/components/schemas/YafaAnalysisCandidate" } }
+        primary_recommendation: { type: string, format: uuid }
+    YafaConfirmInput:
+      type: object
+      properties:
+        quiz_session_id: { type: string, format: uuid }
+        shade_id: { type: string, format: uuid }
+    YafaConfirmation:
+      type: object
+      required: [shade_id, saved_to_profile]
+      properties:
+        shade_id: { type: string, format: uuid }
+        saved_to_profile: { type: boolean }
 
     CartLine:
       type: object

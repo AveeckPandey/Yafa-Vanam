@@ -108,8 +108,18 @@ func main() {
 	// the process falls back to the ephemeral in-memory store for local
 	// development and says so loudly rather than silently losing checkouts.
 	var commerceStore commerce.CommerceStore = commerce.NewStore(catalog)
+	var postgresCommerceStore *commerce.PostgresStore
 	if healthDB != nil {
-		commerceStore = commerce.NewPostgresStore(healthDB, catalog)
+		postgresStore := commerce.NewPostgresStore(healthDB, catalog)
+		inventoryContext, inventoryCancel := context.WithTimeout(context.Background(), 30*time.Second)
+		if err := postgresStore.EnsureInventoryLevels(inventoryContext); err != nil {
+			inventoryCancel()
+			logger.Error("inventory catalogue synchronization failed", "error", err)
+			os.Exit(1)
+		}
+		inventoryCancel()
+		commerceStore = postgresStore
+		postgresCommerceStore = postgresStore
 		logger.Info("commerce persistence enabled", "backend", "postgresql")
 	} else {
 		logger.Warn("commerce carts/orders are EPHEMERAL (in-memory): configure DATABASE_URL to persist them across restarts")
@@ -135,17 +145,39 @@ func main() {
 		return result
 	}
 	var orderConfirmationPublisher httpserver.OrderConfirmationPublisher
-	if queueURL := strings.TrimSpace(os.Getenv("ORDER_CONFIRMATION_QUEUE_URL")); queueURL != "" {
+	orderQueueURL := strings.TrimSpace(os.Getenv("ORDER_CONFIRMATION_QUEUE_URL"))
+	inventoryAlertQueueURL := strings.TrimSpace(os.Getenv("INVENTORY_ALERT_QUEUE_URL"))
+	var inventoryAlertQueue *sqs.Client
+	if orderQueueURL != "" || inventoryAlertQueueURL != "" {
 		loadOptions := []func(*awsconfig.LoadOptions) error{}
-		if region := orderConfirmationAWSRegion(); region != "" {
+		if region := runtimeAWSRegion(); region != "" {
 			loadOptions = append(loadOptions, awsconfig.WithRegion(region))
 		}
 		awsConfig, awsErr := awsconfig.LoadDefaultConfig(context.Background(), loadOptions...)
 		if awsErr != nil {
-			logger.Error("order confirmation queue disabled", "error", awsErr)
+			logger.Error("AWS queue configuration failed", "error", awsErr)
+			if production {
+				os.Exit(1)
+			}
 		} else {
-			orderConfirmationPublisher = httpserver.NewSQSOrderConfirmationPublisher(sqs.NewFromConfig(awsConfig), queueURL)
+			queueClient := sqs.NewFromConfig(awsConfig)
+			if orderQueueURL != "" {
+				orderConfirmationPublisher = httpserver.NewSQSOrderConfirmationPublisher(queueClient, orderQueueURL)
+			}
+			if inventoryAlertQueueURL != "" {
+				inventoryAlertQueue = queueClient
+			}
 		}
+	}
+	if production && postgresCommerceStore != nil && inventoryAlertQueueURL == "" {
+		logger.Error("INVENTORY_ALERT_QUEUE_URL is required in production")
+		os.Exit(1)
+	}
+	var stopInventoryDispatcher context.CancelFunc = func() {}
+	if postgresCommerceStore != nil && inventoryAlertQueue != nil {
+		dispatcherContext, cancelDispatcher := context.WithCancel(context.Background())
+		stopInventoryDispatcher = cancelDispatcher
+		go commerce.RunInventoryAlertDispatcher(dispatcherContext, logger, postgresCommerceStore, inventoryAlertQueue, inventoryAlertQueueURL)
 	}
 	handler := httpserver.New(catalog, commerceStore, httpserver.Config{
 		// healthRedis is a typed nil (*redis.Client) when Redis is not
@@ -187,6 +219,7 @@ func main() {
 	shutdownSignal, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
 	<-shutdownSignal.Done()
+	stopInventoryDispatcher()
 	context, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 	if err := server.Shutdown(context); err != nil {
@@ -196,13 +229,18 @@ func main() {
 	logger.Info("YAFA VANAM Commerce API stopped")
 }
 
-func orderConfirmationAWSRegion() string {
+func runtimeAWSRegion() string {
 	for _, name := range []string{"AWS_REGION", "AWS_DEFAULT_REGION"} {
 		if region := strings.TrimSpace(os.Getenv(name)); region != "" {
 			return region
 		}
 	}
 	return ""
+}
+
+// Retained for compatibility with existing callers and tests.
+func orderConfirmationAWSRegion() string {
+	return runtimeAWSRegion()
 }
 
 // redisRateLimitStore avoids storing a typed-nil *redis.Client inside the

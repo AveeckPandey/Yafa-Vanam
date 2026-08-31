@@ -49,7 +49,24 @@ func newTestPostgresStore(t *testing.T) *PostgresStore {
 	if _, err := pool.Exec(ctx, `DELETE FROM coupons WHERE user_id IS NOT NULL`); err != nil {
 		t.Fatalf("delete test coupons error = %v", err)
 	}
-	return NewPostgresStore(pool, testCatalog(t))
+	store := NewPostgresStore(pool, testCatalog(t))
+	if err := store.EnsureInventoryLevels(ctx); err != nil {
+		t.Fatalf("EnsureInventoryLevels() error = %v", err)
+	}
+	// Every test starts from the canonical fixture stock. Production imports
+	// warehouse counts instead; this reset is intentionally test-only.
+	for variantID, reference := range store.catalog.variants {
+		stock := 0
+		if reference.variant.Stock != nil {
+			stock = *reference.variant.Stock
+		}
+		if _, err := pool.Exec(ctx,
+			`UPDATE inventory_levels SET on_hand_quantity=$2, reserved_quantity=0 WHERE variant_id=$1`,
+			variantID, stock); err != nil {
+			t.Fatalf("reset inventory %s error = %v", variantID, err)
+		}
+	}
+	return store
 }
 
 // seedTestUser inserts a users row because carts.user_id and orders.user_id

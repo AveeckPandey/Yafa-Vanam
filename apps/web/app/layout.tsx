@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import "./globals.css";
+import "./product-reviews.css";
 import "./campaign.css";
 import "./yafa-match.css";
 import "./yafa-drawer.css";

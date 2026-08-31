@@ -108,10 +108,13 @@ func New(catalog *commerce.Catalog, store commerce.CommerceStore, config Config)
 	mux.HandleFunc("GET /api/v1/categories", server.categories)
 	mux.HandleFunc("GET /api/v1/products", server.products)
 	mux.HandleFunc("GET /api/v1/products/{slug}", server.product)
+	mux.HandleFunc("GET /api/v1/products/{productID}/reviews", server.listProductReviews)
 	if config.Auth != nil {
+		mux.Handle("POST /api/v1/products/{productID}/reviews", config.Auth.Middleware(http.HandlerFunc(server.createProductReview)))
 		mux.Handle("POST /api/v1/payments/razorpay/orders", config.Auth.Middleware(http.HandlerFunc(server.createRazorpayOrder)))
 		mux.Handle("POST /api/v1/payments/razorpay/verify", config.Auth.Middleware(http.HandlerFunc(server.verifyRazorpayPayment)))
 	} else {
+		mux.HandleFunc("POST /api/v1/products/{productID}/reviews", server.reviewSignInRequired)
 		mux.HandleFunc("POST /api/v1/payments/razorpay/orders", server.createRazorpayOrder)
 		mux.HandleFunc("POST /api/v1/payments/razorpay/verify", server.verifyRazorpayPayment)
 	}
@@ -207,6 +210,50 @@ func (server *Server) product(w http.ResponseWriter, request *http.Request) {
 		return
 	}
 	writeJSON(w, http.StatusOK, product)
+}
+
+func (server *Server) listProductReviews(w http.ResponseWriter, request *http.Request) {
+	store, ok := server.store.(commerce.ReviewStore)
+	if !ok {
+		writeJSON(w, http.StatusOK, commerce.ProductReviewList{Items: []commerce.ProductReview{}})
+		return
+	}
+	limit, _ := strconv.Atoi(request.URL.Query().Get("limit"))
+	offset, _ := strconv.Atoi(request.URL.Query().Get("offset"))
+	reviews, err := store.ListApprovedReviews(request.PathValue("productID"), limit, offset)
+	if err != nil {
+		server.writeDomainError(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, reviews)
+}
+
+func (server *Server) createProductReview(w http.ResponseWriter, request *http.Request) {
+	user, ok := requestUser(request)
+	if !ok {
+		server.reviewSignInRequired(w, request)
+		return
+	}
+	store, ok := server.store.(commerce.ReviewStore)
+	if !ok {
+		writeError(w, http.StatusServiceUnavailable, "reviews_unavailable", "Reviews are temporarily unavailable.")
+		return
+	}
+	var input commerce.CreateReviewInput
+	if err := decodeJSON(w, request, &input); err != nil {
+		writeError(w, http.StatusBadRequest, "invalid_request", err.Error())
+		return
+	}
+	review, err := store.CreateVerifiedReview(user.ID, request.PathValue("productID"), input)
+	if err != nil {
+		server.writeDomainError(w, err)
+		return
+	}
+	writeJSON(w, http.StatusAccepted, map[string]any{"review": review, "status": "PENDING"})
+}
+
+func (server *Server) reviewSignInRequired(w http.ResponseWriter, _ *http.Request) {
+	writeError(w, http.StatusUnauthorized, "unauthorized", "Sign in is required to review a purchased product.")
 }
 
 func requestUser(request *http.Request) (auth.User, bool) {
@@ -390,8 +437,13 @@ func (server *Server) writeDomainError(w http.ResponseWriter, err error) {
 	case errors.Is(err, commerce.ErrVariantUnavailable), errors.Is(err, commerce.ErrInsufficientStock):
 		writeError(w, http.StatusConflict, "variant_unavailable", err.Error())
 	case errors.Is(err, commerce.ErrEmptyCart), errors.Is(err, commerce.ErrInvalidQuantity),
-		errors.Is(err, commerce.ErrInvalidEmail), errors.Is(err, commerce.ErrInvalidAddress):
+		errors.Is(err, commerce.ErrInvalidEmail), errors.Is(err, commerce.ErrInvalidAddress),
+		errors.Is(err, commerce.ErrInvalidReview):
 		writeError(w, http.StatusUnprocessableEntity, "validation_error", err.Error())
+	case errors.Is(err, commerce.ErrReviewNotEligible):
+		writeError(w, http.StatusForbidden, "review_not_eligible", err.Error())
+	case errors.Is(err, commerce.ErrReviewAlreadyExists):
+		writeError(w, http.StatusConflict, "review_already_exists", err.Error())
 	case errors.Is(err, commerce.ErrCouponInvalid), errors.Is(err, commerce.ErrCouponExpired),
 		errors.Is(err, commerce.ErrCouponLimitReached), errors.Is(err, commerce.ErrCouponMinimumOrder),
 		errors.Is(err, commerce.ErrVoucherRedeemed):

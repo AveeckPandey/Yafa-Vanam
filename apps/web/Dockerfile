@@ -1,5 +1,7 @@
 FROM node:22-alpine AS build
 WORKDIR /workspace
+ARG SHOW_SAMPLE_REVIEWS=false
+ENV SHOW_SAMPLE_REVIEWS=$SHOW_SAMPLE_REVIEWS
 
 COPY package.json package-lock.json ./
 COPY apps/web/package.json ./apps/web/package.json

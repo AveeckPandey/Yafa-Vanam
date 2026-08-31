@@ -15,7 +15,6 @@ concurrency:
 
 env:
   AWS_REGION: ap-south-1
-  ECR_REGISTRY: 758388043025.dkr.ecr.ap-south-1.amazonaws.com
 
 jobs:
   verify:
@@ -30,7 +29,12 @@ jobs:
       - uses: actions/setup-go@v5
         with:
           go-version: '1.25.x'
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
       - run: npm ci
+      - run: pip install -r services/recommendation-engine/requirements.txt
+      - run: python -m pytest services/recommendation-engine/tests -q
       - run: npm run typecheck
       - run: npm run build:web
       - run: cd apps/api && go test ./...
@@ -46,19 +50,49 @@ jobs:
           role-to-assume: arn:aws:iam::758388043025:role/yafa-github-deploy
           aws-region: ${{ env.AWS_REGION }}
       - uses: aws-actions/amazon-ecr-login@v2
-      - name: Build and publish immutable and production images
+      - name: Resolve account-scoped registry
+        run: echo "ECR_REGISTRY=$(aws sts get-caller-identity --query Account --output text).dkr.ecr.${AWS_REGION}.amazonaws.com" >> "$GITHUB_ENV"
+      - name: Build and publish immutable images
         env:
           TAG: ${{ github.sha }}
         run: |
-          docker build -f apps/api/Dockerfile -t "$ECR_REGISTRY/yafa-api:$TAG" -t "$ECR_REGISTRY/yafa-api:production" .
-          docker build -f apps/web/Dockerfile -t "$ECR_REGISTRY/yafa-web:$TAG" -t "$ECR_REGISTRY/yafa-web:production" .
-          docker build -f services/recommendation-engine/Dockerfile -t "$ECR_REGISTRY/yafa-advisor:$TAG" -t "$ECR_REGISTRY/yafa-advisor:production" .
-          docker push --all-tags "$ECR_REGISTRY/yafa-api"
-          docker push --all-tags "$ECR_REGISTRY/yafa-web"
-          docker push --all-tags "$ECR_REGISTRY/yafa-advisor"
+          docker build -f apps/api/Dockerfile -t "$ECR_REGISTRY/yafa-api:$TAG" .
+          docker build --build-arg SHOW_SAMPLE_REVIEWS=true -f apps/web/Dockerfile -t "$ECR_REGISTRY/yafa-web:$TAG" .
+          docker build -f services/recommendation-engine/Dockerfile -t "$ECR_REGISTRY/yafa-advisor:$TAG" .
+          docker push "$ECR_REGISTRY/yafa-api:$TAG"
+          docker push "$ECR_REGISTRY/yafa-web:$TAG"
+          docker push "$ECR_REGISTRY/yafa-advisor:$TAG"
       - name: Roll out safely through Auto Scaling
+        env:
+          TAG: ${{ github.sha }}
         run: |
-          aws autoscaling start-instance-refresh \
+          LAUNCH_TEMPLATE_ID="lt-0e3c82ebc96c3b62b"
+          sed "s/^IMAGE_TAG=production$/IMAGE_TAG=$TAG/" infra/aws/ec2-user-data.sh > /tmp/yafa-ec2-user-data.sh
+          USER_DATA=$(base64 -w0 /tmp/yafa-ec2-user-data.sh)
+          NEW_VERSION=$(aws ec2 create-launch-template-version \
+            --launch-template-id "$LAUNCH_TEMPLATE_ID" \
+            --source-version '$Latest' \
+            --version-description "$GITHUB_SHA" \
+            --launch-template-data "{\"UserData\":\"$USER_DATA\"}" \
+            --query 'LaunchTemplateVersion.VersionNumber' \
+            --output text)
+          REFRESH_ID=$(aws autoscaling start-instance-refresh \
             --auto-scaling-group-name yafa-prod-app \
             --strategy Rolling \
-            --preferences MinHealthyPercentage=50,InstanceWarmup=180
+            --desired-configuration "LaunchTemplate={LaunchTemplateId=$LAUNCH_TEMPLATE_ID,Version=$NEW_VERSION}" \
+            --preferences MinHealthyPercentage=50,InstanceWarmup=180,AutoRollback=true,SkipMatching=true \
+            --query InstanceRefreshId --output text)
+          for attempt in $(seq 1 60); do
+            STATUS=$(aws autoscaling describe-instance-refreshes \
+              --auto-scaling-group-name yafa-prod-app \
+              --instance-refresh-ids "$REFRESH_ID" \
+              --query 'InstanceRefreshes[0].Status' --output text)
+            echo "Instance refresh status: $STATUS"
+            case "$STATUS" in
+              Successful) exit 0 ;;
+              Failed|Cancelled|RollbackFailed|RollbackSuccessful) exit 1 ;;
+            esac
+            sleep 30
+          done
+          echo "Instance refresh did not finish within 30 minutes" >&2
+          exit 1

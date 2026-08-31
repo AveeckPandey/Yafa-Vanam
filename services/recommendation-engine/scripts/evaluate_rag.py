@@ -14,7 +14,9 @@ from __future__ import annotations
 import argparse
 import asyncio
 import json
+import statistics
 import sys
+import time
 from pathlib import Path
 
 SERVICE_ROOT = Path(__file__).resolve().parents[1]
@@ -34,17 +36,31 @@ _FORBIDDEN_CUSTOMER_TRUST = {
 }
 
 
-async def _run_case(retriever, case: dict) -> dict:
+async def _run_case(retriever, case: dict, repeats: int) -> dict:
     request = RagSearchRequest(
         query=case["question"],
         top_k=case.get("top_k", 5),
         allowed_for_customer=True,
         page_context=PageContext(**case["page_context"]) if case.get("page_context") else None,
     )
-    response = await retriever.search(request)
+    responses = []
+    latencies = []
+    for _ in range(repeats):
+        started = time.monotonic()
+        responses.append(await retriever.search(request))
+        latencies.append((time.monotonic() - started) * 1000)
+    response = responses[0]
     failures: list[str] = []
     retrieved_products = {result.product_id for result in response.results}
     retrieved_types = {result.chunk_type for result in response.results}
+    result_signatures = [
+        [(result.chunk_id, result.similarity) for result in item.results]
+        for item in responses
+    ]
+    if any(signature != result_signatures[0] for signature in result_signatures[1:]):
+        failures.append("retrieval changed across identical repeated queries")
+    if response.conflicts:
+        failures.append(f"unresolved source conflicts: {', '.join(response.conflicts)}")
 
     if not case.get("is_live_data_check"):
         if case.get("expected_product") and case["expected_product"] not in retrieved_products:
@@ -80,15 +96,17 @@ async def _run_case(retriever, case: dict) -> dict:
             else None
         ),
         "resolution": response.resolution,
+        "mean_latency_ms": round(statistics.fmean(latencies), 1),
+        "max_latency_ms": round(max(latencies), 1),
     }
 
 
-async def _main_async(fixture_path: Path, as_json: bool) -> int:
+async def _main_async(fixture_path: Path, as_json: bool, repeats: int, max_p95_ms: float) -> int:
     cases = json.loads(fixture_path.read_text(encoding="utf-8"))["cases"]
     retriever = build_retriever(RagSettings.from_env())
     reports = []
     for case in cases:
-        report = await _run_case(retriever, case)
+        report = await _run_case(retriever, case, repeats)
         reports.append(report)
         marker = "PASS" if report["passed"] else "FAIL"
         print(f"[{marker}] {report['id']}: {report['question']}")
@@ -97,6 +115,11 @@ async def _main_async(fixture_path: Path, as_json: bool) -> int:
                 print(f"       - {failure}")
 
     passed = sum(1 for report in reports if report["passed"])
+    latency_values = sorted(report["max_latency_ms"] for report in reports)
+    p95 = latency_values[min(len(latency_values) - 1, max(0, int(len(latency_values) * 0.95) - 1))]
+    if p95 > max_p95_ms:
+        print(f"[FAIL] p95 latency {p95:.1f}ms exceeds {max_p95_ms:.1f}ms")
+        passed = max(0, passed - 1)
     print(f"\n{passed}/{len(reports)} cases passed")
     if as_json:
         print(json.dumps({"passed": passed, "total": len(reports), "cases": reports}, indent=2))
@@ -107,6 +130,8 @@ def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--fixture", type=Path, default=DEFAULT_FIXTURE)
     parser.add_argument("--json", action="store_true", help="append a machine-readable summary")
+    parser.add_argument("--repeats", type=int, default=2)
+    parser.add_argument("--max-p95-ms", type=float, default=1500)
     args = parser.parse_args()
 
     try:
@@ -118,7 +143,7 @@ def main() -> int:
     except ImportError:
         pass
 
-    return asyncio.run(_main_async(args.fixture, args.json))
+    return asyncio.run(_main_async(args.fixture, args.json, max(2, args.repeats), args.max_p95_ms))
 
 
 if __name__ == "__main__":

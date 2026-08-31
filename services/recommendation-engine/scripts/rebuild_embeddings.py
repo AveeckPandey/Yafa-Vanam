@@ -18,6 +18,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+import os
 import sys
 from pathlib import Path
 
@@ -42,6 +43,13 @@ def _load_dotenv() -> None:
 
 def main() -> int:
     _load_dotenv()
+    if (os.getenv("APP_ENV") or os.getenv("ENVIRONMENT") or "").lower() == "production":
+        print(
+            "error: destructive in-place embedding rebuild is disabled in production; "
+            "use scripts/build_shadow_embedding_space.py",
+            file=sys.stderr,
+        )
+        return 2
     settings = RagSettings.from_env()
     if not settings.vector_database_url:
         print("error: VECTOR_DATABASE_URL is not configured", file=sys.stderr)

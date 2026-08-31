@@ -17,6 +17,7 @@ from typing import Any, Callable
 
 from app.rag.chunker import SemanticChunk, build_chunks, build_document, build_source_version, extract_aliases
 from app.rag.providers import EmbeddingProvider, EmbeddingProviderError
+from app.rag.production import contains_prompt_injection
 from app.rag.normalizer import stable_chunk_id
 from app.rag.repository import ChunkUpsert, RagRepository
 from app.rag.config import EmbeddingSpaceMismatchError, RagSettings
@@ -107,6 +108,7 @@ class IngestionStats:
     embeddings_generated: int = 0
     chunks_skipped_unchanged: int = 0
     chunks_deleted: int = 0
+    documents_revoked: int = 0
     stopped_reason: str | None = None
     products_without_chunks: list[str] = field(default_factory=list)
 
@@ -119,6 +121,7 @@ class IngestionStats:
             "embeddings_generated": self.embeddings_generated,
             "chunks_skipped_unchanged": self.chunks_skipped_unchanged,
             "chunks_deleted": self.chunks_deleted,
+            "documents_revoked": self.documents_revoked,
         }
         if self.stopped_reason:
             payload["stopped_reason"] = self.stopped_reason
@@ -176,11 +179,12 @@ def load_catalogue(path: Path, product_ids: list[str] | None = None) -> list[dic
     return raw
 
 
-def chunk_identity(chunk: SemanticChunk, source_version: str) -> str:
+def chunk_identity(chunk: SemanticChunk, source_version: str, tenant_id: str = "public") -> str:
     """Stable row identity per spec: product_id + chunk_type (+local key) +
     source_version + normalized content hash."""
     type_key = chunk.chunk_type if not chunk.local_key else f"{chunk.chunk_type}#{chunk.local_key}"
-    return stable_chunk_id(chunk.canonical_product_id, type_key, source_version, chunk.source_hash)
+    identity_product = chunk.canonical_product_id if tenant_id == "public" else f"{tenant_id}:{chunk.canonical_product_id}"
+    return stable_chunk_id(identity_product, type_key, source_version, chunk.source_hash)
 
 
 async def ingest_catalogue(
@@ -232,28 +236,41 @@ async def ingest_catalogue(
 
     run_id = repo.start_run(source_file, _catalogue_version(products))
     stats = IngestionStats()
+    products_by_tenant: dict[str, set[str]] = {}
+    source_files_by_tenant: dict[str, set[str]] = {}
 
     try:
         stopped = False
         for product in products:
             stats.products_seen += 1
             document = build_document(product, str(product.get("_rag_source_file") or source_file))
+            tenant_id = str(product.get("_rag_tenant_id") or "public")
+            document["tenant_id"] = tenant_id
+            products_by_tenant.setdefault(tenant_id, set()).add(document["canonical_product_id"])
+            source_files_by_tenant.setdefault(tenant_id, set()).add(document["source_file"])
             version = document["source_version"]
             rag_enabled = bool((product.get("rag") or {}).get("enabled", True))
             chunks = build_chunks(product) if rag_enabled else []
+            unsafe_chunks = [chunk for chunk in chunks if contains_prompt_injection(chunk.content, chunk.metadata)]
+            if unsafe_chunks:
+                emit(
+                    f"quarantined {len(unsafe_chunks)} instruction-like chunk(s) for "
+                    f"{document['canonical_product_id']}"
+                )
+                chunks = [chunk for chunk in chunks if chunk not in unsafe_chunks]
             if not chunks:
                 stats.products_without_chunks.append(document["canonical_product_id"])
             aliases = extract_aliases(product)
 
             document_id = repo.upsert_document(document)
             stats.documents_upserted += 1
-            repo.replace_aliases(document["canonical_product_id"], aliases)
+            repo.replace_aliases(document["canonical_product_id"], aliases, tenant_id=tenant_id)
 
-            existing = repo.existing_chunk_hashes(document["canonical_product_id"])
+            existing = repo.existing_chunk_hashes(document["canonical_product_id"], tenant_id=tenant_id)
             pending: list[tuple[str, SemanticChunk]] = []
             for chunk in chunks:
                 stats.chunks_seen += 1
-                chunk_id = chunk_identity(chunk, version)
+                chunk_id = chunk_identity(chunk, version, tenant_id)
                 prior = existing.get(chunk_id)
                 if prior is not None and not force_embed and prior[1] == chunk.source_hash:
                     stats.chunks_skipped_unchanged += 1
@@ -277,8 +294,14 @@ async def ingest_catalogue(
 
             keep_ids: set[str] = set()
             for chunk in chunks:
-                chunk_id = chunk_identity(chunk, version)
+                chunk_id = chunk_identity(chunk, version, tenant_id)
                 keep_ids.add(chunk_id)
+                metadata = dict(chunk.metadata)
+                metadata.setdefault("tenant_id", tenant_id)
+                metadata.setdefault(
+                    "claim_key",
+                    f"{chunk.canonical_product_id}:{chunk.chunk_type}:{chunk.local_key or 'primary'}",
+                )
                 repo.upsert_chunk(
                     ChunkUpsert(
                         chunk_id=chunk_id,
@@ -289,16 +312,31 @@ async def ingest_catalogue(
                         trust_level=chunk.trust_level.value,
                         customer_factual_eligible=chunk.customer_factual_eligible,
                         requires_qualification=chunk.requires_qualification,
-                        metadata=chunk.metadata,
+                        metadata=metadata,
                         source_hash=chunk.source_hash,
                         embedding=vectors.get(chunk_id),
+                        tenant_id=tenant_id,
                     )
                 )
-            stats.chunks_deleted += repo.delete_missing_chunks(document["canonical_product_id"], keep_ids)
+            stats.chunks_deleted += repo.delete_missing_chunks(document["canonical_product_id"], keep_ids, tenant_id=tenant_id)
             if stats.products_seen % 20 == 0:
                 emit(f"ingested {stats.products_seen}/{len(products)} products...")
 
         if stats.stopped_reason is None:
+            # A full snapshot is authoritative: products removed entirely from
+            # a source are revoked, not left retrievable forever. A targeted
+            # product ingestion intentionally skips this global reconciliation.
+            if product_ids is None:
+                for tenant_id, keep_ids in products_by_tenant.items():
+                    stats.documents_revoked += repo.revoke_missing_documents(
+                        tenant_id=tenant_id,
+                        source_files=source_files_by_tenant[tenant_id],
+                        keep_product_ids=keep_ids,
+                    )
+            # Invalidate every service replica's cache through the shared
+            # database revision, even when content hashes were unchanged.
+            for tenant_id in products_by_tenant:
+                repo.bump_corpus_revision(tenant_id)
             emit(
                 f"ingestion complete: {stats.documents_upserted} documents, "
                 f"{stats.chunks_new_or_changed} chunks embedded, "

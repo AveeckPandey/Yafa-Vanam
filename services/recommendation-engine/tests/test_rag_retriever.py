@@ -41,7 +41,7 @@ class StubRepo:
         self.keyword_fallback_calls: list[dict] = []
 
     def search(self, query_vector, *, product_ids=None, customer_factual_only=True, top_k=5,
-               chunk_types=None, trust_levels=None):
+               chunk_types=None, trust_levels=None, tenant_id="public"):
         self.search_calls.append({
             "product_ids": product_ids, "customer_only": customer_factual_only,
             "top_k": top_k, "chunk_types": chunk_types, "trust_levels": trust_levels,
@@ -54,7 +54,7 @@ class StubRepo:
         return pool[:top_k]
 
     def fetch_eligible_chunks(self, *, customer_factual_only=True, top_k=120,
-                              chunk_types=None, trust_levels=None):
+                              chunk_types=None, trust_levels=None, tenant_id="public"):
         self.keyword_fallback_calls.append({
             "customer_only": customer_factual_only, "top_k": top_k,
             "chunk_types": chunk_types, "trust_levels": trust_levels,
@@ -67,7 +67,7 @@ class StubRepo:
         return pool[:top_k]
 
     def fetch_verified_chunks(self, *, product_id, customer_factual_only=True, top_k=5,
-                              chunk_types=None, trust_levels=None):
+                              chunk_types=None, trust_levels=None, tenant_id="public"):
         self.fallback_calls.append({
             "product_id": product_id, "customer_only": customer_factual_only,
             "top_k": top_k, "chunk_types": chunk_types, "trust_levels": trust_levels,
@@ -79,10 +79,10 @@ class StubRepo:
             pool = [hit for hit in pool if hit.customer_factual_eligible]
         return pool[:top_k]
 
-    def resolve_aliases(self, normalized_query: str) -> list[AliasMatch]:
+    def resolve_aliases(self, normalized_query: str, *, tenant_id="public") -> list[AliasMatch]:
         return self.aliases
 
-    def document_for_product(self, product_id: str) -> dict | None:
+    def document_for_product(self, product_id: str, *, tenant_id="public") -> dict | None:
         return self.document
 
 
@@ -365,3 +365,52 @@ class TestPolicyMetadata:
         repo = StubRepo([hit("yv-eye-001", "benefits", "Volume.")])
         response = await retriever_factory(repo).search(make_request("What adds lash volume?"))
         assert response.answer_policy is None
+
+
+class TestProductionFreshness:
+    async def test_corpus_revision_invalidates_cached_retrieval(self, retriever_factory):
+        class RevisionRepo(StubRepo):
+            revision = 1
+
+            def get_corpus_revision(self, tenant_id="public"):
+                return self.revision
+
+        repo = RevisionRepo([hit("yv-eye-001", "benefits", "First fact.")])
+        retriever = retriever_factory(repo)
+        request = make_request("What are the benefits?")
+        first = await retriever.search(request)
+        repo.hits = [hit("yv-eye-001", "benefits", "Updated fact.")]
+        repo.revision = 2
+
+        second = await retriever.search(request)
+
+        assert first.results[0].content == "First fact."
+        assert second.results[0].content == "Updated fact."
+
+    async def test_low_similarity_vector_hit_is_rejected(self, retriever_factory):
+        repo = StubRepo([hit("yv-eye-001", "benefits", "Irrelevant.", similarity=0.2)])
+        response = await retriever_factory(repo).search(make_request("What are the benefits?"))
+        assert response.results == []
+
+    async def test_database_outage_serves_valid_cache_then_opens_circuit(self, retriever_factory):
+        class OutageRepo(StubRepo):
+            revision_calls = 0
+            failing = False
+
+            def get_corpus_revision(self, tenant_id="public"):
+                self.revision_calls += 1
+                if self.failing:
+                    raise RuntimeError("database unavailable")
+                return 1
+
+        repo = OutageRepo([hit("yv-eye-001", "benefits", "Cached verified fact.")])
+        retriever = retriever_factory(repo)
+        request = make_request("What are the benefits?")
+        first = await retriever.search(request)
+        repo.failing = True
+        for _ in range(6):
+            response = await retriever.search(request)
+            assert response.results[0].content == first.results[0].content
+        # Initial success + four failures; after that the open circuit serves
+        # cache without continuing to hammer PostgreSQL.
+        assert repo.revision_calls == 5

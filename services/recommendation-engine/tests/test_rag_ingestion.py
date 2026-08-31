@@ -40,6 +40,7 @@ class FakeRepo:
         self.schema_calls: list[int] = []
         self.embedding_metadata: dict | None = None
         self._document_ids: dict[str, str] = {}
+        self.revisions: dict[str, int] = {}
 
     # -- schema/runs -------------------------------------------------------
     def ensure_schema(self, dimension: int) -> None:
@@ -68,7 +69,7 @@ class FakeRepo:
         self.documents[pid] = document
         return f"doc-{pid}"
 
-    def replace_aliases(self, canonical_product_id: str, aliases: list) -> None:
+    def replace_aliases(self, canonical_product_id: str, aliases: list, *, tenant_id="public") -> None:
         merged: dict[str, tuple] = {}
         for alias, normalized, is_exact in aliases:
             existing = merged.get(normalized)
@@ -76,7 +77,7 @@ class FakeRepo:
                 merged[normalized] = (alias, normalized, is_exact)
         self.aliases[canonical_product_id] = sorted(merged.values())
 
-    def existing_chunk_hashes(self, canonical_product_id: str) -> dict[str, tuple[str, str]]:
+    def existing_chunk_hashes(self, canonical_product_id: str, *, tenant_id="public") -> dict[str, tuple[str, str]]:
         return {
             chunk_id: (chunk.chunk_type, chunk.source_hash)
             for chunk_id, chunk in self.chunks.items()
@@ -86,7 +87,7 @@ class FakeRepo:
     def upsert_chunk(self, chunk: ChunkUpsert) -> None:
         self.chunks[chunk.chunk_id] = chunk
 
-    def delete_missing_chunks(self, canonical_product_id: str, keep_chunk_ids: set[str]) -> int:
+    def delete_missing_chunks(self, canonical_product_id: str, keep_chunk_ids: set[str], *, tenant_id="public") -> int:
         stale = [
             chunk_id for chunk_id, chunk in self.chunks.items()
             if chunk.canonical_product_id == canonical_product_id and chunk_id not in keep_chunk_ids
@@ -94,6 +95,21 @@ class FakeRepo:
         for chunk_id in stale:
             del self.chunks[chunk_id]
         return len(stale)
+
+    def revoke_missing_documents(self, *, tenant_id: str, source_files: set[str], keep_product_ids: set[str]) -> int:
+        stale = [
+            pid for pid, document in self.documents.items()
+            if document.get("tenant_id", "public") == tenant_id
+            and document.get("source_file") in source_files
+            and pid not in keep_product_ids
+        ]
+        for pid in stale:
+            del self.documents[pid]
+        return len(stale)
+
+    def bump_corpus_revision(self, tenant_id="public") -> int:
+        self.revisions[tenant_id] = self.revisions.get(tenant_id, 0) + 1
+        return self.revisions[tenant_id]
 
 
 @pytest.fixture()
@@ -214,6 +230,21 @@ async def test_removed_section_deletes_stale_chunk(tmp_path):
     await ingest_catalogue(repo, CountingEmbedder(), mini_catalogue_file(tmp_path, [slimmed]))
     assert len(repo.chunks) == with_warnings - 1
     assert not any(c.chunk_type == "warnings" for c in repo.chunks.values())
+
+
+@pytest.mark.asyncio
+async def test_full_snapshot_revokes_product_removed_entirely(tmp_path):
+    first = _variant("yv-mini-001", "First")
+    removed = _variant("yv-mini-002", "Removed")
+    repo = FakeRepo()
+    await ingest_catalogue(repo, CountingEmbedder(), mini_catalogue_file(tmp_path, [first, removed]))
+    assert "yv-mini-002" in repo.documents
+
+    stats = await ingest_catalogue(repo, CountingEmbedder(), mini_catalogue_file(tmp_path, [first]))
+
+    assert stats.documents_revoked == 1
+    assert "yv-mini-002" not in repo.documents
+    assert repo.revisions["public"] >= 2
 
 
 @pytest.mark.asyncio

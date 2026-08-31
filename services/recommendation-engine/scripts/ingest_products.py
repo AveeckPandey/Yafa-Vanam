@@ -64,7 +64,10 @@ def main() -> int:
 
     provider = build_provider(settings)  # validates configured vs model dimension
     repo = RagRepository(settings.vector_database_url)
+    lock_acquired = False
     try:
+        repo.acquire_ingestion_lock()
+        lock_acquired = True
         def log(message: str) -> None:
             if not args.quiet:
                 print(message)
@@ -79,6 +82,8 @@ def main() -> int:
         print(f"ingestion failed: {error}", file=sys.stderr)
         return 1
     finally:
+        if lock_acquired:
+            repo.release_ingestion_lock()
         repo.close()
 
     print(json.dumps(stats.as_dict(), indent=2))

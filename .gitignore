@@ -11,6 +11,9 @@ test-results/
 apps/api/bin/
 *.test
 *.out
+.cache/
+tmp/
+apps/api/.cache/
 
 # Python
 __pycache__/

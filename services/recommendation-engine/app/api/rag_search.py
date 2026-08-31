@@ -11,7 +11,10 @@ credentials, connection strings or raw internal errors.
 from __future__ import annotations
 
 import hmac
+import json
+import logging
 import os
+import re
 
 from fastapi import APIRouter, Header, HTTPException
 
@@ -19,9 +22,11 @@ from app.rag.config import EmbeddingSpaceMismatchError, RagSettings, validate_di
 from app.rag.providers import provider_identity
 from app.rag.providers.base import EmbeddingProviderError
 from app.rag.repository import RagRepository
-from app.rag.schemas import RagHealthResponse, RagSearchRequest, RagSearchResponse
+from app.rag.schemas import RagFeedbackRequest, RagHealthResponse, RagSearchRequest, RagSearchResponse
 
 router = APIRouter(prefix="/internal/rag", tags=["internal-rag"])
+logger = logging.getLogger("yafa.rag.telemetry")
+_TENANT_ID = re.compile(r"^[A-Za-z0-9_.-]{1,120}$")
 
 
 def _require_service_token(token: str | None) -> None:
@@ -34,8 +39,23 @@ def _require_service_token(token: str | None) -> None:
 async def rag_search(
     request: RagSearchRequest,
     x_yafa_service_token: str | None = Header(default=None),
+    x_yafa_tenant_id: str | None = Header(default=None),
+    x_yafa_tenant_signature: str | None = Header(default=None),
 ) -> RagSearchResponse:
     _require_service_token(x_yafa_service_token)
+    if request.tenant_id != "public" and not x_yafa_tenant_id:
+        raise HTTPException(status_code=403, detail="tenant must be established by the trusted gateway")
+    tenant_id = x_yafa_tenant_id or "public"
+    if not _TENANT_ID.fullmatch(tenant_id):
+        raise HTTPException(status_code=400, detail="invalid tenant")
+    if tenant_id != "public":
+        signing_secret = RagSettings.from_env().tenant_signing_secret
+        expected_signature = hmac.new(signing_secret.encode(), tenant_id.encode(), "sha256").hexdigest()
+        if len(signing_secret) < 32 or not x_yafa_tenant_signature or not hmac.compare_digest(
+            x_yafa_tenant_signature, expected_signature
+        ):
+            raise HTTPException(status_code=403, detail="invalid tenant authorization")
+    request = RagSearchRequest.model_validate({**request.model_dump(), "tenant_id": tenant_id})
     retriever = _get_retriever()
     try:
         return await retriever.search(request)
@@ -44,6 +64,20 @@ async def rag_search(
             status_code=503,
             detail="RAG embedding service is temporarily unavailable. Please try again shortly.",
         ) from error
+
+
+@router.post("/feedback", status_code=202)
+async def rag_feedback(
+    feedback: RagFeedbackRequest,
+    x_yafa_service_token: str | None = Header(default=None),
+) -> dict[str, bool]:
+    """Emit a privacy-safe user/human review signal to the log drain."""
+    _require_service_token(x_yafa_service_token)
+    logger.info(json.dumps({
+        "event": "rag_feedback", "request_id": feedback.request_id,
+        "helpful": feedback.helpful, "reason": feedback.reason or "",
+    }, separators=(",", ":")))
+    return {"accepted": True}
 
 
 @router.get("/health", response_model=RagHealthResponse)

@@ -36,6 +36,9 @@ class YafaChatRequest(BaseModel):
 
 
 class GroundingChunk(BaseModel):
+    # Stable source id lets the agent cite evidence without exposing database
+    # credentials or internal vector values.
+    chunk_id: str = ""
     product_id: str
     chunk_type: str
     content: str
@@ -50,6 +53,7 @@ class LiveRequirement(BaseModel):
 
 
 class YafaChatResponse(BaseModel):
+    request_id: str = ""
     conversation_id: str
     intent: str
     message: str

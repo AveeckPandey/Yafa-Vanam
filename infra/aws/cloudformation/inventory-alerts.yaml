@@ -1,0 +1,175 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: YAFA VANAM durable low-stock email alert pipeline
+
+Parameters:
+  ProjectName:
+    Type: String
+    Default: yafa-prod
+  AdminEmail:
+    Type: String
+    Default: aveeckpandey.619@gmail.com
+
+Resources:
+  InventoryAlertsDeadLetterQueue:
+    Type: AWS::SQS::Queue
+    Properties:
+      QueueName: !Sub "${ProjectName}-inventory-alerts-dlq.fifo"
+      FifoQueue: true
+      ContentBasedDeduplication: true
+      MessageRetentionPeriod: 1209600
+      SqsManagedSseEnabled: true
+
+  InventoryAlertsQueue:
+    Type: AWS::SQS::Queue
+    Properties:
+      QueueName: !Sub "${ProjectName}-inventory-alerts.fifo"
+      FifoQueue: true
+      ContentBasedDeduplication: true
+      MessageRetentionPeriod: 1209600
+      VisibilityTimeout: 120
+      SqsManagedSseEnabled: true
+      RedrivePolicy:
+        deadLetterTargetArn: !GetAtt InventoryAlertsDeadLetterQueue.Arn
+        maxReceiveCount: 5
+
+  InventoryAlertsTopic:
+    Type: AWS::SNS::Topic
+    Properties:
+      TopicName: !Sub "${ProjectName}-inventory-alerts"
+      DisplayName: YAFA Inventory
+
+  AdminEmailSubscription:
+    Type: AWS::SNS::Subscription
+    Properties:
+      Protocol: email
+      Endpoint: !Ref AdminEmail
+      TopicArn: !Ref InventoryAlertsTopic
+
+  InventoryAlertLambdaRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub "${ProjectName}-inventory-alert-lambda"
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+            Action: sts:AssumeRole
+      Policies:
+        - PolicyName: inventory-alert-runtime
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Action:
+                  - logs:CreateLogGroup
+                  - logs:CreateLogStream
+                  - logs:PutLogEvents
+                Resource: !Sub "arn:${AWS::Partition}:logs:${AWS::Region}:${AWS::AccountId}:*"
+              - Effect: Allow
+                Action:
+                  - sqs:ReceiveMessage
+                  - sqs:DeleteMessage
+                  - sqs:GetQueueAttributes
+                Resource: !GetAtt InventoryAlertsQueue.Arn
+              - Effect: Allow
+                Action: sns:Publish
+                Resource: !Ref InventoryAlertsTopic
+
+  InventoryAlertFunction:
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: !Sub "${ProjectName}-inventory-alert"
+      Description: Emails the YAFA administrator when available stock reaches its threshold.
+      Runtime: python3.12
+      Architectures:
+        - arm64
+      Handler: index.handler
+      MemorySize: 128
+      Timeout: 15
+      Role: !GetAtt InventoryAlertLambdaRole.Arn
+      Environment:
+        Variables:
+          ALERT_TOPIC_ARN: !Ref InventoryAlertsTopic
+      Code:
+        ZipFile: |
+          import json
+          import logging
+          import os
+          import boto3
+
+          logger = logging.getLogger()
+          logger.setLevel(logging.INFO)
+          sns = boto3.client("sns")
+          topic_arn = os.environ["ALERT_TOPIC_ARN"]
+
+          def handler(event, context):
+              failures = []
+              for record in event.get("Records", []):
+                  try:
+                      alert = json.loads(record["body"])
+                      variant_id = str(alert["variant_id"])
+                      available = int(alert["available_quantity"])
+                      threshold = int(alert["low_stock_threshold"])
+                      version = int(alert["inventory_version"])
+                      event_id = str(alert["event_id"])
+                      if available > threshold:
+                          raise ValueError("inventory alert is above its threshold")
+                      sns.publish(
+                          TopicArn=topic_arn,
+                          Subject=f"YAFA low stock: {variant_id}"[:100],
+                          Message=(
+                              "YAFA VANAM inventory needs attention.\n\n"
+                              f"Variant: {variant_id}\n"
+                              f"Available quantity: {available}\n"
+                              f"Alert threshold: {threshold}\n"
+                              f"Inventory version: {version}\n"
+                              f"Event ID: {event_id}\n\n"
+                              "Please review and replenish this item in the admin inventory workflow."
+                          ),
+                      )
+                      logger.info(json.dumps({"event": "low_stock_email_sent", "event_id": event_id, "variant_id": variant_id}))
+                  except Exception:
+                      logger.exception("inventory alert delivery failed")
+                      failures.append({"itemIdentifier": record["messageId"]})
+              return {"batchItemFailures": failures}
+
+  InventoryAlertEventSource:
+    Type: AWS::Lambda::EventSourceMapping
+    Properties:
+      EventSourceArn: !GetAtt InventoryAlertsQueue.Arn
+      FunctionName: !Ref InventoryAlertFunction
+      BatchSize: 10
+      FunctionResponseTypes:
+        - ReportBatchItemFailures
+      Enabled: true
+
+  InventoryAlertDLQAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmName: !Sub "${ProjectName}-inventory-alerts-dlq-not-empty"
+      AlarmDescription: Low-stock notifications exhausted all Lambda retries.
+      Namespace: AWS/SQS
+      MetricName: ApproximateNumberOfMessagesVisible
+      Dimensions:
+        - Name: QueueName
+          Value: !GetAtt InventoryAlertsDeadLetterQueue.QueueName
+      Statistic: Maximum
+      Period: 300
+      EvaluationPeriods: 1
+      Threshold: 0
+      ComparisonOperator: GreaterThanThreshold
+      TreatMissingData: notBreaching
+      AlarmActions:
+        - !Ref InventoryAlertsTopic
+
+Outputs:
+  InventoryAlertQueueUrl:
+    Value: !Ref InventoryAlertsQueue
+  InventoryAlertQueueArn:
+    Value: !GetAtt InventoryAlertsQueue.Arn
+  InventoryAlertTopicArn:
+    Value: !Ref InventoryAlertsTopic
+  InventoryAlertFunctionName:
+    Value: !Ref InventoryAlertFunction

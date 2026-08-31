@@ -23,6 +23,32 @@ def _env_flag(source: dict[str, str], key: str, default: bool = False) -> bool:
     return raw in {"1", "true", "yes", "on"}
 
 
+def _env_int(source: dict[str, str], key: str, default: int, *, minimum: int = 0) -> int:
+    raw = (source.get(key) or "").strip()
+    if not raw:
+        return default
+    try:
+        value = int(raw)
+    except ValueError as exc:
+        raise ValueError(f"{key} must be an integer") from exc
+    if value < minimum:
+        raise ValueError(f"{key} must be >= {minimum}")
+    return value
+
+
+def _env_float(source: dict[str, str], key: str, default: float, *, minimum: float = 0.0) -> float:
+    raw = (source.get(key) or "").strip()
+    if not raw:
+        return default
+    try:
+        value = float(raw)
+    except ValueError as exc:
+        raise ValueError(f"{key} must be a number") from exc
+    if value < minimum:
+        raise ValueError(f"{key} must be >= {minimum}")
+    return value
+
+
 @dataclass(frozen=True)
 class RagSettings:
     vector_database_url: str | None
@@ -36,6 +62,28 @@ class RagSettings:
     openrouter_base_url: str
     bedrock_region: str
     rerank_enabled: bool
+    # Query controls keep a spike of unique requests from overwhelming Bedrock
+    # or exhausting the small Free Tier database. The cache namespace should
+    # change whenever a new knowledge corpus is promoted.
+    cache_ttl_seconds: int
+    cache_max_entries: int
+    cache_namespace: str
+    max_concurrent_embeddings: int
+    query_timeout_seconds: float
+    min_grounding_similarity: float
+    # Agentic generation is deliberately opt-in. A local/test service remains
+    # deterministic until AWS model access and production evaluation are ready.
+    agentic_enabled: bool
+    agent_model: str
+    agent_max_tool_calls: int
+    agent_timeout_seconds: float
+    agent_max_output_tokens: int
+    agent_fallback_model: str
+    agent_fallback_region: str
+    max_context_chars: int
+    circuit_breaker_failures: int
+    circuit_breaker_reset_seconds: float
+    tenant_signing_secret: str
 
     @classmethod
     def from_env(cls, env: dict[str, str] | None = None) -> "RagSettings":
@@ -68,6 +116,23 @@ class RagSettings:
             ).strip(),
             bedrock_region=(source.get("BEDROCK_REGION") or source.get("AWS_REGION") or "ap-south-1").strip(),
             rerank_enabled=_env_flag(source, "RAG_RERANK_ENABLED", default=False),
+            cache_ttl_seconds=_env_int(source, "RAG_CACHE_TTL_SECONDS", 90, minimum=0),
+            cache_max_entries=_env_int(source, "RAG_CACHE_MAX_ENTRIES", 500, minimum=1),
+            cache_namespace=(source.get("RAG_CACHE_NAMESPACE") or source.get("RELEASE_VERSION") or "local").strip(),
+            max_concurrent_embeddings=_env_int(source, "RAG_MAX_CONCURRENT_EMBEDDINGS", 8, minimum=1),
+            query_timeout_seconds=_env_float(source, "RAG_QUERY_TIMEOUT_SECONDS", 8.0, minimum=0.1),
+            min_grounding_similarity=_env_float(source, "RAG_MIN_GROUNDING_SIMILARITY", 0.62, minimum=0.0),
+            agentic_enabled=_env_flag(source, "YAFA_AGENTIC_RAG_ENABLED", default=False),
+            agent_model=(source.get("YAFA_AGENT_MODEL") or "amazon.nova-lite-v1:0").strip(),
+            agent_max_tool_calls=_env_int(source, "YAFA_AGENT_MAX_TOOL_CALLS", 2, minimum=1),
+            agent_timeout_seconds=_env_float(source, "YAFA_AGENT_TIMEOUT_SECONDS", 12.0, minimum=0.1),
+            agent_max_output_tokens=_env_int(source, "YAFA_AGENT_MAX_OUTPUT_TOKENS", 350, minimum=64),
+            agent_fallback_model=(source.get("YAFA_AGENT_FALLBACK_MODEL") or "").strip(),
+            agent_fallback_region=(source.get("YAFA_AGENT_FALLBACK_REGION") or "").strip(),
+            max_context_chars=_env_int(source, "RAG_MAX_CONTEXT_CHARS", 6000, minimum=500),
+            circuit_breaker_failures=_env_int(source, "RAG_CIRCUIT_BREAKER_FAILURES", 4, minimum=1),
+            circuit_breaker_reset_seconds=_env_float(source, "RAG_CIRCUIT_BREAKER_RESET_SECONDS", 20.0, minimum=1.0),
+            tenant_signing_secret=(source.get("YAFA_TENANT_SIGNING_SECRET") or "").strip(),
         )
 
 
