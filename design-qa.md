@@ -68,6 +68,49 @@ final result: passed
 
 ---
 
+# Mobile responsive audit — 2026-08-31
+
+## Tested routes and viewports
+
+- Homepage at 375 × 667 and 390 × 844 CSS pixels.
+- Riverrose Lip Color product page at 390 × 844 CSS pixels.
+- Homepage and YAFA assistant drawer at 768 × 1024 CSS pixels.
+- Riverrose Lip Color desktop regression check at 1440 × 900 CSS pixels.
+
+## Verified behaviour
+
+- The compact header, carousel, cards, product layout, mobile navigation, and
+  YAFA drawer stay within the viewport. No root horizontal overflow was found
+  at any tested width.
+- The carousel control and lipstick swatches respond to browser touch-style
+  interactions; selecting a shade updates the selected state.
+- The product sticky purchase bar now remains hidden while the original
+  purchase controls are visible, then appears after those controls scroll out
+  of view. This preserves the desktop behaviour and removes the duplicate
+  mobile action.
+- The 375px-wide shipping announcement now fits in full, without ellipsis.
+- There are no canvas elements in the reviewed storefront. The existing CSS
+  motion includes a `prefers-reduced-motion` fallback; no real-device GPU/FPS
+  benchmark was performed.
+
+## Evidence
+
+- `audit-output/mobile-responsive/01-phone-home.png`
+- `audit-output/mobile-responsive/02-phone-navigation.png`
+- `audit-output/mobile-responsive/07-tablet-yafa.png`
+- `audit-output/mobile-responsive/08-phone-product-after-fix.png`
+- `audit-output/mobile-responsive/09-compact-phone-home-after-fix.png`
+
+## Validation
+
+- `npm run typecheck --workspace=@yafa/web` passed.
+- `npm run build:web` passed.
+
+final result: passed with real-device touch and frame-rate profiling outside
+the scope of this local browser audit.
+
+---
+
 # Launch-readiness check — popup, email, and AWS
 
 ## Scope and evidence

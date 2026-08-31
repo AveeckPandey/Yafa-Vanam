@@ -1354,6 +1354,10 @@ a{
   }.collection-intro > p{
     grid-column: 9 / -1;
   }
+}@media (max-width:390px){.announcement-bar__message{
+    font-size: 9px;
+    letter-spacing: .035em;
+  }
 }@media (max-width: 1100px){.collection-intro{
     min-height: 500px;
   }.collection-intro h1{
