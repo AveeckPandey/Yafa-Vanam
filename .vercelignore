@@ -1,0 +1,8 @@
+# Local service caches cannot be packaged and are not part of the web deployment.
+services/recommendation-engine/.pytest_cache/
+services/recommendation-engine/.uv-cache-ui/
+**/__pycache__/
+
+# Local review captures and process logs are not application source.
+audit-output/
+*.log
