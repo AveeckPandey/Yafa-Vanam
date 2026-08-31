@@ -43,3 +43,4 @@ npm-debug.log*
 # Superdesign temporary component templates
 .superdesign/tmp/
 .vercel
+.env*
