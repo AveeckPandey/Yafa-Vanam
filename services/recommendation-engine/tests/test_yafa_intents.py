@@ -11,6 +11,7 @@ from app.yafa.intents import Intent, classify
         ("What does Soft Ember smell like?", Intent.PRODUCT_INFORMATION),
         ("What are the verified benefits and usage instructions for Airbloom Blush?", Intent.PRODUCT_INFORMATION),
         ("What does Airbloom Blush do?", Intent.PRODUCT_INFORMATION),
+        ("How should I use Airbloom Blush and what does it do?", Intent.PRODUCT_INFORMATION),
         ("Tell me about Airbloom Blush", Intent.PRODUCT_INFORMATION),
         ("Is everything vegan?", Intent.PRODUCT_INFORMATION),
         ("Fernwing versus Nightbloom", Intent.PRODUCT_COMPARISON),

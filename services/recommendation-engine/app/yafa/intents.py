@@ -17,7 +17,7 @@ class Intent(str, Enum):
 
 _GREETING = re.compile(r"(^|\s)(hi|hiya|hey|hello|yo|good\s(morning|afternoon|evening)|how\sare\syou|thanks|thank\syou|thankyou|bye|goodbye)(\s|[!.?,]|$)", re.IGNORECASE)
 _CAPABILITY = re.compile(r"\b(what can you do|who are you|what are you|help me|can you help|how (does|do) (this|you) work|what do you do)\b", re.IGNORECASE)
-_RECOMMENDATION = re.compile(r"\b(recommend|suggest|should i (get|buy|try|wear|use)|looking for|need a|want a|full look|complete look|build (my |a )?look|match my makeup|find my shade)\b", re.IGNORECASE)
+_RECOMMENDATION = re.compile(r"\b(recommend|suggest|(?<!how )should i (get|buy|try|wear|use)|looking for|need a|want a|full look|complete look|build (my |a )?look|match my makeup|find my shade)\b", re.IGNORECASE)
 _PRODUCT_FACT = re.compile(
     r"\b("
     r"ingredients?|inci|contains?|"
