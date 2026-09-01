@@ -59,7 +59,7 @@ func (store *Store) PrepareRefund(orderNumber string, amountPaise int64, reason,
 	if order == nil {
 		return Refund{}, false, ErrOrderNotFound
 	}
-	if order.PaymentStatus != "CAPTURED" || order.RazorpayPaymentID == "" {
+	if (order.PaymentStatus != "CAPTURED" && order.PaymentStatus != "PARTIALLY_REFUNDED") || order.RazorpayPaymentID == "" {
 		return Refund{}, false, ErrRefundNotSupported
 	}
 	totalPaise := int64(math.Round(order.TotalAmount * 100))
@@ -172,7 +172,7 @@ func (store *PostgresStore) PrepareRefund(orderNumber string, amountPaise int64,
 	if err != nil {
 		return Refund{}, false, err
 	}
-	if paymentStatus != "CAPTURED" || providerPaymentID == "" {
+	if (paymentStatus != "CAPTURED" && paymentStatus != "PARTIALLY_REFUNDED") || providerPaymentID == "" {
 		return Refund{}, false, ErrRefundNotSupported
 	}
 	var reserved int64
