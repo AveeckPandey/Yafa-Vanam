@@ -27,7 +27,7 @@ export async function POST(request: NextRequest) {
   } catch (reason) {
     if (reason instanceof CognitoError) {
       const status = reason.code === "CodeMismatchException" || reason.code === "ExpiredCodeException" ? 422 : 400;
-      return NextResponse.json({ error: reason.message }, { status });
+      return NextResponse.json({ error: reason.message, code: reason.code }, { status });
     }
     throw reason;
   }

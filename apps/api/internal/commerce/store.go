@@ -141,6 +141,7 @@ type Store struct {
 	redemptions map[string]string
 	paidUsers   map[string]bool
 	firstGrants map[string]bool
+	refunds     map[string]*Refund
 	now         func() time.Time
 }
 
@@ -148,7 +149,7 @@ func NewStore(catalog *Catalog) *Store {
 	return &Store{
 		catalog: catalog, carts: make(map[string]*Cart), orders: make(map[string]*Order),
 		idempotency: make(map[string]string), coupons: legacyCoupons(), redemptions: make(map[string]string),
-		paidUsers: make(map[string]bool), firstGrants: make(map[string]bool),
+		paidUsers: make(map[string]bool), firstGrants: make(map[string]bool), refunds: make(map[string]*Refund),
 		now: time.Now,
 	}
 }

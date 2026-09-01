@@ -188,6 +188,14 @@ func (server *Server) razorpayWebhook(w http.ResponseWriter, request *http.Reque
 					ID string `json:"id"`
 				} `json:"entity"`
 			} `json:"order"`
+			Refund struct {
+				Entity struct {
+					ID        string `json:"id"`
+					PaymentID string `json:"payment_id"`
+					Receipt   string `json:"receipt"`
+					Status    string `json:"status"`
+				} `json:"entity"`
+			} `json:"refund"`
 		} `json:"payload"`
 	}
 	if err := json.Unmarshal(body, &event); err != nil {
@@ -204,6 +212,18 @@ func (server *Server) razorpayWebhook(w http.ResponseWriter, request *http.Reque
 		status = "captured"
 	case "payment.failed":
 		status = "failed"
+	case "refund.created", "refund.processed", "refund.failed":
+		refundStatus := event.Payload.Refund.Entity.Status
+		if refundStatus == "" {
+			refundStatus = strings.TrimPrefix(event.Event, "refund.")
+		}
+		if store, ok := server.refundStore(); ok && event.Payload.Refund.Entity.ID != "" {
+			if _, err := store.RecordRefundStatus(event.Payload.Refund.Entity.ID, event.Payload.Refund.Entity.Receipt, refundStatus); err != nil && !errors.Is(err, commerce.ErrRefundNotFound) {
+				server.logger.Error("razorpay refund webhook update failed", "event", event.Event, "error", err)
+			}
+		}
+		writeJSON(w, http.StatusOK, map[string]bool{"received": true})
+		return
 	default:
 		writeJSON(w, http.StatusOK, map[string]bool{"received": true})
 		return

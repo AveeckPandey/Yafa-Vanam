@@ -25,6 +25,7 @@ tags:
   - name: Carts
   - name: Orders
   - name: Payments
+  - name: Admin
   - name: Beauty Profile
 
 paths:
@@ -549,7 +550,7 @@ paths:
   /api/v1/payments/razorpay/webhook:
     post:
       tags: [Payments]
-      summary: Razorpay webhook (payment.captured / order.paid / payment.failed)
+      summary: Razorpay payment and refund webhook
       description: Authenticated by the X-Razorpay-Signature HMAC of the raw body against RAZORPAY_WEBHOOK_SECRET. Idempotent; unknown events are acknowledged without state changes.
       parameters:
         - in: header
@@ -583,6 +584,16 @@ paths:
                           type: object
                           properties:
                             id: { type: string }
+                    refund:
+                      type: object
+                      properties:
+                        entity:
+                          type: object
+                          properties:
+                            id: { type: string }
+                            payment_id: { type: string }
+                            receipt: { type: string }
+                            status: { type: string, enum: [pending, processed, failed] }
       responses:
         "200":
           description: Acknowledged
@@ -600,6 +611,39 @@ paths:
             application/json:
               schema: { $ref: "#/components/schemas/Error" }
 
+  /api/internal/refunds:
+    post:
+      tags: [Admin]
+      summary: Create or replay a full or partial Razorpay refund
+      description: Protected machine-to-machine operation. Amount 0 or omitted refunds the remaining captured amount. The idempotency key is converted to Razorpay's unique receipt, preventing duplicate money movement after retries or timeouts.
+      security:
+        - internalBearer: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/CreateRefund" }
+      responses:
+        "201":
+          description: Refund accepted by Razorpay
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Refund" }
+        "200":
+          description: Existing idempotent refund replayed
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Refund" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/SimpleUnauthorized" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Validation" }
+        "502":
+          description: Razorpay did not confirm the request; retry with the same idempotency key
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+
 components:
   securitySchemes:
     cookieAuth:
@@ -612,6 +656,10 @@ components:
       in: header
       name: X-Order-Access-Token
       description: Guest order credential returned as access_token when the order is created (no-auth mode only).
+    internalBearer:
+      type: http
+      scheme: bearer
+      description: Shared internal service credential from Secrets Manager; never exposed to browsers.
   parameters:
     CartId:
       in: path
@@ -999,8 +1047,8 @@ components:
         shipping_amount: { type: number, minimum: 0 }
         discount_amount: { type: number, minimum: 0 }
         total_amount: { type: number, minimum: 0 }
-        order_status: { type: string, enum: [PENDING_PAYMENT, PAID] }
-        payment_status: { type: string, enum: [PENDING, AUTHORIZED, CAPTURED, FAILED] }
+        order_status: { type: string, enum: [PENDING_PAYMENT, PAID, REFUNDED] }
+        payment_status: { type: string, enum: [PENDING, AUTHORIZED, CAPTURED, FAILED, PARTIALLY_REFUNDED, REFUNDED] }
         razorpay_order_id: { type: string }
         razorpay_payment_id: { type: string }
         fulfillment_status: { type: string, enum: [UNFULFILLED] }
@@ -1031,3 +1079,28 @@ components:
         verified: { type: boolean, const: true }
         order_number: { type: string }
         payment_status: { type: string, const: AUTHORIZED }
+
+    CreateRefund:
+      type: object
+      additionalProperties: false
+      required: [order_number, reason, idempotency_key]
+      properties:
+        order_number: { type: string, pattern: "^YV-[0-9]{8}-[A-Z0-9]{4}$" }
+        amount_paise: { type: integer, minimum: 0, description: Zero or omitted means all remaining refundable value. }
+        reason: { type: string, minLength: 1, maxLength: 500 }
+        idempotency_key: { type: string, minLength: 1, maxLength: 200 }
+    Refund:
+      type: object
+      required: [id, order_number, receipt, amount_paise, currency, reason, status, created_at]
+      properties:
+        id: { type: string }
+        order_number: { type: string }
+        provider_payment_id: { type: string }
+        provider_refund_id: { type: string }
+        receipt: { type: string }
+        amount_paise: { type: integer, minimum: 1 }
+        currency: { type: string }
+        reason: { type: string }
+        status: { type: string, enum: [PENDING, PROCESSED, FAILED] }
+        created_at: { type: string, format: date-time }
+        processed_at: { type: string, format: date-time }

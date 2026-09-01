@@ -49,6 +49,13 @@ export class ConfirmationRequiredError extends Error {
   email: string;
 }
 
+export class CognitoFlowError extends Error {
+  constructor(message: string, public readonly code?: string) {
+    super(message);
+    this.name = "CognitoFlowError";
+  }
+}
+
 async function readError(response: Response, fallback: string) {
   const payload = await response.json().catch(() => null) as { error?: string } | null;
   return payload?.error || fallback;
@@ -162,8 +169,8 @@ function useAuthApi() {
 
   const confirmRegistration = useCallback(async (email: string, code: string, password: string, remember: boolean) => {
     const response = await cognitoPost("/auth/cognito/confirm", { email, code, password, remember });
-    const payload = await response.json().catch(() => ({})) as { user?: AuthUser; error?: string };
-    if (!response.ok || !payload.user) throw new Error(payload.error || "We could not verify that code. Please try again.");
+    const payload = await response.json().catch(() => ({})) as { user?: AuthUser; error?: string; code?: string };
+    if (!response.ok || !payload.user) throw new CognitoFlowError(payload.error || "We could not verify that code. Please try again.", payload.code);
     return payload.user!;
   }, [cognitoPost]);
 
@@ -190,8 +197,8 @@ function useAuthApi() {
 
   const submitResetCode = useCallback(async (email: string, code: string, password: string) => {
     const response = await cognitoPost("/auth/cognito/reset-confirm", { email, code, password });
-    const payload = await response.json().catch(() => ({})) as { message?: string; error?: string };
-    if (!response.ok) throw new Error(payload.error || "We could not update your password. Please try again.");
+    const payload = await response.json().catch(() => ({})) as { message?: string; error?: string; code?: string };
+    if (!response.ok) throw new CognitoFlowError(payload.error || "We could not update your password. Please try again.", payload.code);
     return payload.message || "Your password has been updated. You can now sign in.";
   }, [cognitoPost]);
 

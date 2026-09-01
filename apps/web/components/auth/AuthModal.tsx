@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useId, useRef, useState } from "react";
-import { ConfirmationRequiredError, VerificationRequiredError, useAuth } from "./AuthProvider";
+import { CognitoFlowError, ConfirmationRequiredError, VerificationRequiredError, useAuth } from "./AuthProvider";
 import { GENDER_OPTIONS, validateSignUpProfile } from "@/lib/cognito-shared";
 
 const GENDER_LABELS: Record<(typeof GENDER_OPTIONS)[number], string> = {
@@ -34,7 +34,7 @@ export default function AuthModal({ open, onClose, returnTo }: Props) {
   if (!open) return null;
 
   const switchMode = (next: Mode) => { setMode(next); setStep("form"); setError(""); setNotice(""); setPassword(""); setPendingEmail(""); setPendingPassword(""); setResetCodeSent(false); };
-  const enterConfirm = (email: string, rememberedPassword: string) => { setPendingEmail(email); setPendingPassword(rememberedPassword); setStep("confirm"); setError(""); setNotice(""); setResendIn(60); };
+  const enterConfirm = (email: string, rememberedPassword: string, resendCooldown = 0) => { setPendingEmail(email); setPendingPassword(rememberedPassword); setStep("confirm"); setError(""); setNotice(""); setResendIn(resendCooldown); };
 
   const submitForm = async (form: HTMLFormElement) => {
     const data = new FormData(form);
@@ -54,7 +54,7 @@ export default function AuthModal({ open, onClose, returnTo }: Props) {
       try {
         await register({ ...checked.profile, password: nextPassword, remember: data.get("remember") === "on" });
       } catch (reason) {
-        if (reason instanceof ConfirmationRequiredError) enterConfirm(reason.email, nextPassword);
+        if (reason instanceof ConfirmationRequiredError) enterConfirm(reason.email, nextPassword, 60);
         else setError(reason instanceof Error ? reason.message : "We could not complete that request. Please try again.");
       } finally {
         setBusy(false);
@@ -66,9 +66,11 @@ export default function AuthModal({ open, onClose, returnTo }: Props) {
       if (mode === "signin") {
         await login(email, nextPassword, data.get("remember") === "on");
       } else {
-        setNotice(await requestPasswordReset(email));
+        const message = await requestPasswordReset(email);
         setPendingEmail(email);
         setResetCodeSent(true);
+        setNotice(message);
+        if (cognito) { setStep("forgot-code"); setResendIn(60); }
       }
     } catch (reason) {
       if (reason instanceof VerificationRequiredError || reason instanceof ConfirmationRequiredError) {
@@ -89,6 +91,10 @@ export default function AuthModal({ open, onClose, returnTo }: Props) {
       await confirmRegistration(pendingEmail, code, pendingPassword, true);
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : "We could not verify that code. Please try again.");
+      if (reason instanceof CognitoFlowError && reason.code === "ExpiredCodeException") {
+        setNotice("You can request a fresh code now. Only the newest email code will work.");
+        setResendIn(0);
+      }
     } finally { setBusy(false); }
   };
 
@@ -104,6 +110,10 @@ export default function AuthModal({ open, onClose, returnTo }: Props) {
       setStep("form"); setMode("signin"); setPendingEmail(""); setResetCodeSent(false);
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : "We could not update your password. Please try again.");
+      if (reason instanceof CognitoFlowError && reason.code === "ExpiredCodeException") {
+        setNotice("You can request a fresh reset code now. Only the newest code will work.");
+        setResendIn(0);
+      }
     } finally { setBusy(false); }
   };
 
@@ -112,6 +122,14 @@ export default function AuthModal({ open, onClose, returnTo }: Props) {
     setBusy(true); setError(""); setNotice("");
     try { await resendConfirmationCode(pendingEmail); setNotice("If no new code arrives, your email may already be verified. Return to sign in."); setResendIn(60); }
     catch (reason) { setError(reason instanceof Error ? reason.message : "We could not send a new code."); }
+    finally { setBusy(false); }
+  };
+
+  const resendReset = async () => {
+    if (resendIn > 0) return;
+    setBusy(true); setError(""); setNotice("");
+    try { setNotice(await requestPasswordReset(pendingEmail)); setResendIn(60); }
+    catch (reason) { setError(reason instanceof Error ? reason.message : "We could not send a new reset code."); }
     finally { setBusy(false); }
   };
 
@@ -147,7 +165,9 @@ export default function AuthModal({ open, onClose, returnTo }: Props) {
           <div id={`${id}-strength`} className={`auth-modal__strength is-${strength}`} aria-live="polite"><span><i/><i/><i/></span><b>Password strength: {strength}</b></div>
           <PasswordField id={`${id}-reset-confirm`} name="confirmPassword" label="Confirm password" autoComplete="new-password" describedBy={error ? errorID : undefined}/>
           {error && <p id={errorID} className="auth-modal__error" role="alert">{error}</p>}
+          {notice && <p className="auth-modal__notice" role="status">{notice}</p>}
           <button className="auth-modal__submit" disabled={busy} type="submit">{busy ? "Updating…" : "Update password"}</button>
+          <button type="button" className="auth-modal__link" onClick={() => void resendReset()} disabled={busy || resendIn > 0}>{resendIn > 0 ? `Resend reset code in ${resendIn}s` : "Resend reset code"}</button>
           <button type="button" className="auth-modal__link auth-modal__back-link" onClick={() => switchMode("signin")}>← Back to sign in</button>
         </form>
       ) : (

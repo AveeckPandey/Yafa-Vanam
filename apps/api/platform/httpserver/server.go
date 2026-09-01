@@ -127,6 +127,7 @@ func New(catalog *commerce.Catalog, store commerce.CommerceStore, config Config)
 	mux.Handle("POST /api/internal/coupons/welcome", server.internalGuard(http.HandlerFunc(server.issueWelcomeCoupon)))
 	mux.Handle("POST /api/internal/coupons/recovery", server.internalGuard(http.HandlerFunc(server.issueRecoveryVoucher)))
 	mux.Handle("POST /api/internal/coupons/recovery/revoke", server.internalGuard(http.HandlerFunc(server.revokeRecoveryVoucher)))
+	mux.Handle("POST /api/internal/refunds", server.internalGuard(http.HandlerFunc(server.createRefund)))
 	mux.Handle("POST /api/internal/messages/record", server.internalGuard(http.HandlerFunc(server.recordLifecycleMessage)))
 	if config.Auth != nil {
 		mux.Handle("POST /api/v1/carts", config.Auth.OptionalMiddleware(http.HandlerFunc(server.createCart)))
