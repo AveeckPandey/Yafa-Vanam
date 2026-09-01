@@ -33,6 +33,42 @@
       "Resource": "*"
     },
     {
+      "Sid": "ValidateProductionLaunchTemplateResources",
+      "Effect": "Allow",
+      "Action": "ec2:RunInstances",
+      "Resource": [
+        "arn:aws:ec2:ap-south-1::image/ami-0ac7b260cf76d8865",
+        "arn:aws:ec2:ap-south-1:758388043025:subnet/subnet-06f9da0024dce4ecc",
+        "arn:aws:ec2:ap-south-1:758388043025:subnet/subnet-00be5d7fe0841b6ff",
+        "arn:aws:ec2:ap-south-1:758388043025:security-group/sg-0f41b33f6f64ce560",
+        "arn:aws:ec2:ap-south-1:758388043025:launch-template/lt-0e3c82ebc96c3b62b",
+        "arn:aws:ec2:ap-south-1:758388043025:network-interface/*",
+        "arn:aws:ec2:ap-south-1:758388043025:volume/*"
+      ]
+    },
+    {
+      "Sid": "ValidateProductionInstanceType",
+      "Effect": "Allow",
+      "Action": "ec2:RunInstances",
+      "Resource": "arn:aws:ec2:ap-south-1:758388043025:instance/*",
+      "Condition": {
+        "StringEquals": {
+          "ec2:InstanceType": "t3.micro"
+        }
+      }
+    },
+    {
+      "Sid": "PassOnlyProductionEc2RuntimeRole",
+      "Effect": "Allow",
+      "Action": "iam:PassRole",
+      "Resource": "arn:aws:iam::758388043025:role/yafa-prod-ec2-runtime",
+      "Condition": {
+        "StringEquals": {
+          "iam:PassedToService": "ec2.amazonaws.com"
+        }
+      }
+    },
+    {
       "Effect": "Allow",
       "Action": [
         "autoscaling:UpdateAutoScalingGroup",
