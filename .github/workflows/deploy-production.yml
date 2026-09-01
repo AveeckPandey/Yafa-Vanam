@@ -57,7 +57,7 @@ jobs:
           TAG: ${{ github.sha }}
         run: |
           docker build -f apps/api/Dockerfile -t "$ECR_REGISTRY/yafa-api:$TAG" .
-          docker build --build-arg SHOW_SAMPLE_REVIEWS=true -f apps/web/Dockerfile -t "$ECR_REGISTRY/yafa-web:$TAG" .
+          docker build -f apps/web/Dockerfile -t "$ECR_REGISTRY/yafa-web:$TAG" .
           docker build -f services/recommendation-engine/Dockerfile -t "$ECR_REGISTRY/yafa-advisor:$TAG" .
           docker push "$ECR_REGISTRY/yafa-api:$TAG"
           docker push "$ECR_REGISTRY/yafa-web:$TAG"
