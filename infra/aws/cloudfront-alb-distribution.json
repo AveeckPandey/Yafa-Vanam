@@ -1,6 +1,6 @@
 {
   "CallerReference": "yafa-prod-assets-20260827",
-  "Aliases": { "Quantity": 1, "Items": ["yafavanam.buildwithaveeck.com"] },
+  "Aliases": { "Quantity": 1, "Items": ["api.yafavanam.buildwithaveeck.com"] },
   "DefaultRootObject": "",
   "Origins": {
     "Quantity": 1,
@@ -46,16 +46,16 @@
   },
   "CacheBehaviors": { "Quantity": 0 },
   "CustomErrorResponses": { "Quantity": 0 },
-  "Comment": "YAFA VANAM storefront via Application Load Balancer",
+  "Comment": "YAFA VANAM private backend bridge via Application Load Balancer",
   "Logging": { "Enabled": false, "IncludeCookies": false, "Bucket": "", "Prefix": "" },
   "PriceClass": "PriceClass_200",
   "Enabled": true,
   "ViewerCertificate": {
     "CloudFrontDefaultCertificate": false,
-    "ACMCertificateArn": "arn:aws:acm:us-east-1:758388043025:certificate/589a6e48-356d-49e5-975c-02b19b708590",
+    "ACMCertificateArn": "arn:aws:acm:us-east-1:758388043025:certificate/98e6d1f5-f3a2-4cf4-9a2b-cc4f0458e156",
     "SSLSupportMethod": "sni-only",
     "MinimumProtocolVersion": "TLSv1.2_2021",
-    "Certificate": "arn:aws:acm:us-east-1:758388043025:certificate/589a6e48-356d-49e5-975c-02b19b708590",
+    "Certificate": "arn:aws:acm:us-east-1:758388043025:certificate/98e6d1f5-f3a2-4cf4-9a2b-cc4f0458e156",
     "CertificateSource": "acm"
   },
   "Restrictions": { "GeoRestriction": { "RestrictionType": "none", "Quantity": 0 } },

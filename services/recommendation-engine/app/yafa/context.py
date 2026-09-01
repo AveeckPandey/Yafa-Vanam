@@ -20,19 +20,26 @@ FACT_TYPES: dict[str, tuple[tuple[str, ...], tuple[str, ...]]] = {
     "expiry": (("expir", "expiry", "expiration", "pao", "shelf life", "best before", "use by"), ("expiry", "shelf_life", "storage")),
     "scent": (("smell like", "scent", "fragrance notes", "notes of", "smells"), ("scent_profile",)),
     "ingredients": (("ingredient", "inci", "contains", "made with"), ("ingredients", "ingredients_concept")),
-    "usage": (("how do i use", "how to use", "how to apply", "application"), ("usage",)),
+    "usage": (("how do i use", "how to use", "how to apply", "application", "usage", "direction", "instruction"), ("usage",)),
     "warnings": (("warning", "allergic", "allergy", "irritat", "patch test", "side effect"), ("warnings",)),
     "benefits": (("benefit", "what does it do", "designed for", "good for"), ("benefits",)),
     "routine": (("where does this fit", "fit in my routine", "routine step", "when do i use"), ("routine_position",)),
 }
 
 
-def detect_fact_type(message: str) -> str | None:
+def detect_fact_types(message: str) -> tuple[str, ...]:
     text = message.lower()
-    for label, (patterns, _) in FACT_TYPES.items():
-        if any(pattern in text for pattern in patterns):
-            return label
-    return None
+    return tuple(
+        label
+        for label, (patterns, _) in FACT_TYPES.items()
+        if any(pattern in text for pattern in patterns)
+    )
+
+
+def detect_fact_type(message: str) -> str | None:
+    """Return the first matching fact type for backwards compatibility."""
+    labels = detect_fact_types(message)
+    return labels[0] if labels else None
 
 
 def fact_chunk_types(label: str) -> tuple[str, ...]:

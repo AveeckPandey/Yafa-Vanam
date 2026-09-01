@@ -18,7 +18,17 @@ class Intent(str, Enum):
 _GREETING = re.compile(r"(^|\s)(hi|hiya|hey|hello|yo|good\s(morning|afternoon|evening)|how\sare\syou|thanks|thank\syou|thankyou|bye|goodbye)(\s|[!.?,]|$)", re.IGNORECASE)
 _CAPABILITY = re.compile(r"\b(what can you do|who are you|what are you|help me|can you help|how (does|do) (this|you) work|what do you do)\b", re.IGNORECASE)
 _RECOMMENDATION = re.compile(r"\b(recommend|suggest|should i (get|buy|try|wear|use)|looking for|need a|want a|full look|complete look|build (my |a )?look|match my makeup|find my shade)\b", re.IGNORECASE)
-_PRODUCT_FACT = re.compile(r"\b(ingredient|inci|contains|how (do|to) (i )?use|apply|warning|allergy|benefit|designed for|scent|smell|fragrance notes|expiry|expiration|shelf life|cruelty[- ]?free|vegan|animal test|charit|donat|giving policy|compare|versus| vs )\b", re.IGNORECASE)
+_PRODUCT_FACT = re.compile(
+    r"\b("
+    r"ingredients?|inci|contains?|"
+    r"how (do|should|to) (i )?use|how is .+ used|uses?|usage|directions?|instructions?|apply|application|"
+    r"warnings?|allerg(?:y|ies|en(?:s|ic)?)|benefits?|features?|claims?|designed for|suitable for|what does .+ do|"
+    r"scent|smell|fragrance notes?|expiry|expiration|shelf life|"
+    r"cruelty[- ]?free|vegan|animal test|charit|donat|giving policy|"
+    r"product (details?|facts?|information)|tell me about|compare|versus| vs "
+    r")\b",
+    re.IGNORECASE,
+)
 
 
 def classify(message: str) -> Intent:

@@ -13,7 +13,7 @@ from app.rag.schemas import RagSearchRequest
 from app.yafa.agent import ToolSearchResult, get_agentic_responder
 from app.yafa import prompts
 from app.yafa.context import (
-    detect_fact_type,
+    detect_fact_types,
     detect_live_data_domain,
     fact_chunk_types,
     message_refers_to_page_product,
@@ -29,7 +29,7 @@ logger = logging.getLogger(__name__)
 async def _rag_lookup(
     query: str,
     product_id: str | None,
-    fact_label: str | None,
+    fact_labels: tuple[str, ...],
     request_id: str,
 ) -> tuple[list[dict[str, Any]], list[str], list[str], bool]:
     """Retrieve eligible facts only; a RAG failure must not break the chat."""
@@ -41,7 +41,13 @@ async def _rag_lookup(
                 product_id=product_id,
                 top_k=5,
                 allowed_for_customer=True,
-                chunk_types=list(fact_chunk_types(fact_label)) if fact_label else None,
+                chunk_types=sorted(
+                    {
+                        chunk_type
+                        for label in fact_labels
+                        for chunk_type in fact_chunk_types(label)
+                    }
+                ) or None,
             )
         )
     except (RuntimeError, HTTPException):
@@ -68,7 +74,7 @@ async def _agentic_answer(
     *,
     message: str,
     page_product_id: str | None,
-    fact_label: str | None,
+    fact_labels: tuple[str, ...],
     request_id: str,
 ):
     """Ask Bedrock to use the verified-search tool, never raw data access."""
@@ -76,10 +82,16 @@ async def _agentic_answer(
     if not settings.agentic_enabled:
         return None
 
+    allowed_chunk_types = {
+        chunk_type
+        for label in fact_labels
+        for chunk_type in fact_chunk_types(label)
+    }
+
     async def search(query: str, locked_product_id: str | None) -> ToolSearchResult:
-        chunks, citations, medical, available = await _rag_lookup(query, locked_product_id, fact_label, request_id)
-        if fact_label:
-            chunks = [chunk for chunk in chunks if chunk["chunk_type"] in set(fact_chunk_types(fact_label))]
+        chunks, citations, medical, available = await _rag_lookup(query, locked_product_id, fact_labels, request_id)
+        if allowed_chunk_types:
+            chunks = [chunk for chunk in chunks if chunk["chunk_type"] in allowed_chunk_types]
         # The model receives only high-confidence semantic matches. A zero
         # score is an explicit verified keyword fallback from the retriever.
         chunks = [
@@ -132,11 +144,11 @@ async def handle_chat(request: YafaChatRequest) -> YafaChatResponse:
         if intent is Intent.GENERAL:
             response = YafaChatResponse(conversation_id=conversation.conversation_id, intent=intent.value, message=prompts.general_message())
         else:
-            fact_label = detect_fact_type(request.message)
+            fact_labels = detect_fact_types(request.message)
             agent_answer = await _agentic_answer(
                 message=request.message,
                 page_product_id=(page_product or {}).get("id"),
-                fact_label=fact_label,
+                fact_labels=fact_labels,
                 request_id=request_id,
             )
             if agent_answer is not None:
@@ -154,16 +166,21 @@ async def handle_chat(request: YafaChatRequest) -> YafaChatResponse:
                 return response
 
             chunks, citations, medical, available = await _rag_lookup(
-                request.message, (page_product or {}).get("id"), fact_label, request_id
+                request.message, (page_product or {}).get("id"), fact_labels, request_id
             )
-            if fact_label:
-                chunks = [chunk for chunk in chunks if chunk["chunk_type"] in set(fact_chunk_types(fact_label))]
+            allowed_chunk_types = {
+                chunk_type
+                for label in fact_labels
+                for chunk_type in fact_chunk_types(label)
+            }
+            if allowed_chunk_types:
+                chunks = [chunk for chunk in chunks if chunk["chunk_type"] in allowed_chunk_types]
             if not available:
                 message = prompts.product_information_message([], rag_available=False)
-            elif fact_label and not chunks:
-                message = prompts.unavailable_fact_message(fact_label)
+            elif fact_labels and not chunks:
+                message = prompts.unavailable_fact_message(" and ".join(fact_labels))
             elif (
-                fact_label == "scent"
+                "scent" in fact_labels
                 and not page_product
                 and len({chunk["product_id"] for chunk in chunks}) > 1
             ):

@@ -34,7 +34,10 @@
     },
     {
       "Effect": "Allow",
-      "Action": "autoscaling:StartInstanceRefresh",
+      "Action": [
+        "autoscaling:UpdateAutoScalingGroup",
+        "autoscaling:StartInstanceRefresh"
+      ],
       "Resource": "arn:aws:autoscaling:ap-south-1:758388043025:autoScalingGroup:*:autoScalingGroupName/yafa-prod-app"
     },
     {

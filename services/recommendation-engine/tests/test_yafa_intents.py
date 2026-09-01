@@ -9,6 +9,9 @@ from app.yafa.intents import Intent, classify
     [
         ("hi", Intent.GREETING_OR_SMALL_TALK),
         ("What does Soft Ember smell like?", Intent.PRODUCT_INFORMATION),
+        ("What are the verified benefits and usage instructions for Airbloom Blush?", Intent.PRODUCT_INFORMATION),
+        ("What does Airbloom Blush do?", Intent.PRODUCT_INFORMATION),
+        ("Tell me about Airbloom Blush", Intent.PRODUCT_INFORMATION),
         ("Is everything vegan?", Intent.PRODUCT_INFORMATION),
         ("Fernwing versus Nightbloom", Intent.PRODUCT_COMPARISON),
         ("Recommend a lipstick for me", Intent.RECOMMENDATION_UNAVAILABLE),

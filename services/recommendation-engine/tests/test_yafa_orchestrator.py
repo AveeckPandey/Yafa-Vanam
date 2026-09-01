@@ -34,6 +34,39 @@ class StubRetriever:
         )
 
 
+class BenefitsUsageStubRetriever:
+    async def search(self, request):
+        assert set(request.chunk_types or []) == {"benefits", "usage"}
+        return RagSearchResponse(
+            query=request.query,
+            product_id=request.product_id,
+            results=[
+                RetrievedChunk(
+                    chunk_id="benefits-1",
+                    product_id="yv-cheek-001",
+                    product_name="Airbloom Blush",
+                    chunk_type="benefits",
+                    content="Adds fresh, buildable cheek colour.",
+                    similarity=0.93,
+                    trust_level=TrustLevel.AUTHORITATIVE_CATALOGUE,
+                    customer_factual_eligible=True,
+                    requires_qualification=False,
+                ),
+                RetrievedChunk(
+                    chunk_id="usage-1",
+                    product_id="yv-cheek-001",
+                    product_name="Airbloom Blush",
+                    chunk_type="usage",
+                    content="Apply to the cheeks and blend to the desired intensity.",
+                    similarity=0.92,
+                    trust_level=TrustLevel.AUTHORITATIVE_CATALOGUE,
+                    customer_factual_eligible=True,
+                    requires_qualification=False,
+                ),
+            ],
+        )
+
+
 def _request(message: str, **kwargs) -> YafaChatRequest:
     return YafaChatRequest(message=message, **kwargs)
 
@@ -50,6 +83,15 @@ async def test_product_fact_uses_rag_and_preserves_grounding(monkeypatch):
     assert response.grounding[0].product_id == "yv-frag-010"
     assert response.recommendations == []
     assert "amber" in response.message.lower()
+
+
+async def test_product_benefits_and_usage_question_reaches_rag(monkeypatch):
+    monkeypatch.setattr(orchestrator, "_get_retriever", lambda: BenefitsUsageStubRetriever())
+    response = await handle_chat(
+        _request("What are the verified benefits and usage instructions for Airbloom Blush?")
+    )
+    assert response.intent == "product_information"
+    assert {chunk.chunk_type for chunk in response.grounding} == {"benefits", "usage"}
 
 
 async def test_live_inventory_question_short_circuits_to_commerce():
