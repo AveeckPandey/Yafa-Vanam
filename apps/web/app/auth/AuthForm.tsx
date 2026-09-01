@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { FormEvent, useEffect, useState } from "react";
-import { ConfirmationRequiredError, VerificationRequiredError, useAuth } from "../../components/auth/AuthProvider";
+import { CognitoFlowError, ConfirmationRequiredError, VerificationRequiredError, useAuth } from "../../components/auth/AuthProvider";
 import { GENDER_OPTIONS, validateSignUpProfile } from "@/lib/cognito-shared";
 
 const GENDER_LABELS: Record<(typeof GENDER_OPTIONS)[number], string> = {
@@ -40,7 +40,7 @@ export default function AuthForm({ mode }: { mode: "sign-in" | "sign-up" | "rese
 
   useEffect(() => { if (resendIn <= 0) return; const timer = setInterval(() => setResendIn((value) => Math.max(0, value - 1)), 1000); return () => clearInterval(timer); }, [resendIn]);
 
-  const armConfirm = (email: string, rememberedPassword: string) => { setPendingEmail(email); setPendingPassword(rememberedPassword); setConfirming(true); setError(""); setNotice(""); setResendIn(60); };
+  const armConfirm = (email: string, rememberedPassword: string, resendCooldown = 0) => { setPendingEmail(email); setPendingPassword(rememberedPassword); setConfirming(true); setError(""); setNotice(""); setResendIn(resendCooldown); };
 
   const submit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -63,12 +63,18 @@ export default function AuthForm({ mode }: { mode: "sign-in" | "sign-up" | "rese
         });
         if (!checked.ok) { setError(checked.error); return; }
         try { await register({ ...checked.profile, password: entered, remember: false }); router.push(returnTo); }
-        catch (reason) { if (reason instanceof ConfirmationRequiredError) armConfirm(reason.email, entered); else throw reason; }
+        catch (reason) { if (reason instanceof ConfirmationRequiredError) armConfirm(reason.email, entered, 60); else throw reason; }
       } else {
         try { await login(email, entered, false); router.push(returnTo); }
         catch (reason) { if (reason instanceof VerificationRequiredError) armConfirm(reason.email, entered); else throw reason; }
       }
-    } catch (reason) { setError(reason instanceof Error ? reason.message : "Unable to continue. Please try again."); } finally { setBusy(false); }
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : "Unable to continue. Please try again.");
+      if (reason instanceof CognitoFlowError && reason.code === "ExpiredCodeException") {
+        setNotice("You can request a fresh reset code now. Only the newest code will work.");
+        setResendIn(0);
+      }
+    } finally { setBusy(false); }
   };
 
   const submitConfirm = async (event: FormEvent<HTMLFormElement>) => {
@@ -76,13 +82,27 @@ export default function AuthForm({ mode }: { mode: "sign-in" | "sign-up" | "rese
     const code = String(new FormData(event.currentTarget).get("code") || "").trim();
     setBusy(true); setError("");
     try { await confirmRegistration(pendingEmail, code, pendingPassword, false); router.push(returnTo); }
-    catch (reason) { setError(reason instanceof Error ? reason.message : "We could not verify that code. Please try again."); } finally { setBusy(false); }
+    catch (reason) {
+      setError(reason instanceof Error ? reason.message : "We could not verify that code. Please try again.");
+      if (reason instanceof CognitoFlowError && reason.code === "ExpiredCodeException") {
+        setNotice("You can request a fresh code now. Only the newest email code will work.");
+        setResendIn(0);
+      }
+    } finally { setBusy(false); }
   };
 
   const resend = async () => {
     if (resendIn > 0 || busy) return;
     setBusy(true); setError(""); setNotice("");
-    try { await resendConfirmationCode(pendingEmail); setNotice("If no new code arrives, your email may already be verified. Return to sign in."); setResendIn(60); }
+    try {
+      if (confirming) {
+        await resendConfirmationCode(pendingEmail);
+        setNotice("If no new code arrives, your email may already be verified. Return to sign in.");
+      } else {
+        setNotice(await requestPasswordReset(pendingEmail));
+      }
+      setResendIn(60);
+    }
     catch (reason) { setError(reason instanceof Error ? reason.message : "We could not send a new code."); } finally { setBusy(false); }
   };
 
