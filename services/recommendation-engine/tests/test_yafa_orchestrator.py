@@ -85,11 +85,16 @@ async def test_product_fact_uses_rag_and_preserves_grounding(monkeypatch):
     assert "amber" in response.message.lower()
 
 
-async def test_product_benefits_and_usage_question_reaches_rag(monkeypatch):
+@pytest.mark.parametrize(
+    "message",
+    [
+        "What are the verified benefits and usage instructions for Airbloom Blush?",
+        "How should I use Airbloom Blush and what does it do?",
+    ],
+)
+async def test_product_benefits_and_usage_question_reaches_rag(monkeypatch, message):
     monkeypatch.setattr(orchestrator, "_get_retriever", lambda: BenefitsUsageStubRetriever())
-    response = await handle_chat(
-        _request("What are the verified benefits and usage instructions for Airbloom Blush?")
-    )
+    response = await handle_chat(_request(message))
     assert response.intent == "product_information"
     assert {chunk.chunk_type for chunk in response.grounding} == {"benefits", "usage"}
 
