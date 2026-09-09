@@ -46,6 +46,7 @@ try {
     } else {
         Write-Host '      no DATABASE_URL/REDIS_URL -> ephemeral in-memory mode'
     }
+    $env:GOTOOLCHAIN = 'local'
     $processes += Start-Process go -ArgumentList 'run', './cmd/api' `
         -WorkingDirectory (Join-Path $root 'apps/api') `
         -PassThru -WindowStyle Minimized

@@ -2,8 +2,6 @@ module github.com/BuildWithAveeck/yafa-vanam/apps/api
 
 go 1.25.0
 
-toolchain go1.25.13
-
 require (
 	github.com/aws/aws-sdk-go-v2 v1.45.1
 	github.com/aws/aws-sdk-go-v2/config v1.29.8

@@ -1,0 +1,44 @@
+{
+  "schemaVersion": 1,
+  "targets": {
+    "/auth/sign-up": {
+      "targetKind": "existing-ui",
+      "projectId": "122e762a-898a-4dc1-92f3-aae7ae4c99f4",
+      "baselineDraftId": "9f45956b-26e4-42c7-9d6d-4615ac2d3f36",
+      "activeDraftId": "9f45956b-26e4-42c7-9d6d-4615ac2d3f36",
+      "designSystemPath": ".superdesign/design-system.md",
+      "referenceIds": [
+        "abd0cb0c-3c3c-4db1-9ac6-9bfd2c25c2e7"
+      ],
+      "contextFiles": [
+        ".superdesign/design-system.md",
+        ".superdesign/init/theme.md",
+        "apps/web/app/auth/AuthForm.tsx",
+        "apps/web/lib/cognito-shared.ts",
+        "apps/web/app/auth/sign-up/page.tsx"
+      ],
+      "fingerprints": {
+        ".superdesign/design-system.md": "4E7C4A0ABCAEE1D5FCAF91059D4AD42D4D3A07C17AEB5F5BBF1FEB06198CD31E",
+        ".superdesign/init/theme.md": "EBAD9D23BA6DCE1A97A5786BB09535B41971015F61592F519FEC936FA6A233F5",
+        "apps/web/app/auth/AuthForm.tsx": "E61F3AA9FCD9E5959FC50836EF6ACACF6807BB225F044570390958927B8CE148",
+        "apps/web/lib/cognito-shared.ts": "453A92582A0E8B915AA7EB6365644949E0A55FBEE32F4DFD21ADD87CF487701E",
+        "apps/web/app/auth/sign-up/page.tsx": "8053D0C48FDA56460F2EFAF882A56F85B7ED70862A5CB214A955B2FEB04CF9F8"
+      },
+      "components": [
+        {
+          "name": "NavBar",
+          "id": "5404fe2f-f2e6-4153-aaca-22cb87df4bb0",
+          "sourcePath": "apps/web/components/Navbar.tsx"
+        }
+      ],
+      "drafts": {
+        "9f45956b-26e4-42c7-9d6d-4615ac2d3f36": {
+          "title": "YAFA VANAM Mobile Sign Up - Custom Birthday Picker",
+          "visualDirection": "existing YAFA VANAM editorial sign-up with a smooth segmented birthday picker",
+          "currentVersion": 3
+        }
+      },
+      "updatedAt": "2026-08-28T21:05:00+05:30"
+    }
+  }
+}
