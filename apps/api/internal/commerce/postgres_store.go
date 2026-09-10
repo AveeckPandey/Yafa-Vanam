@@ -161,7 +161,9 @@ func (store *PostgresStore) CreateCartForUser(ownerID string) (CartView, error) 
 	var id string
 	var updatedAt time.Time
 	err := store.db.QueryRow(ctx,
-		`INSERT INTO carts (user_id) VALUES (NULLIF($1,'')::uuid) RETURNING id::text, updated_at`,
+		`INSERT INTO carts (user_id, anonymous_key)
+		 VALUES (NULLIF($1,'')::uuid, CASE WHEN NULLIF($1,'') IS NULL THEN gen_random_uuid()::text ELSE NULL END)
+		 RETURNING id::text, updated_at`,
 		ownerID).Scan(&id, &updatedAt)
 	if err != nil {
 		return CartView{}, err

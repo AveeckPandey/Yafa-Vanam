@@ -104,6 +104,9 @@ func New(catalog *commerce.Catalog, store commerce.CommerceStore, config Config)
 	}
 	mux.HandleFunc("GET /health", server.health)
 	mux.HandleFunc("GET /ready", server.health)
+	mux.HandleFunc("GET /api/v1/health", server.health)
+	mux.HandleFunc("GET /api/v1/ready", server.health)
+	mux.HandleFunc("GET /api/v1/diag", server.diag)
 	mux.HandleFunc("GET /api/v1", server.index)
 	mux.HandleFunc("GET /api/v1/categories", server.categories)
 	mux.HandleFunc("GET /api/v1/products", server.products)
@@ -180,6 +183,28 @@ func (server *Server) health(w http.ResponseWriter, request *http.Request) {
 		return
 	}
 	writeJSON(w, http.StatusOK, response)
+}
+
+func (server *Server) diag(w http.ResponseWriter, request *http.Request) {
+	dependencies := map[string]string{}
+	if server.dependencyHealth != nil {
+		dependencies = server.dependencyHealth(request.Context())
+	}
+	diag := map[string]any{
+		"service":            "yafa-api",
+		"dependencies":       dependencies,
+		"catalogue_products": server.catalog.ProductCount(),
+		"uptime_seconds":     int64(time.Since(server.startedAt).Seconds()),
+	}
+	testCart, err := server.store.CreateCart()
+	if err != nil {
+		diag["test_cart_status"] = "error"
+		diag["test_cart_error"] = err.Error()
+	} else {
+		diag["test_cart_status"] = "ok"
+		diag["test_cart_id"] = testCart.ID
+	}
+	writeJSON(w, http.StatusOK, diag)
 }
 
 func (server *Server) index(w http.ResponseWriter, _ *http.Request) {
@@ -455,7 +480,7 @@ func (server *Server) writeDomainError(w http.ResponseWriter, err error) {
 		writeError(w, http.StatusForbidden, "access_denied", "The order access token is missing or invalid.")
 	default:
 		server.logger.Error("unhandled domain error", "error", err)
-		writeError(w, http.StatusInternalServerError, "internal_error", "An unexpected error occurred.")
+		writeError(w, http.StatusInternalServerError, "internal_error", err.Error())
 	}
 }
 
