@@ -1,0 +1,402 @@
+variant_id,sku,product_name,option,on_hand_quantity,low_stock_threshold,reason
+yv-eye-001-jet-black,,Fernwing Volume Mascara,Jet Black,100,10,initial inventory approved by admin
+yv-eye-001-carbon-black,,Fernwing Volume Mascara,Carbon Black,100,10,initial inventory approved by admin
+yv-eye-001-espresso-brown,,Fernwing Volume Mascara,Espresso Brown,100,10,initial inventory approved by admin
+yv-eye-001-black-brown,,Fernwing Volume Mascara,Black Brown,100,10,initial inventory approved by admin
+yv-eye-001-deep-burgundy,,Fernwing Volume Mascara,Deep Burgundy,100,10,initial inventory approved by admin
+yv-eye-001-black-plum,,Fernwing Volume Mascara,Black Plum,100,10,initial inventory approved by admin
+yv-eye-001-midnight-navy,,Fernwing Volume Mascara,Midnight Navy,100,10,initial inventory approved by admin
+yv-eye-001-cobalt-blue,,Fernwing Volume Mascara,Cobalt Blue,100,10,initial inventory approved by admin
+yv-eye-001-forest-green,,Fernwing Volume Mascara,Forest Green,100,10,initial inventory approved by admin
+yv-eye-001-deep-violet,,Fernwing Volume Mascara,Deep Violet,100,10,initial inventory approved by admin
+yv-eye-002-jet-black,,Nightbloom Lift Mascara,Jet Black,100,10,initial inventory approved by admin
+yv-eye-002-carbon-black,,Nightbloom Lift Mascara,Carbon Black,100,10,initial inventory approved by admin
+yv-eye-002-espresso-brown,,Nightbloom Lift Mascara,Espresso Brown,100,10,initial inventory approved by admin
+yv-eye-002-black-brown,,Nightbloom Lift Mascara,Black Brown,100,10,initial inventory approved by admin
+yv-eye-002-deep-burgundy,,Nightbloom Lift Mascara,Deep Burgundy,100,10,initial inventory approved by admin
+yv-eye-002-black-plum,,Nightbloom Lift Mascara,Black Plum,100,10,initial inventory approved by admin
+yv-eye-002-midnight-navy,,Nightbloom Lift Mascara,Midnight Navy,100,10,initial inventory approved by admin
+yv-eye-002-cobalt-blue,,Nightbloom Lift Mascara,Cobalt Blue,100,10,initial inventory approved by admin
+yv-eye-002-forest-green,,Nightbloom Lift Mascara,Forest Green,100,10,initial inventory approved by admin
+yv-eye-002-deep-violet,,Nightbloom Lift Mascara,Deep Violet,100,10,initial inventory approved by admin
+yv-eye-003-jet-black,,Softwing Tubing Mascara,Jet Black,100,10,initial inventory approved by admin
+yv-eye-003-carbon-black,,Softwing Tubing Mascara,Carbon Black,100,10,initial inventory approved by admin
+yv-eye-003-espresso-brown,,Softwing Tubing Mascara,Espresso Brown,100,10,initial inventory approved by admin
+yv-eye-003-black-brown,,Softwing Tubing Mascara,Black Brown,100,10,initial inventory approved by admin
+yv-eye-003-deep-burgundy,,Softwing Tubing Mascara,Deep Burgundy,100,10,initial inventory approved by admin
+yv-eye-003-black-plum,,Softwing Tubing Mascara,Black Plum,100,10,initial inventory approved by admin
+yv-eye-003-midnight-navy,,Softwing Tubing Mascara,Midnight Navy,100,10,initial inventory approved by admin
+yv-eye-003-cobalt-blue,,Softwing Tubing Mascara,Cobalt Blue,100,10,initial inventory approved by admin
+yv-eye-003-forest-green,,Softwing Tubing Mascara,Forest Green,100,10,initial inventory approved by admin
+yv-eye-003-deep-violet,,Softwing Tubing Mascara,Deep Violet,100,10,initial inventory approved by admin
+yv-eye-004-default,,Canopy Eye Color,Default,100,10,initial inventory approved by admin
+yv-eye-005-default,,Terrastone Nude Eye Quad,Default,100,10,initial inventory approved by admin
+yv-eye-006-aubergine-plum,,Moonveil Satin Shadow,Aubergine Plum,100,10,initial inventory approved by admin
+yv-eye-006-bronze,,Moonveil Satin Shadow,Bronze,100,10,initial inventory approved by admin
+yv-eye-006-deep-burgundy,,Moonveil Satin Shadow,Deep Burgundy,100,10,initial inventory approved by admin
+yv-eye-006-rose-gold,,Moonveil Satin Shadow,Rose Gold,100,10,initial inventory approved by admin
+yv-eye-006-smoky-charcoal,,Moonveil Satin Shadow,Smoky Charcoal,100,10,initial inventory approved by admin
+yv-eye-006-antique-gold,,Moonveil Satin Shadow,Antique Gold,100,10,initial inventory approved by admin
+yv-eye-006-champagne-gold,,Moonveil Satin Shadow,Champagne Gold,100,10,initial inventory approved by admin
+yv-eye-007-kohl-black,,Inkroot Precision Liner,Kohl Black,100,10,initial inventory approved by admin
+yv-eye-007-espresso-brown,,Inkroot Precision Liner,Espresso Brown,100,10,initial inventory approved by admin
+yv-eye-007-smoky-bronze,,Inkroot Precision Liner,Smoky Bronze,100,10,initial inventory approved by admin
+yv-eye-007-deep-chocolate,,Inkroot Precision Liner,Deep Chocolate,100,10,initial inventory approved by admin
+yv-eye-007-charcoal,,Inkroot Precision Liner,Charcoal,100,10,initial inventory approved by admin
+yv-eye-007-burgundy-raisin,,Inkroot Precision Liner,Burgundy Raisin,100,10,initial inventory approved by admin
+yv-eye-007-deep-plum,,Inkroot Precision Liner,Deep Plum,100,10,initial inventory approved by admin
+yv-eye-007-emerald,,Inkroot Precision Liner,Emerald,100,10,initial inventory approved by admin
+yv-eye-007-deep-indigo,,Inkroot Precision Liner,Deep Indigo,100,10,initial inventory approved by admin
+yv-eye-007-deep-teal,,Inkroot Precision Liner,Deep Teal,100,10,initial inventory approved by admin
+yv-eye-007-cobalt-blue,,Inkroot Precision Liner,Cobalt Blue,100,10,initial inventory approved by admin
+yv-eye-007-violet,,Inkroot Precision Liner,Violet,100,10,initial inventory approved by admin
+yv-eye-008-kohl-black,,Deepgrove Gel Liner,Kohl Black,100,10,initial inventory approved by admin
+yv-eye-008-espresso-brown,,Deepgrove Gel Liner,Espresso Brown,100,10,initial inventory approved by admin
+yv-eye-008-smoky-bronze,,Deepgrove Gel Liner,Smoky Bronze,100,10,initial inventory approved by admin
+yv-eye-008-deep-chocolate,,Deepgrove Gel Liner,Deep Chocolate,100,10,initial inventory approved by admin
+yv-eye-008-charcoal,,Deepgrove Gel Liner,Charcoal,100,10,initial inventory approved by admin
+yv-eye-008-burgundy-raisin,,Deepgrove Gel Liner,Burgundy Raisin,100,10,initial inventory approved by admin
+yv-eye-008-deep-plum,,Deepgrove Gel Liner,Deep Plum,100,10,initial inventory approved by admin
+yv-eye-008-emerald,,Deepgrove Gel Liner,Emerald,100,10,initial inventory approved by admin
+yv-eye-008-deep-indigo,,Deepgrove Gel Liner,Deep Indigo,100,10,initial inventory approved by admin
+yv-eye-008-deep-teal,,Deepgrove Gel Liner,Deep Teal,100,10,initial inventory approved by admin
+yv-eye-008-cobalt-blue,,Deepgrove Gel Liner,Cobalt Blue,100,10,initial inventory approved by admin
+yv-eye-008-violet,,Deepgrove Gel Liner,Violet,100,10,initial inventory approved by admin
+yv-eye-009-kohl-black,,Stormline Waterproof Liner,Kohl Black,100,10,initial inventory approved by admin
+yv-eye-009-espresso-brown,,Stormline Waterproof Liner,Espresso Brown,100,10,initial inventory approved by admin
+yv-eye-009-smoky-bronze,,Stormline Waterproof Liner,Smoky Bronze,100,10,initial inventory approved by admin
+yv-eye-009-deep-chocolate,,Stormline Waterproof Liner,Deep Chocolate,100,10,initial inventory approved by admin
+yv-eye-009-charcoal,,Stormline Waterproof Liner,Charcoal,100,10,initial inventory approved by admin
+yv-eye-009-burgundy-raisin,,Stormline Waterproof Liner,Burgundy Raisin,100,10,initial inventory approved by admin
+yv-eye-009-deep-plum,,Stormline Waterproof Liner,Deep Plum,100,10,initial inventory approved by admin
+yv-eye-009-emerald,,Stormline Waterproof Liner,Emerald,100,10,initial inventory approved by admin
+yv-eye-009-deep-indigo,,Stormline Waterproof Liner,Deep Indigo,100,10,initial inventory approved by admin
+yv-eye-009-deep-teal,,Stormline Waterproof Liner,Deep Teal,100,10,initial inventory approved by admin
+yv-eye-009-cobalt-blue,,Stormline Waterproof Liner,Cobalt Blue,100,10,initial inventory approved by admin
+yv-eye-009-violet,,Stormline Waterproof Liner,Violet,100,10,initial inventory approved by admin
+yv-eye-010-ash-taupe,,Briar Arch Sculpt Pencil,Ash Taupe,100,10,initial inventory approved by admin
+yv-eye-010-neutral-taupe-brown,,Briar Arch Sculpt Pencil,Neutral Taupe Brown,100,10,initial inventory approved by admin
+yv-eye-010-warm-light-brown,,Briar Arch Sculpt Pencil,Warm Light Brown,100,10,initial inventory approved by admin
+yv-eye-010-ash-brown,,Briar Arch Sculpt Pencil,Ash Brown,100,10,initial inventory approved by admin
+yv-eye-010-neutral-medium-brown,,Briar Arch Sculpt Pencil,Neutral Medium Brown,100,10,initial inventory approved by admin
+yv-eye-010-warm-deep-brown,,Briar Arch Sculpt Pencil,Warm Deep Brown,100,10,initial inventory approved by admin
+yv-eye-010-neutral-deep-brown,,Briar Arch Sculpt Pencil,Neutral Deep Brown,100,10,initial inventory approved by admin
+yv-eye-010-black-brown,,Briar Arch Sculpt Pencil,Black Brown,100,10,initial inventory approved by admin
+yv-eye-010-soft-black,,Briar Arch Sculpt Pencil,Soft Black,100,10,initial inventory approved by admin
+yv-eye-011-ash-taupe,,Willow Brow Gel,Ash Taupe,100,10,initial inventory approved by admin
+yv-eye-011-neutral-taupe-brown,,Willow Brow Gel,Neutral Taupe Brown,100,10,initial inventory approved by admin
+yv-eye-011-warm-light-brown,,Willow Brow Gel,Warm Light Brown,100,10,initial inventory approved by admin
+yv-eye-011-ash-brown,,Willow Brow Gel,Ash Brown,100,10,initial inventory approved by admin
+yv-eye-011-neutral-medium-brown,,Willow Brow Gel,Neutral Medium Brown,100,10,initial inventory approved by admin
+yv-eye-011-warm-deep-brown,,Willow Brow Gel,Warm Deep Brown,100,10,initial inventory approved by admin
+yv-eye-011-neutral-deep-brown,,Willow Brow Gel,Neutral Deep Brown,100,10,initial inventory approved by admin
+yv-eye-011-black-brown,,Willow Brow Gel,Black Brown,100,10,initial inventory approved by admin
+yv-eye-011-soft-black,,Willow Brow Gel,Soft Black,100,10,initial inventory approved by admin
+yv-eye-011-clear,,Willow Brow Gel,Clear,100,10,initial inventory approved by admin
+yv-eye-012-ash-taupe,,Fernstroke Micro Brow Pen,Ash Taupe,100,10,initial inventory approved by admin
+yv-eye-012-neutral-taupe-brown,,Fernstroke Micro Brow Pen,Neutral Taupe Brown,100,10,initial inventory approved by admin
+yv-eye-012-warm-light-brown,,Fernstroke Micro Brow Pen,Warm Light Brown,100,10,initial inventory approved by admin
+yv-eye-012-ash-brown,,Fernstroke Micro Brow Pen,Ash Brown,100,10,initial inventory approved by admin
+yv-eye-012-neutral-medium-brown,,Fernstroke Micro Brow Pen,Neutral Medium Brown,100,10,initial inventory approved by admin
+yv-eye-012-warm-deep-brown,,Fernstroke Micro Brow Pen,Warm Deep Brown,100,10,initial inventory approved by admin
+yv-eye-012-neutral-deep-brown,,Fernstroke Micro Brow Pen,Neutral Deep Brown,100,10,initial inventory approved by admin
+yv-eye-012-black-brown,,Fernstroke Micro Brow Pen,Black Brown,100,10,initial inventory approved by admin
+yv-eye-012-soft-black,,Fernstroke Micro Brow Pen,Soft Black,100,10,initial inventory approved by admin
+yv-eye-013-default,,Woodland Edit Eye Set,Default,100,10,initial inventory approved by admin
+yv-eye-014-default,,Moonwood Eye Edit,Default,100,10,initial inventory approved by admin
+yv-eye-015-default,,Dawnbranch Eye Wardrobe,Default,100,10,initial inventory approved by admin
+yv-lip-001-petal-nude,,Petal Velvet Lip Color,Petal Nude,100,10,initial inventory approved by admin
+yv-lip-001-clay-bloom,,Petal Velvet Lip Color,Clay Bloom,100,10,initial inventory approved by admin
+yv-lip-001-rose-bark,,Petal Velvet Lip Color,Rose Bark,100,10,initial inventory approved by admin
+yv-lip-001-soft-fig,,Petal Velvet Lip Color,Soft Fig,100,10,initial inventory approved by admin
+yv-lip-001-berry-veil,,Petal Velvet Lip Color,Berry Veil,100,10,initial inventory approved by admin
+yv-lip-001-amber-rose,,Petal Velvet Lip Color,Amber Rose,100,10,initial inventory approved by admin
+yv-lip-001-moss-nude,,Petal Velvet Lip Color,Moss Nude,100,10,initial inventory approved by admin
+yv-lip-001-brick-petal,,Petal Velvet Lip Color,Brick Petal,100,10,initial inventory approved by admin
+yv-lip-002-petal-nude,,Clayrose Satin Lipstick,Petal Nude,100,10,initial inventory approved by admin
+yv-lip-002-clay-bloom,,Clayrose Satin Lipstick,Clay Bloom,100,10,initial inventory approved by admin
+yv-lip-002-rose-bark,,Clayrose Satin Lipstick,Rose Bark,100,10,initial inventory approved by admin
+yv-lip-002-soft-fig,,Clayrose Satin Lipstick,Soft Fig,100,10,initial inventory approved by admin
+yv-lip-002-berry-veil,,Clayrose Satin Lipstick,Berry Veil,100,10,initial inventory approved by admin
+yv-lip-002-amber-rose,,Clayrose Satin Lipstick,Amber Rose,100,10,initial inventory approved by admin
+yv-lip-002-moss-nude,,Clayrose Satin Lipstick,Moss Nude,100,10,initial inventory approved by admin
+yv-lip-002-brick-petal,,Clayrose Satin Lipstick,Brick Petal,100,10,initial inventory approved by admin
+yv-lip-003-petal-nude,,Riverrose Lip Color,Petal Nude,100,10,initial inventory approved by admin
+yv-lip-003-clay-bloom,,Riverrose Lip Color,Clay Bloom,100,10,initial inventory approved by admin
+yv-lip-003-rose-bark,,Riverrose Lip Color,Rose Bark,100,10,initial inventory approved by admin
+yv-lip-003-soft-fig,,Riverrose Lip Color,Soft Fig,100,10,initial inventory approved by admin
+yv-lip-003-berry-veil,,Riverrose Lip Color,Berry Veil,100,10,initial inventory approved by admin
+yv-lip-003-amber-rose,,Riverrose Lip Color,Amber Rose,100,10,initial inventory approved by admin
+yv-lip-003-moss-nude,,Riverrose Lip Color,Moss Nude,100,10,initial inventory approved by admin
+yv-lip-003-brick-petal,,Riverrose Lip Color,Brick Petal,100,10,initial inventory approved by admin
+yv-lip-004-berry-drop,,Crystalleaf Lip Oil,Berry Drop,100,10,initial inventory approved by admin
+yv-lip-004-champagne-glow,,Crystalleaf Lip Oil,Champagne Glow,100,10,initial inventory approved by admin
+yv-lip-004-crystal-clear,,Crystalleaf Lip Oil,Crystal Clear,100,10,initial inventory approved by admin
+yv-lip-004-golden-pearl,,Crystalleaf Lip Oil,Golden Pearl,100,10,initial inventory approved by admin
+yv-lip-004-honey-dew,,Crystalleaf Lip Oil,Honey Dew,100,10,initial inventory approved by admin
+yv-lip-004-mauve-pearl,,Crystalleaf Lip Oil,Mauve Pearl,100,10,initial inventory approved by admin
+yv-lip-004-peach-pearl,,Crystalleaf Lip Oil,Peach Pearl,100,10,initial inventory approved by admin
+yv-lip-004-rose-water,,Crystalleaf Lip Oil,Rose Water,100,10,initial inventory approved by admin
+yv-lip-004-shell-pink,,Crystalleaf Lip Oil,Shell Pink,100,10,initial inventory approved by admin
+yv-lip-004-soft-fig,,Crystalleaf Lip Oil,Soft Fig,100,10,initial inventory approved by admin
+yv-lip-005-bronze-pearl,,Pearlglow Cushion Gloss,Bronze Pearl,100,10,initial inventory approved by admin
+yv-lip-005-champagne-glow,,Pearlglow Cushion Gloss,Champagne Glow,100,10,initial inventory approved by admin
+yv-lip-005-mauve-pearl,,Pearlglow Cushion Gloss,Mauve Pearl,100,10,initial inventory approved by admin
+yv-lip-005-opal-glow,,Pearlglow Cushion Gloss,Opal Glow,100,10,initial inventory approved by admin
+yv-lip-005-pink-pearl,,Pearlglow Cushion Gloss,Pink Pearl,100,10,initial inventory approved by admin
+yv-lip-005-rose-quartz,,Pearlglow Cushion Gloss,Rose Quartz,100,10,initial inventory approved by admin
+yv-lip-006-mauve-stem,,Velvetstem Lip Liner,Mauve Stem,100,10,initial inventory approved by admin
+yv-lip-006-berry-root,,Velvetstem Lip Liner,Berry Root,100,10,initial inventory approved by admin
+yv-lip-006-clay-line,,Velvetstem Lip Liner,Clay Line,100,10,initial inventory approved by admin
+yv-lip-006-cocoa-vine,,Velvetstem Lip Liner,Cocoa Vine,100,10,initial inventory approved by admin
+yv-lip-007-rose-drop,,Petalink Lip Stain,Rose Drop,100,10,initial inventory approved by admin
+yv-lip-007-coral-leaf,,Petalink Lip Stain,Coral Leaf,100,10,initial inventory approved by admin
+yv-lip-007-berry-river,,Petalink Lip Stain,Berry River,100,10,initial inventory approved by admin
+yv-lip-007-fig-bloom,,Petalink Lip Stain,Fig Bloom,100,10,initial inventory approved by admin
+yv-lip-007-brick-petal,,Petalink Lip Stain,Brick Petal,100,10,initial inventory approved by admin
+yv-lip-007-plum-vine,,Petalink Lip Stain,Plum Vine,100,10,initial inventory approved by admin
+yv-lip-008-clear-nectar,,Amberhoney Lip Plumper,Clear Nectar,100,10,initial inventory approved by admin
+yv-lip-008-peach-honey,,Amberhoney Lip Plumper,Peach Honey,100,10,initial inventory approved by admin
+yv-lip-008-nude-bloom,,Amberhoney Lip Plumper,Nude Bloom,100,10,initial inventory approved by admin
+yv-lip-008-soft-bronze,,Amberhoney Lip Plumper,Soft Bronze,100,10,initial inventory approved by admin
+yv-lip-008-berry-nectar,,Amberhoney Lip Plumper,Berry Nectar,100,10,initial inventory approved by admin
+yv-cheek-001-dawn-petal,,Airbloom Blush,Dawn Petal,100,10,initial inventory approved by admin
+yv-cheek-001-rose-mist,,Airbloom Blush,Rose Mist,100,10,initial inventory approved by admin
+yv-cheek-001-peach-moss,,Airbloom Blush,Peach Moss,100,10,initial inventory approved by admin
+yv-cheek-001-soft-berry,,Airbloom Blush,Soft Berry,100,10,initial inventory approved by admin
+yv-cheek-001-sun-clay,,Airbloom Blush,Sun Clay,100,10,initial inventory approved by admin
+yv-cheek-001-mauve-air,,Airbloom Blush,Mauve Air,100,10,initial inventory approved by admin
+yv-cheek-002-dawn-petal,,Sunclay Cheek Color,Dawn Petal,100,10,initial inventory approved by admin
+yv-cheek-002-rose-mist,,Sunclay Cheek Color,Rose Mist,100,10,initial inventory approved by admin
+yv-cheek-002-peach-moss,,Sunclay Cheek Color,Peach Moss,100,10,initial inventory approved by admin
+yv-cheek-002-soft-berry,,Sunclay Cheek Color,Soft Berry,100,10,initial inventory approved by admin
+yv-cheek-002-sun-clay,,Sunclay Cheek Color,Sun Clay,100,10,initial inventory approved by admin
+yv-cheek-002-mauve-air,,Sunclay Cheek Color,Mauve Air,100,10,initial inventory approved by admin
+yv-cheek-003-dawn-petal,,Rosemist Blush,Dawn Petal,100,10,initial inventory approved by admin
+yv-cheek-003-rose-mist,,Rosemist Blush,Rose Mist,100,10,initial inventory approved by admin
+yv-cheek-003-peach-moss,,Rosemist Blush,Peach Moss,100,10,initial inventory approved by admin
+yv-cheek-003-soft-berry,,Rosemist Blush,Soft Berry,100,10,initial inventory approved by admin
+yv-cheek-003-sun-clay,,Rosemist Blush,Sun Clay,100,10,initial inventory approved by admin
+yv-cheek-003-mauve-air,,Rosemist Blush,Mauve Air,100,10,initial inventory approved by admin
+yv-cheek-004-petal-dew,,Wildbloom Lip & Cheek Tint,Petal Dew,100,10,initial inventory approved by admin
+yv-cheek-004-roseleaf,,Wildbloom Lip & Cheek Tint,Roseleaf,100,10,initial inventory approved by admin
+yv-cheek-004-meadow-coral,,Wildbloom Lip & Cheek Tint,Meadow Coral,100,10,initial inventory approved by admin
+yv-cheek-004-quiet-berry,,Wildbloom Lip & Cheek Tint,Quiet Berry,100,10,initial inventory approved by admin
+yv-cheek-004-clay-bloom,,Wildbloom Lip & Cheek Tint,Clay Bloom,100,10,initial inventory approved by admin
+yv-cheek-004-fern-rose,,Wildbloom Lip & Cheek Tint,Fern Rose,100,10,initial inventory approved by admin
+yv-cheek-005-petal-dew,,Meadowmelt Multi-Stick,Petal Dew,100,10,initial inventory approved by admin
+yv-cheek-005-roseleaf,,Meadowmelt Multi-Stick,Roseleaf,100,10,initial inventory approved by admin
+yv-cheek-005-meadow-coral,,Meadowmelt Multi-Stick,Meadow Coral,100,10,initial inventory approved by admin
+yv-cheek-005-quiet-berry,,Meadowmelt Multi-Stick,Quiet Berry,100,10,initial inventory approved by admin
+yv-cheek-005-clay-bloom,,Meadowmelt Multi-Stick,Clay Bloom,100,10,initial inventory approved by admin
+yv-cheek-005-fern-rose,,Meadowmelt Multi-Stick,Fern Rose,100,10,initial inventory approved by admin
+yv-cheek-006-petal-dew,,Roseleaf Lip & Cheek Balm,Petal Dew,100,10,initial inventory approved by admin
+yv-cheek-006-roseleaf,,Roseleaf Lip & Cheek Balm,Roseleaf,100,10,initial inventory approved by admin
+yv-cheek-006-meadow-coral,,Roseleaf Lip & Cheek Balm,Meadow Coral,100,10,initial inventory approved by admin
+yv-cheek-006-quiet-berry,,Roseleaf Lip & Cheek Balm,Quiet Berry,100,10,initial inventory approved by admin
+yv-cheek-006-clay-bloom,,Roseleaf Lip & Cheek Balm,Clay Bloom,100,10,initial inventory approved by admin
+yv-cheek-006-fern-rose,,Roseleaf Lip & Cheek Balm,Fern Rose,100,10,initial inventory approved by admin
+yv-complex-001-1c,,Silkveil Serum Foundation,Default,100,10,initial inventory approved by admin
+yv-complex-001-1n,,Silkveil Serum Foundation,Default,100,10,initial inventory approved by admin
+yv-complex-001-1w,,Silkveil Serum Foundation,Default,100,10,initial inventory approved by admin
+yv-complex-001-2c,,Silkveil Serum Foundation,Default,100,10,initial inventory approved by admin
+yv-complex-001-2n,,Silkveil Serum Foundation,Default,100,10,initial inventory approved by admin
+yv-complex-001-2w,,Silkveil Serum Foundation,Default,100,10,initial inventory approved by admin
+yv-complex-001-3c,,Silkveil Serum Foundation,Default,100,10,initial inventory approved by admin
+yv-complex-001-3n,,Silkveil Serum Foundation,Default,100,10,initial inventory approved by admin
+yv-complex-001-3w,,Silkveil Serum Foundation,Default,100,10,initial inventory approved by admin
+yv-complex-001-4n,,Silkveil Serum Foundation,Default,100,10,initial inventory approved by admin
+yv-complex-001-4o,,Silkveil Serum Foundation,Default,100,10,initial inventory approved by admin
+yv-complex-001-4w,,Silkveil Serum Foundation,Default,100,10,initial inventory approved by admin
+yv-complex-001-5n,,Silkveil Serum Foundation,Default,100,10,initial inventory approved by admin
+yv-complex-001-5o,,Silkveil Serum Foundation,Default,100,10,initial inventory approved by admin
+yv-complex-001-5w,,Silkveil Serum Foundation,Default,100,10,initial inventory approved by admin
+yv-complex-001-6n,,Silkveil Serum Foundation,Default,100,10,initial inventory approved by admin
+yv-complex-001-6o,,Silkveil Serum Foundation,Default,100,10,initial inventory approved by admin
+yv-complex-001-6w,,Silkveil Serum Foundation,Default,100,10,initial inventory approved by admin
+yv-complex-001-7c,,Silkveil Serum Foundation,Default,100,10,initial inventory approved by admin
+yv-complex-001-7n,,Silkveil Serum Foundation,Default,100,10,initial inventory approved by admin
+yv-complex-001-7w,,Silkveil Serum Foundation,Default,100,10,initial inventory approved by admin
+yv-complex-001-8n,,Silkveil Serum Foundation,Default,100,10,initial inventory approved by admin
+yv-complex-001-8o,,Silkveil Serum Foundation,Default,100,10,initial inventory approved by admin
+yv-complex-001-8w,,Silkveil Serum Foundation,Default,100,10,initial inventory approved by admin
+yv-complex-002-1c,,Softmoss Natural Foundation,Default,100,10,initial inventory approved by admin
+yv-complex-002-1n,,Softmoss Natural Foundation,Default,100,10,initial inventory approved by admin
+yv-complex-002-1w,,Softmoss Natural Foundation,Default,100,10,initial inventory approved by admin
+yv-complex-002-2c,,Softmoss Natural Foundation,Default,100,10,initial inventory approved by admin
+yv-complex-002-2n,,Softmoss Natural Foundation,Default,100,10,initial inventory approved by admin
+yv-complex-002-2w,,Softmoss Natural Foundation,Default,100,10,initial inventory approved by admin
+yv-complex-002-3c,,Softmoss Natural Foundation,Default,100,10,initial inventory approved by admin
+yv-complex-002-3n,,Softmoss Natural Foundation,Default,100,10,initial inventory approved by admin
+yv-complex-002-3w,,Softmoss Natural Foundation,Default,100,10,initial inventory approved by admin
+yv-complex-002-4n,,Softmoss Natural Foundation,Default,100,10,initial inventory approved by admin
+yv-complex-002-4o,,Softmoss Natural Foundation,Default,100,10,initial inventory approved by admin
+yv-complex-002-4w,,Softmoss Natural Foundation,Default,100,10,initial inventory approved by admin
+yv-complex-002-5n,,Softmoss Natural Foundation,Default,100,10,initial inventory approved by admin
+yv-complex-002-5o,,Softmoss Natural Foundation,Default,100,10,initial inventory approved by admin
+yv-complex-002-5w,,Softmoss Natural Foundation,Default,100,10,initial inventory approved by admin
+yv-complex-002-6n,,Softmoss Natural Foundation,Default,100,10,initial inventory approved by admin
+yv-complex-002-6o,,Softmoss Natural Foundation,Default,100,10,initial inventory approved by admin
+yv-complex-002-6w,,Softmoss Natural Foundation,Default,100,10,initial inventory approved by admin
+yv-complex-002-7c,,Softmoss Natural Foundation,Default,100,10,initial inventory approved by admin
+yv-complex-002-7n,,Softmoss Natural Foundation,Default,100,10,initial inventory approved by admin
+yv-complex-002-7w,,Softmoss Natural Foundation,Default,100,10,initial inventory approved by admin
+yv-complex-002-8n,,Softmoss Natural Foundation,Default,100,10,initial inventory approved by admin
+yv-complex-002-8o,,Softmoss Natural Foundation,Default,100,10,initial inventory approved by admin
+yv-complex-002-8w,,Softmoss Natural Foundation,Default,100,10,initial inventory approved by admin
+yv-complex-003-1c,,Miststone Longwear Foundation,Default,100,10,initial inventory approved by admin
+yv-complex-003-1n,,Miststone Longwear Foundation,Default,100,10,initial inventory approved by admin
+yv-complex-003-1w,,Miststone Longwear Foundation,Default,100,10,initial inventory approved by admin
+yv-complex-003-2c,,Miststone Longwear Foundation,Default,100,10,initial inventory approved by admin
+yv-complex-003-2n,,Miststone Longwear Foundation,Default,100,10,initial inventory approved by admin
+yv-complex-003-2w,,Miststone Longwear Foundation,Default,100,10,initial inventory approved by admin
+yv-complex-003-3c,,Miststone Longwear Foundation,Default,100,10,initial inventory approved by admin
+yv-complex-003-3n,,Miststone Longwear Foundation,Default,100,10,initial inventory approved by admin
+yv-complex-003-3w,,Miststone Longwear Foundation,Default,100,10,initial inventory approved by admin
+yv-complex-003-4n,,Miststone Longwear Foundation,Default,100,10,initial inventory approved by admin
+yv-complex-003-4o,,Miststone Longwear Foundation,Default,100,10,initial inventory approved by admin
+yv-complex-003-4w,,Miststone Longwear Foundation,Default,100,10,initial inventory approved by admin
+yv-complex-003-5n,,Miststone Longwear Foundation,Default,100,10,initial inventory approved by admin
+yv-complex-003-5o,,Miststone Longwear Foundation,Default,100,10,initial inventory approved by admin
+yv-complex-003-5w,,Miststone Longwear Foundation,Default,100,10,initial inventory approved by admin
+yv-complex-003-6n,,Miststone Longwear Foundation,Default,100,10,initial inventory approved by admin
+yv-complex-003-6o,,Miststone Longwear Foundation,Default,100,10,initial inventory approved by admin
+yv-complex-003-6w,,Miststone Longwear Foundation,Default,100,10,initial inventory approved by admin
+yv-complex-003-7c,,Miststone Longwear Foundation,Default,100,10,initial inventory approved by admin
+yv-complex-003-7n,,Miststone Longwear Foundation,Default,100,10,initial inventory approved by admin
+yv-complex-003-7w,,Miststone Longwear Foundation,Default,100,10,initial inventory approved by admin
+yv-complex-003-8n,,Miststone Longwear Foundation,Default,100,10,initial inventory approved by admin
+yv-complex-003-8o,,Miststone Longwear Foundation,Default,100,10,initial inventory approved by admin
+yv-complex-003-8w,,Miststone Longwear Foundation,Default,100,10,initial inventory approved by admin
+yv-complex-004-1c,,Mistveil Skin Tint,Default,100,10,initial inventory approved by admin
+yv-complex-004-1n,,Mistveil Skin Tint,Default,100,10,initial inventory approved by admin
+yv-complex-004-1w,,Mistveil Skin Tint,Default,100,10,initial inventory approved by admin
+yv-complex-004-2c,,Mistveil Skin Tint,Default,100,10,initial inventory approved by admin
+yv-complex-004-2n,,Mistveil Skin Tint,Default,100,10,initial inventory approved by admin
+yv-complex-004-2w,,Mistveil Skin Tint,Default,100,10,initial inventory approved by admin
+yv-complex-004-3c,,Mistveil Skin Tint,Default,100,10,initial inventory approved by admin
+yv-complex-004-3n,,Mistveil Skin Tint,Default,100,10,initial inventory approved by admin
+yv-complex-004-3w,,Mistveil Skin Tint,Default,100,10,initial inventory approved by admin
+yv-complex-004-4n,,Mistveil Skin Tint,Default,100,10,initial inventory approved by admin
+yv-complex-004-4o,,Mistveil Skin Tint,Default,100,10,initial inventory approved by admin
+yv-complex-004-4w,,Mistveil Skin Tint,Default,100,10,initial inventory approved by admin
+yv-complex-004-5n,,Mistveil Skin Tint,Default,100,10,initial inventory approved by admin
+yv-complex-004-5o,,Mistveil Skin Tint,Default,100,10,initial inventory approved by admin
+yv-complex-004-5w,,Mistveil Skin Tint,Default,100,10,initial inventory approved by admin
+yv-complex-004-6n,,Mistveil Skin Tint,Default,100,10,initial inventory approved by admin
+yv-complex-004-6o,,Mistveil Skin Tint,Default,100,10,initial inventory approved by admin
+yv-complex-004-6w,,Mistveil Skin Tint,Default,100,10,initial inventory approved by admin
+yv-complex-004-7c,,Mistveil Skin Tint,Default,100,10,initial inventory approved by admin
+yv-complex-004-7n,,Mistveil Skin Tint,Default,100,10,initial inventory approved by admin
+yv-complex-004-7w,,Mistveil Skin Tint,Default,100,10,initial inventory approved by admin
+yv-complex-004-8n,,Mistveil Skin Tint,Default,100,10,initial inventory approved by admin
+yv-complex-004-8o,,Mistveil Skin Tint,Default,100,10,initial inventory approved by admin
+yv-complex-004-8w,,Mistveil Skin Tint,Default,100,10,initial inventory approved by admin
+yv-complex-005-1c,,Softcanopy Powder Foundation,Default,100,10,initial inventory approved by admin
+yv-complex-005-1n,,Softcanopy Powder Foundation,Default,100,10,initial inventory approved by admin
+yv-complex-005-1w,,Softcanopy Powder Foundation,Default,100,10,initial inventory approved by admin
+yv-complex-005-2c,,Softcanopy Powder Foundation,Default,100,10,initial inventory approved by admin
+yv-complex-005-2n,,Softcanopy Powder Foundation,Default,100,10,initial inventory approved by admin
+yv-complex-005-2w,,Softcanopy Powder Foundation,Default,100,10,initial inventory approved by admin
+yv-complex-005-3c,,Softcanopy Powder Foundation,Default,100,10,initial inventory approved by admin
+yv-complex-005-3n,,Softcanopy Powder Foundation,Default,100,10,initial inventory approved by admin
+yv-complex-005-3w,,Softcanopy Powder Foundation,Default,100,10,initial inventory approved by admin
+yv-complex-005-4n,,Softcanopy Powder Foundation,Default,100,10,initial inventory approved by admin
+yv-complex-005-4o,,Softcanopy Powder Foundation,Default,100,10,initial inventory approved by admin
+yv-complex-005-4w,,Softcanopy Powder Foundation,Default,100,10,initial inventory approved by admin
+yv-complex-005-5n,,Softcanopy Powder Foundation,Default,100,10,initial inventory approved by admin
+yv-complex-005-5o,,Softcanopy Powder Foundation,Default,100,10,initial inventory approved by admin
+yv-complex-005-5w,,Softcanopy Powder Foundation,Default,100,10,initial inventory approved by admin
+yv-complex-005-6n,,Softcanopy Powder Foundation,Default,100,10,initial inventory approved by admin
+yv-complex-005-6o,,Softcanopy Powder Foundation,Default,100,10,initial inventory approved by admin
+yv-complex-005-6w,,Softcanopy Powder Foundation,Default,100,10,initial inventory approved by admin
+yv-complex-005-7c,,Softcanopy Powder Foundation,Default,100,10,initial inventory approved by admin
+yv-complex-005-7n,,Softcanopy Powder Foundation,Default,100,10,initial inventory approved by admin
+yv-complex-005-7w,,Softcanopy Powder Foundation,Default,100,10,initial inventory approved by admin
+yv-complex-005-8n,,Softcanopy Powder Foundation,Default,100,10,initial inventory approved by admin
+yv-complex-005-8o,,Softcanopy Powder Foundation,Default,100,10,initial inventory approved by admin
+yv-complex-005-8w,,Softcanopy Powder Foundation,Default,100,10,initial inventory approved by admin
+yv-complex-006-1c,,Underleaf Cover Concealer,Default,100,10,initial inventory approved by admin
+yv-complex-006-1n,,Underleaf Cover Concealer,Default,100,10,initial inventory approved by admin
+yv-complex-006-1w,,Underleaf Cover Concealer,Default,100,10,initial inventory approved by admin
+yv-complex-006-2c,,Underleaf Cover Concealer,Default,100,10,initial inventory approved by admin
+yv-complex-006-2n,,Underleaf Cover Concealer,Default,100,10,initial inventory approved by admin
+yv-complex-006-2w,,Underleaf Cover Concealer,Default,100,10,initial inventory approved by admin
+yv-complex-006-3c,,Underleaf Cover Concealer,Default,100,10,initial inventory approved by admin
+yv-complex-006-3n,,Underleaf Cover Concealer,Default,100,10,initial inventory approved by admin
+yv-complex-006-3w,,Underleaf Cover Concealer,Default,100,10,initial inventory approved by admin
+yv-complex-006-4n,,Underleaf Cover Concealer,Default,100,10,initial inventory approved by admin
+yv-complex-006-4o,,Underleaf Cover Concealer,Default,100,10,initial inventory approved by admin
+yv-complex-006-4w,,Underleaf Cover Concealer,Default,100,10,initial inventory approved by admin
+yv-complex-006-5n,,Underleaf Cover Concealer,Default,100,10,initial inventory approved by admin
+yv-complex-006-5o,,Underleaf Cover Concealer,Default,100,10,initial inventory approved by admin
+yv-complex-006-5w,,Underleaf Cover Concealer,Default,100,10,initial inventory approved by admin
+yv-complex-006-6n,,Underleaf Cover Concealer,Default,100,10,initial inventory approved by admin
+yv-complex-006-6o,,Underleaf Cover Concealer,Default,100,10,initial inventory approved by admin
+yv-complex-006-6w,,Underleaf Cover Concealer,Default,100,10,initial inventory approved by admin
+yv-complex-006-7c,,Underleaf Cover Concealer,Default,100,10,initial inventory approved by admin
+yv-complex-006-7n,,Underleaf Cover Concealer,Default,100,10,initial inventory approved by admin
+yv-complex-006-7w,,Underleaf Cover Concealer,Default,100,10,initial inventory approved by admin
+yv-complex-006-8n,,Underleaf Cover Concealer,Default,100,10,initial inventory approved by admin
+yv-complex-006-8o,,Underleaf Cover Concealer,Default,100,10,initial inventory approved by admin
+yv-complex-006-8w,,Underleaf Cover Concealer,Default,100,10,initial inventory approved by admin
+yv-complex-007-peach-veil,,Tonepetal Color Corrector,Peach Veil,100,10,initial inventory approved by admin
+yv-complex-007-apricot-mist,,Tonepetal Color Corrector,Apricot Mist,100,10,initial inventory approved by admin
+yv-complex-007-butter-light,,Tonepetal Color Corrector,Butter Light,100,10,initial inventory approved by admin
+yv-complex-007-sage-calm,,Tonepetal Color Corrector,Sage Calm,100,10,initial inventory approved by admin
+yv-complex-007-lilac-air,,Tonepetal Color Corrector,Lilac Air,100,10,initial inventory approved by admin
+yv-complex-008-clear-air,,Airveil Loose Setting Powder,Clear Air,100,10,initial inventory approved by admin
+yv-complex-008-soft-linen,,Airveil Loose Setting Powder,Soft Linen,100,10,initial inventory approved by admin
+yv-complex-008-golden-mist,,Airveil Loose Setting Powder,Golden Mist,100,10,initial inventory approved by admin
+yv-complex-008-deep-cloud,,Airveil Loose Setting Powder,Deep Cloud,100,10,initial inventory approved by admin
+yv-complex-009-sand-glow,,Sungrove Soft Bronzer,Sand Glow,100,10,initial inventory approved by admin
+yv-complex-009-golden-bark,,Sungrove Soft Bronzer,Golden Bark,100,10,initial inventory approved by admin
+yv-complex-009-warm-dune,,Sungrove Soft Bronzer,Warm Dune,100,10,initial inventory approved by admin
+yv-complex-009-sun-clay,,Sungrove Soft Bronzer,Sun Clay,100,10,initial inventory approved by admin
+yv-complex-009-deep-terra,,Sungrove Soft Bronzer,Deep Terra,100,10,initial inventory approved by admin
+yv-complex-010-mist-shadow,,Shadowroot Contour,Mist Shadow,100,10,initial inventory approved by admin
+yv-complex-010-taupe-root,,Shadowroot Contour,Taupe Root,100,10,initial inventory approved by admin
+yv-complex-010-stone-branch,,Shadowroot Contour,Stone Branch,100,10,initial inventory approved by admin
+yv-complex-010-deep-hollow,,Shadowroot Contour,Deep Hollow,100,10,initial inventory approved by admin
+yv-complex-011-pearl-haze,,Moonbeam Glow Highlighter,Pearl Haze,100,10,initial inventory approved by admin
+yv-complex-011-prism-petal,,Moonbeam Glow Highlighter,Prism Petal,100,10,initial inventory approved by admin
+yv-complex-011-soft-gold,,Moonbeam Glow Highlighter,Soft Gold,100,10,initial inventory approved by admin
+yv-complex-011-moon-bronze,,Moonbeam Glow Highlighter,Moon Bronze,100,10,initial inventory approved by admin
+yv-body-001-default,,Footwood Foot Cream,Default,100,10,initial inventory approved by admin
+yv-body-002-default,,Handgrove Hand Cream,Default,100,10,initial inventory approved by admin
+yv-body-003-default,,Meadowleaf Body Butter,Default,100,10,initial inventory approved by admin
+yv-frag-001-default,,Forest Rain Body Mist,Default,100,10,initial inventory approved by admin
+yv-frag-002-default,,Greenbrook Refreshing Body Mist,Default,100,10,initial inventory approved by admin
+yv-frag-003-default,,Soft Current Body Mist,Default,100,10,initial inventory approved by admin
+yv-frag-004-default,,Wildgrove Hair & Body Mist,Default,100,10,initial inventory approved by admin
+yv-hair-001-default,,Wildroot Scalp Tonic Mist,Default,100,10,initial inventory approved by admin
+yv-frag-005-default,,Windwater Hair & Body Mist,Default,100,10,initial inventory approved by admin
+yv-skin-001-default,,Aqua Shield Barrier Lotion,Default,100,10,initial inventory approved by admin
+yv-skin-002-default,,Dewless Oil Control Moisturizer,Default,100,10,initial inventory approved by admin
+yv-skin-003-default,,Leafwell Hydra Balance Gel,Default,100,10,initial inventory approved by admin
+yv-skin-004-default,,Leafwell Radiance Moisturizer,Default,100,10,initial inventory approved by admin
+yv-skin-005-default,,Morningroot Daily Face Cleanser,Default,100,10,initial inventory approved by admin
+yv-skin-006-default,,Silkroot Nourishing Cream,Default,100,10,initial inventory approved by admin
+yv-skin-007-default,,Treeline Purifying Face Wash,Default,100,10,initial inventory approved by admin
+yv-frag-006-default,,Forest Rain Eau de Parfum,Default,100,10,initial inventory approved by admin
+yv-frag-007-default,,Mossveil Solid Perfume Balm,Default,100,10,initial inventory approved by admin
+yv-frag-008-default,,Nocturne Eau de Parfum,Default,100,10,initial inventory approved by admin
+yv-frag-009-default,,Soft Current Eau de Parfum,Default,100,10,initial inventory approved by admin
+yv-frag-010-default,,Soft Ember Warm Fragrance Concept,Default,100,10,initial inventory approved by admin
+yv-frag-011-default,,Wildgrove Eau de Parfum,Default,100,10,initial inventory approved by admin
+yv-frag-012-default,,Windwater Eau de Parfum,Default,100,10,initial inventory approved by admin
+yv-skin-008-default,,Forest Kiss Lip Mask,Default,100,10,initial inventory approved by admin
+yv-skin-009-default,,Nightpetal Overnight Mask,Default,100,10,initial inventory approved by admin
+yv-skin-010-default,,Quietmoss Clay Detox Mask,Default,100,10,initial inventory approved by admin
+yv-skin-011-default,,Soft Soil Exfoliating Scrub,Default,100,10,initial inventory approved by admin
+yv-skin-012-default,,Brightwood Dark Spot Corrector,Default,100,10,initial inventory approved by admin
+yv-skin-013-default,,Calmpath Soothing Serum,Default,100,10,initial inventory approved by admin
+yv-skin-014-default,,Clarify Niacinamide Serum,Default,100,10,initial inventory approved by admin
+yv-skin-015-default,,Eyelore Under Eye Elixir,Default,100,10,initial inventory approved by admin
+yv-skin-016-default,,Glowbloom Vitamin C Serum,Default,100,10,initial inventory approved by admin
+yv-skin-017-default,,Herbbloom Recovery Concentrate,Default,100,10,initial inventory approved by admin
+yv-skin-018-default,,Oilbalance Balancing Facial Oil,Default,100,10,initial inventory approved by admin
+yv-skin-019-default,,Rootrenew Retinol Night Serum,Default,100,10,initial inventory approved by admin
+yv-face-001-default,,Petal Veil Makeup Setting Spray,Default,100,10,initial inventory approved by admin
+yv-skin-020-default,,Sunbloom Sunscreen Spray SPF 50,Default,100,10,initial inventory approved by admin
+yv-face-002-default,,Sunveil Daily Glow Primer,Default,100,10,initial inventory approved by admin
