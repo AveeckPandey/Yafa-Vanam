@@ -752,5 +752,4 @@ pipeline {
 ## 👨‍💻 Author & Acknowledgements
 
 - **Lead Engineer & Architect:** [Aveeck](https://x.com/BuildWithAveeck)
-- **Live Platform:** [YAFA VANAM Luxury E-Commerce](https://yafavanam.buildwithaveeck.com)
 - **Announcement & Demo:** [X.com Post](https://x.com/BuildWithAveeck/status/2098317702322610570?s=20)
