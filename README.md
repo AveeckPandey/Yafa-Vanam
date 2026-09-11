@@ -11,10 +11,6 @@
 [![License](https://img.shields.io/badge/License-MIT-green.svg?style=flat)](LICENSE)
 
 ---
-
-## 🔗 Live Showcase & Links
-
-- 🌐 **Live Storefront:** [yafavanam.buildwithaveeck.com](https://yafavanam.buildwithaveeck.com)
 - 🚀 **Video Walkthrough & Demo:** [X (formerly Twitter) Live Announcement](https://x.com/BuildWithAveeck/status/2098317702322610570?s=20)
 
 ---
